@@ -56,8 +56,8 @@ $("grab").addEventListener("click", async () => {
     }
     // Build payload, base64-encode, redirect to Chord Archive's #new= URL.
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
-      title: result.title || "",
-      artist: result.artist || "",
+      title: cleanScrapedTitle(result.title || ""),
+      artist: cleanScrapedTitle(result.artist || ""),
       lyrics: result.lyrics,
       sourceUrl: tab.url || "",
     }))));
@@ -66,8 +66,10 @@ $("grab").addEventListener("click", async () => {
     if (targetUrl.length > 500000) {
       // Massive chart — fallback to clipboard so we don't blow URL limits
       let out = "";
-      if (result.title)  out += "{title: "  + result.title.replace(/[{}]/g, "") + "}\n";
-      if (result.artist) out += "{artist: " + result.artist.replace(/[{}]/g, "") + "}\n";
+      const cleanTitle = cleanScrapedTitle(result.title || "");
+      const cleanArtist = cleanScrapedTitle(result.artist || "");
+      if (cleanTitle)  out += "{title: "  + cleanTitle.replace(/[{}]/g, "") + "}\n";
+      if (cleanArtist) out += "{artist: " + cleanArtist.replace(/[{}]/g, "") + "}\n";
       out += "\n" + result.lyrics;
       await navigator.clipboard.writeText(out);
       setStatus("Chart was too large for direct import. Copied to clipboard — paste into the lyrics field.", "ok");
@@ -84,6 +86,19 @@ $("grab").addEventListener("click", async () => {
     btn.disabled = false;
   }
 });
+
+// Strip "(chords)" / "(tab)" / etc. trailing noise from a song title
+function cleanScrapedTitle(t) {
+  if (!t) return t;
+  let out = t;
+  // Strip common parenthetical/bracketed type tags that may repeat ("Foo (Chords) (Tab)")
+  for (let i = 0; i < 3; i++) {
+    out = out.replace(/\s*[\(\[]\s*(?:chords?|tabs?|lyrics?|guitar\s*pro|gp|bass|ukulele|drum|power\s*tab|piano|keyboard|chord\s*pro)\s*[\)\]]\s*$/i, "");
+  }
+  // Strip bare trailing words too ("Foo Chords")
+  out = out.replace(/\s+(?:chords?|tabs?|lyrics?|tablature)\s*$/i, "");
+  return out.trim();
+}
 
 // ---------- Page-context scraper ----------
 function scrapePage() {
