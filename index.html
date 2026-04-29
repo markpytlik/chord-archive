@@ -295,13 +295,18 @@
   .lyrics .section-label::before { content: "— "; opacity: .5; }
   .lyrics .section-label::after  { content: " —"; opacity: .5; }
   .lyrics .section-label:first-child { margin-top: 0; }
-  /* Chord-only lines (intros/outros) — render as inline flow of pills, no absolute positioning */
+  /* Chord-only lines (intros/outros) — block-level row of inline pills, no absolute positioning */
   .lyrics .chord-only-row {
-    display: inline-block;
-    line-height: 1.8;
+    display: block;
+    line-height: 1.6;
+    margin: 0 0 .25em 0;
+    padding: 0;
   }
-  .lyrics .chord-only-pill {
-    position: static;
+  .lyrics .chord-pill-inline {
+    /* Independent class — no overlap with .lyrics .seg .chord (which is absolute-positioned). */
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
     display: inline-block;
     margin-right: 6px;
     color: #1a1a1a;
@@ -316,7 +321,7 @@
     font-family: var(--mono);
     transition: background .1s, transform .1s;
   }
-  .lyrics .chord-only-pill:hover {
+  .lyrics .chord-pill-inline:hover {
     background: #dcdbd6; transform: translateY(-1px);
   }
 
@@ -1595,14 +1600,14 @@ function renderLyrics(text) {
       out.push(`<span class="section-label">${escapeHtml(sec[1])}</span>`);
       continue;
     }
-    // Chord-only line (e.g. intro/outro chord progression) — render as inline pills, no absolute positioning
+    // Chord-only line (e.g. intro/outro chord progression) — render as block of inline pills, no absolute positioning
     if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(line)) {
       const re = /\[([^\]]+)\]/g;
       let m, html = "";
       while ((m = re.exec(line)) !== null) {
-        html += `<span class="chord chord-only-pill" data-chord="${escapeHtml(m[1])}">${escapeHtml(m[1])}</span> `;
+        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(m[1])}">${escapeHtml(m[1])}</span>`;
       }
-      out.push(`<span class="chord-only-row">${html.trim()}</span>`);
+      out.push(`<div class="chord-only-row">${html}</div>`);
       continue;
     }
     // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment
