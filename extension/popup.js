@@ -199,6 +199,11 @@ function scrapePage() {
         if (a) artist = a.textContent.trim();
       }
     }
+    // STEP 6 — last-ditch: derive artist from UG URL path (/tab/<artist-slug>/...)
+    if (!artist) {
+      const m = location.pathname.match(/^\/tab\/([^\/]+)\//i);
+      if (m) artist = m[1].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    }
   }
   if (!lyrics && /e-chords\.com/.test(host)) {
     const pre = document.querySelector("pre#core") || document.querySelector("pre");

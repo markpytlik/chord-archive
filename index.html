@@ -655,11 +655,11 @@
     padding: 1px 5px; border-radius: 3px;
   }
 
-  /* ====================== Play mode ====================== */
+  /* ====================== Play mode (pure white on black) ====================== */
   .play-mode {
     position: fixed; inset: 0; z-index: 50;
-    background: #14161a;
-    color: #e8e6df;
+    background: #000;
+    color: #fff;
     display: flex; flex-direction: column;
     overflow: hidden;
   }
@@ -667,8 +667,8 @@
     flex: 0 0 auto;
     display: flex; align-items: center; gap: 14px;
     padding: 14px 28px;
-    background: rgba(0,0,0,.4);
-    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: #000;
+    border-bottom: 1px solid #1a1a1a;
   }
   .play-mode .play-title {
     flex: 1; min-width: 0;
@@ -677,48 +677,48 @@
     color: #fff;
   }
   .play-mode .play-title .artist {
-    color: #b3a99a; font-size: 12px;
+    color: #888; font-size: 12px;
     text-transform: uppercase; letter-spacing: .08em; font-family: var(--sans);
     margin-bottom: 2px;
   }
   .play-mode button {
-    background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.15);
-    color: #e8e6df;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: #fff;
     padding: 7px 14px; border-radius: 6px;
     font-size: 13px;
     cursor: pointer;
   }
-  .play-mode button:hover { background: rgba(255,255,255,.15); }
-  .play-mode button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .play-mode button.primary:hover { background: var(--accent-deep); }
+  .play-mode button:hover { background: #262626; }
+  .play-mode button.primary { background: #fff; border-color: #fff; color: #000; }
+  .play-mode button.primary:hover { background: #ddd; border-color: #ddd; }
   .play-mode .speed-controls {
     display: inline-flex; align-items: center; gap: 8px;
   }
   .play-mode .speed-controls input[type=range] {
-    width: 140px; accent-color: var(--accent);
+    width: 160px; accent-color: #fff;
     background: transparent; border: 0; padding: 0;
   }
   .play-mode .speed-controls .speed-label {
-    font-size: 11px; color: #b3a99a;
+    font-size: 11px; color: #888;
     font-family: var(--mono);
-    width: 56px; text-align: right;
+    width: 64px; text-align: right;
   }
   .play-mode .play-content {
     flex: 1 1 auto;
     overflow-y: auto;
     padding: 20vh 14% 60vh;
-    scroll-behavior: smooth;
+    scroll-behavior: auto; /* avoid smooth-scroll fighting auto-scroll loop */
   }
   .play-mode .play-content::-webkit-scrollbar { width: 6px; }
-  .play-mode .play-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 3px; }
+  .play-mode .play-content::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
   .play-mode .lyrics-large {
     font-family: var(--mono);
-    font-size: 22px;
+    font-size: 24px;
     line-height: 1.7;
-    color: #f0eee8;
+    color: #fff;
     white-space: pre-wrap;
-    max-width: 900px;
+    max-width: 980px;
     margin: 0 auto;
   }
   .play-mode .lyrics-large .seg {
@@ -728,9 +728,9 @@
   .play-mode .lyrics-large .seg:has(.chord) { min-width: 3em; }
   .play-mode .lyrics-large .seg .chord {
     position: absolute; top: 0; left: 0;
-    color: #ffb78c;
-    background: rgba(177, 74, 44, .2);
-    border: 1px solid rgba(177, 74, 44, .4);
+    color: #fff;
+    background: #2a2a2a;
+    border: 1px solid #444;
     border-radius: 5px;
     padding: 1px 7px;
     font-size: 17px;
@@ -745,25 +745,25 @@
   .play-mode .lyrics-large .chord-pill-inline {
     display: inline-block;
     margin-right: 14px;
-    color: #ffb78c;
-    background: rgba(177, 74, 44, .2);
-    border: 1px solid rgba(177, 74, 44, .4);
+    color: #fff;
+    background: #2a2a2a;
+    border: 1px solid #444;
     border-radius: 5px;
     padding: 2px 10px;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
     font-family: var(--mono);
   }
   .play-mode .lyrics-large .chord-rep {
     margin-left: 14px;
-    color: #d6c89c;
-    font-size: 18px;
+    color: #999;
+    font-size: 20px;
     font-weight: 600;
     font-style: italic;
     font-family: var(--serif);
   }
   .play-mode .lyrics-large .section-label {
-    color: #ffb78c;
+    color: #aaa;
     font-weight: 700;
     font-style: normal;
     margin-top: 1.4em;
@@ -910,7 +910,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.2";
+const APP_VERSION = "1.3.3";
 
 //=============================================================
 // STORAGE
@@ -1859,6 +1859,11 @@ function bookmarkletSource() {
           }
         } catch (e) {}
       }
+      // Last-ditch: derive artist from /tab/<artist-slug>/... in the URL path
+      if (!artist) {
+        const m = location.pathname.match(/^\/tab\/([^\/]+)\//i);
+        if (m) artist = m[1].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      }
     }
     if (!lyrics && /e-chords\.com/.test(host)) {
       const pre = document.querySelector("pre#core") || document.querySelector("pre");
@@ -1900,41 +1905,48 @@ function escapeHtml(s) {
 }
 function renderLyrics(text) {
   if (!text) return `<div class="muted">No lyrics yet — click <em>Edit</em> to add some.</div>`;
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const rawLines = text.replace(/\r\n/g, "\n").split("\n");
+  // Pre-condense: if two chord-only lines have identical chord sets, merge them
+  // (skipping any blank lines in between).
+  const lines = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const ln = rawLines[i];
+    if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(ln)) {
+      const sig = ln.replace(/\s+/g, " ").trim();
+      let count = 1;
+      let j = i + 1;
+      while (j < rawLines.length) {
+        if (!rawLines[j].trim()) { j++; continue; }
+        const next = rawLines[j];
+        if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(next) && next.replace(/\s+/g, " ").trim() === sig) {
+          count++; j++;
+        } else break;
+      }
+      lines.push({ kind: "chord-only", text: ln, count });
+      i = j - 1;
+    } else {
+      lines.push(ln);
+    }
+  }
+
   const out = [];
-  let lastChordOnlySig = null;   // for condensing repeats
-  let lastChordOnlyIdx = -1;
-  let lastChordOnlyCount = 0;
   for (const line of lines) {
-    if (!line.trim()) { out.push(""); lastChordOnlySig = null; continue; }
+    if (typeof line === "object" && line.kind === "chord-only") {
+      const re = /\[([^\]]+)\]/g;
+      let m, html = "";
+      while ((m = re.exec(line.text)) !== null) {
+        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(m[1])}">${escapeHtml(m[1])}</span>`;
+      }
+      const repHtml = line.count > 1 ? `<span class="chord-rep">× ${line.count}</span>` : "";
+      out.push(`<div class="chord-only-row">${html}${repHtml}</div>`);
+      continue;
+    }
+    if (!line.trim()) { out.push(""); continue; }
     const sec = line.match(/^\s*\{([^}]+)\}\s*$/);
     if (sec) {
       out.push(`<span class="section-label">${escapeHtml(sec[1])}</span>`);
-      lastChordOnlySig = null;
       continue;
     }
-    // Chord-only line — render as block of inline pills, condense consecutive identical rows
-    if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(line)) {
-      const re = /\[([^\]]+)\]/g;
-      const chords = [];
-      let m;
-      while ((m = re.exec(line)) !== null) chords.push(m[1]);
-      const sig = chords.join("|");
-      if (sig === lastChordOnlySig && lastChordOnlyIdx === out.length - 1) {
-        // Same chord set as previous → bump count, replace last entry
-        lastChordOnlyCount++;
-        const html = chords.map(c => `<span class="chord-pill-inline" data-chord="${escapeHtml(c)}">${escapeHtml(c)}</span>`).join("");
-        out[lastChordOnlyIdx] = `<div class="chord-only-row">${html}<span class="chord-rep">× ${lastChordOnlyCount}</span></div>`;
-      } else {
-        const html = chords.map(c => `<span class="chord-pill-inline" data-chord="${escapeHtml(c)}">${escapeHtml(c)}</span>`).join("");
-        out.push(`<div class="chord-only-row">${html}</div>`);
-        lastChordOnlySig = sig;
-        lastChordOnlyIdx = out.length - 1;
-        lastChordOnlyCount = 1;
-      }
-      continue;
-    }
-    lastChordOnlySig = null;
     // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment.
     // Each chord-bearing segment gets a min-width sized to its chord name so adjacent pills don't overlap.
     let html = "";
@@ -2116,13 +2128,6 @@ function renderEditor(el) {
       </div>
     </div>
 
-    <div class="url-import" title="Paste a chord-site URL — best-effort fetch via CORS proxy">
-      <div class="label">Import URL</div>
-      <input id="f-url" placeholder="https://tabs.ultimate-guitar.com/tab/…  or any chord page" />
-      <button id="t-fetch" class="primary" type="button">Fetch</button>
-      <button id="t-bookmarklet" type="button" title="Get the bookmarklet (works for sites that block proxies)">Bookmarklet</button>
-    </div>
-
     <div class="editor-grid">
       <div>
         <label>Artist</label>
@@ -2160,11 +2165,6 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
         <div class="helper-msg" id="helper"></div>
       </div>
 
-      <div class="full">
-        <label>Phrasings &amp; voicing notes</label>
-        <textarea id="f-notes" rows="5" placeholder="e.g. 'Verse uses Em7 voiced 022030 — keep B string ringing.&#10;On piano, root in left hand octaves, voicing in right hand: Em7 = E G B D.'">${escapeHtml(song.notes || "")}</textarea>
-      </div>
-
       <!-- Footer fields — key, capo (guitar-only), source URL -->
       <div>
         <label>Key <button type="button" id="t-detect-key" class="ghost" style="float:right; padding:0 6px; font-size:11px; text-transform:none; letter-spacing:0;">auto-detect ↻</button></label>
@@ -2196,8 +2196,6 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
     if (parsed.key && !document.getElementById("f-key").value) document.getElementById("f-key").value = parsed.key;
     setHelper("Tidied — chords aligned to word starts.", "ok");
   });
-
-  document.getElementById("t-bookmarklet").addEventListener("click", () => openBookmarkletModal());
 
   // Swap artist <-> title for cases where the scraper got them backwards
   document.getElementById("t-swap").addEventListener("click", () => {
@@ -2252,27 +2250,6 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
       setHelper("Detected key: " + k + " (best fit for " + chords.length + " chord" + (chords.length !== 1 ? "s" : "") + ")", "ok");
     } else {
       setHelper("Couldn't determine a clear key from this chord set.", "err");
-    }
-  });
-
-  document.getElementById("t-fetch").addEventListener("click", async () => {
-    const url = document.getElementById("f-url").value.trim();
-    if (!url) { setHelper("Paste a URL first.", "err"); return; }
-    setHelper("Fetching via CORS proxy — this can take 5–15 seconds…", "busy");
-    try {
-      const result = await importFromUrl(url);
-      const ta = document.getElementById("f-lyrics");
-      if (ta.value.trim() && !confirm("Replace existing lyrics with the fetched chord chart?")) {
-        setHelper("Cancelled.", "");
-        return;
-      }
-      ta.value = result.lyrics;
-      if (result.title && !document.getElementById("f-title").value) document.getElementById("f-title").value = result.title;
-      if (result.artist && !document.getElementById("f-artist").value) document.getElementById("f-artist").value = result.artist;
-      if (!document.getElementById("f-source").value) document.getElementById("f-source").value = url;
-      setHelper("Fetched! Review the chord chart and tailor it as you like.", "ok");
-    } catch (e) {
-      setHelper("Couldn't fetch: " + e.message + ". Try paste-and-parse, or another URL.", "err");
     }
   });
 
@@ -2411,7 +2388,7 @@ function saveEdit(isNew, songSnapshot) {
     instruments,
     sourceUrl: document.getElementById("f-source").value.trim(),
     lyrics: parsedLyrics,
-    notes: document.getElementById("f-notes").value,
+    notes: song.notes || "",  // notes textarea was removed from editor; preserve existing value
     updatedAt: now(),
   };
   if (!updates.title) { setHelper("A title is required.", "err"); return; }
@@ -2459,10 +2436,10 @@ function openPlayMode(song) {
         <div>${escapeHtml(song.title || "Untitled")}</div>
       </div>
       <div class="speed-controls">
-        <button id="play-slower" title="Slower">−</button>
-        <input id="play-speed" type="range" min="0" max="120" step="2" value="20" title="Scroll speed (px/s)" />
-        <button id="play-faster" title="Faster">+</button>
-        <span class="speed-label" id="speed-label">20 px/s</span>
+        <button id="play-slower" title="Slower (↓)">−</button>
+        <input id="play-speed" type="range" min="0" max="500" step="5" value="80" title="Scroll speed (px/s)" />
+        <button id="play-faster" title="Faster (↑)">+</button>
+        <span class="speed-label" id="speed-label">80 px/s</span>
       </div>
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
@@ -2520,11 +2497,11 @@ function openPlayMode(song) {
   toggleBtn.addEventListener("click", () => isPlaying ? pause() : play());
   speedInput.addEventListener("input", e => setSpeed(e.target.value));
   overlay.querySelector("#play-slower").addEventListener("click", () => {
-    speedInput.value = Math.max(0, parseFloat(speedInput.value) - 5);
+    speedInput.value = Math.max(0, parseFloat(speedInput.value) - 20);
     setSpeed(speedInput.value);
   });
   overlay.querySelector("#play-faster").addEventListener("click", () => {
-    speedInput.value = Math.min(120, parseFloat(speedInput.value) + 5);
+    speedInput.value = Math.min(500, parseFloat(speedInput.value) + 20);
     setSpeed(speedInput.value);
   });
 

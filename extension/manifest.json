@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chord Archive — Grab Chords",
-  "version": "1.2.4",
+  "version": "1.3.3",
   "description": "One-click chord-chart capture for Chord Archive. Works on Ultimate Guitar, E-Chords, Chordie, and any page with a <pre> chord chart.",
   "icons": {
     "48":  "icon.svg",
