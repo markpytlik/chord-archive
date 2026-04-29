@@ -481,6 +481,15 @@
     display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
   }
   .editor-tools button { font-size: 13px; padding: 5px 11px; }
+  .editor-tools button.prominent {
+    background: var(--chord-bg);
+    border-color: #cdd9ed;
+    color: var(--chord);
+    font-weight: 600;
+  }
+  .editor-tools button.prominent:hover {
+    background: #d8e1f5; border-color: #a9bde0;
+  }
   .helper-msg {
     color: var(--muted); font-size: 12px;
     margin-top: 6px; min-height: 18px;
@@ -771,7 +780,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 
 //=============================================================
 // STORAGE
@@ -1487,31 +1496,59 @@ function ugMarkupToChordPro(s) {
     .replace(/\[\/?tab\]/g, "");
 }
 
-function parseUltimateGuitar(html) {
-  // 1) Newer UG embeds JSON in <div class="js-store" data-content="...">
-  let m = html.match(/<div[^>]+class="js-store"[^>]+data-content="([^"]+)"/);
-  if (m) {
-    try {
-      const json = JSON.parse(decodeHtmlEntities(m[1]));
-      const data = json?.store?.page?.data;
-      const tab = data?.tab_view?.wiki_tab?.content || data?.tab?.wiki_tab?.content;
-      const titleField = data?.tab?.song_name || data?.tab_view?.versions?.[0]?.song_name;
-      const artistField = data?.tab?.artist_name || data?.tab_view?.versions?.[0]?.artist_name;
-      if (tab) {
-        const lyrics = ugMarkupToChordPro(tab);
-        return { lyrics, title: titleField, artist: artistField };
-      }
-    } catch (e) { console.warn("UG JSON parse failed", e); }
+// Recursively search a parsed JSON for any key matching the regex; used as a robust fallback
+function deepFindKey(obj, keyPattern, depth = 0) {
+  if (depth > 8 || !obj || typeof obj !== "object") return null;
+  for (const k of Object.keys(obj)) {
+    if (keyPattern.test(k)) {
+      const v = obj[k];
+      if (typeof v === "string" && v.trim() && v.length < 200) return v.trim();
+    }
   }
-  // 2) Older / fallback: a <pre> with [ch] markup
-  m = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
-  if (m) {
-    const content = decodeHtmlEntities(m[1].replace(/<[^>]+>/g, ""));
-    if (/\[ch\]/.test(content)) {
-      return { lyrics: ugMarkupToChordPro(content), title: null, artist: null };
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    if (v && typeof v === "object") {
+      const found = deepFindKey(v, keyPattern, depth + 1);
+      if (found) return found;
     }
   }
   return null;
+}
+
+function parseUltimateGuitar(html) {
+  let title = null, artist = null, lyrics = null;
+  // 1) og:title is the most reliable: "Sail To The Moon CHORDS by Radiohead @ Ultimate-Guitar.com"
+  //    Try several formats: with type word, with " - " separator, with " by " separator.
+  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i);
+  if (og) {
+    const t = decodeHtmlEntities(og[1]);
+    let m = t.match(/^(.+?)\s+(?:Chords?|Tabs?|Bass|Ukulele|Drum|Pro|Lyrics)\s+(?:by|–|—|-)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
+    if (!m) m = t.match(/^(.+?)\s+(?:by)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
+    if (!m) m = t.match(/^(.+?)\s+[-–—]\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/);
+    if (m) { title = m[1].trim(); artist = m[2].trim(); }
+  }
+  // 2) Pull lyrics + fill-in title/artist from the embedded JSON
+  let storeMatch = html.match(/<div[^>]+class="js-store"[^>]+data-content="([^"]+)"/);
+  if (storeMatch) {
+    try {
+      const json = JSON.parse(decodeHtmlEntities(storeMatch[1]));
+      const data = json?.store?.page?.data;
+      const tab = data?.tab_view?.wiki_tab?.content || data?.tab?.wiki_tab?.content;
+      if (tab) lyrics = ugMarkupToChordPro(tab);
+      if (!artist) artist = deepFindKey(json, /^(artist_name|artist|band|musician|performer|song_band|byArtist)$/i);
+      if (!title)  title  = deepFindKey(json, /^(song_name|song_title|title|name|track_name)$/i);
+    } catch (e) { console.warn("UG JSON parse failed", e); }
+  }
+  // 3) Older: a <pre> with [ch] markup
+  if (!lyrics) {
+    const m = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
+    if (m) {
+      const content = decodeHtmlEntities(m[1].replace(/<[^>]+>/g, ""));
+      if (/\[ch\]/.test(content)) lyrics = ugMarkupToChordPro(content);
+    }
+  }
+  if (!lyrics) return null;
+  return { lyrics, title, artist };
 }
 function parseEChords(html) {
   // E-Chords also uses [ch]X[/ch] inside <pre id="core"> typically
@@ -1902,6 +1939,7 @@ I sucked the moon...I spoke too soon
 Section labels go in [brackets]. Use the monospace font — chord positions align to the lyrics below.">${escapeHtml(chordProToChordSheet(song.lyrics || ""))}</textarea>
         <div class="editor-tools">
           <button id="t-tidy" type="button">Tidy &amp; align ↻</button>
+          <button id="t-strip-tabs" type="button" class="prominent" title="Remove tablature lines (e|---0---0---|)">🗑 Remove tablature</button>
           <button id="t-fill-meta" type="button">Autofill metadata</button>
           <button id="t-fill-lyrics" type="button">Autofill lyrics</button>
         </div>
@@ -1955,8 +1993,9 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
     setHelper("Swapped artist and title.", "ok");
   });
 
-  // Strip tablature lines (e|---0---|, B|---1---|, etc.)
-  document.getElementById("t-strip-tabs").addEventListener("click", () => {
+  // Strip tablature lines (e|---0---|, B|---1---|, etc.) — defensive in case button is missing
+  const stripBtn = document.getElementById("t-strip-tabs");
+  if (stripBtn) stripBtn.addEventListener("click", () => {
     const ta = document.getElementById("f-lyrics");
     // Tab line patterns: starts with one of e B G D A E (case-sensitive guitar/uke strings) or numbers, followed by | and dashes/digits/dots
     // Common forms:  e|--3--3--|   B|--0--0--|   |---3-2-0---|
