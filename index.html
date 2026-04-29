@@ -300,22 +300,24 @@
     border-radius: 999px;
   }
   .detail-head h1 .key-inline::before { content: "Key of "; opacity: .7; }
-  .detail-head h1 .source-inline {
-    display: inline-block;
-    vertical-align: middle;
-    margin-left: 12px;
-    margin-bottom: 6px;
-    font-family: var(--sans);
-    font-size: 12px;
-    font-weight: 500;
+  .detail-head .title-block { position: relative; padding-right: 32px; }
+  .detail-head .source-corner {
+    position: absolute;
+    top: -2px;
+    right: 0;
     color: var(--muted);
+    font-size: 18px;
+    line-height: 1;
     text-decoration: none;
-    border-bottom: 1px dotted var(--muted);
-    padding: 0 2px 1px;
-    transition: color .12s, border-color .12s;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: color .12s, background .12s, transform .12s;
   }
-  .detail-head h1 .source-inline:hover { color: var(--accent); border-bottom-color: var(--accent); }
-  .detail-head h1 .source-inline::after { content: " ↗"; font-size: 11px; opacity: .8; }
+  .detail-head .source-corner:hover {
+    color: var(--accent);
+    background: var(--accent-soft);
+    transform: translate(1px, -1px);
+  }
   .detail-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
   .meta-row {
@@ -943,7 +945,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.6";
+const APP_VERSION = "1.3.7";
 
 //=============================================================
 // STORAGE
@@ -1455,6 +1457,40 @@ const BLACK_KEYS = [
   { afterWhite: 4, pc: 8 },
   { afterWhite: 5, pc: 10 },
 ];
+
+// Render a piano keyboard highlighting an explicit set of pitch classes (root optional).
+function svgPianoFromPcs(pcs, rootPc, octaves=2, size="md") {
+  const noteSet = new Set(pcs.map(pc => ((pc % 12) + 12) % 12));
+  const dim = size === "sm" ? { whiteW: 18, whiteH: 80, blackW: 11, blackH: 50 } :
+              size === "lg" ? { whiteW: 26, whiteH: 110, blackW: 16, blackH: 70 } :
+                              { whiteW: 22, whiteH: 100, blackW: 13, blackH: 62 };
+  const { whiteW, whiteH, blackW, blackH } = dim;
+  const totalWhites = 7 * octaves;
+  const W = whiteW * totalWhites, H = whiteH;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  for (let i = 0; i < totalWhites; i++) {
+    const pc = WHITE_KEYS_PC[i % 7];
+    const isHit = noteSet.has(pc);
+    const isRoot = (rootPc !== undefined && pc === rootPc);
+    const x = i * whiteW;
+    const fill = isRoot ? "#b14a2c" : (isHit ? "#1e3a8a" : "#fff");
+    svg += `<rect x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
+    if (isHit) svg += `<text x="${x + whiteW/2}" y="${whiteH - 10}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(pc)}</text>`;
+  }
+  for (let oct = 0; oct < octaves; oct++) {
+    for (const bk of BLACK_KEYS) {
+      const i = oct * 7 + bk.afterWhite;
+      const x = (i + 1) * whiteW - blackW/2;
+      const isHit = noteSet.has(bk.pc);
+      const isRoot = (rootPc !== undefined && bk.pc === rootPc);
+      const fill = isRoot ? "#b14a2c" : (isHit ? "#1e3a8a" : "#14161a");
+      svg += `<rect x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
+      if (isHit) svg += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="8" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(bk.pc)}</text>`;
+    }
+  }
+  svg += `</svg>`;
+  return svg;
+}
 
 function svgPiano(chordName, octaves=2, size="md") {
   const parsed = splitChord(chordName);
@@ -2156,8 +2192,9 @@ function renderDetail() {
   el.innerHTML = `
     <div class="detail-head">
       <div class="title-block">
+        ${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
-        <h1>${escapeHtml(song.title || "Untitled")}${song.key ? `<span class="key-inline" title="Key">${escapeHtml(song.key)}</span>` : ""}${song.sourceUrl ? `<a class="source-inline" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source">source</a>` : ""}</h1>
+        <h1>${escapeHtml(song.title || "Untitled")}${song.key ? `<span class="key-inline" title="Key">${escapeHtml(song.key)}</span>` : ""}</h1>
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
@@ -2424,20 +2461,23 @@ function getVoicings(song, chordName) {
   }
   song.voicings = song.voicings || {};
   const list = [];
-  // Built-in shape — but skip for simple major/minor triads
+  // Built-in suggested voicings — only for complex chords (major/minor user already knows)
   if (!isSimpleMajorOrMinor(chordName)) {
+    const parsed = splitChord(chordName);
     const builtIn = lookupShape(chordName);
-    if (builtIn) {
+    const pianoNotes = parsed ? qualityToIntervals(parsed.quality).map(i => (parsed.root + i) % 12) : null;
+    if (builtIn || pianoNotes) {
       list.push({
-        frets: builtIn.frets,
-        fingers: builtIn.fingers,
-        barre: builtIn.barre,
-        note: builtIn.derived ? "Movable barre shape" : "",
-        builtIn: true,
+        frets:    builtIn?.frets,
+        fingers:  builtIn?.fingers,
+        barre:    builtIn?.barre,
+        pianoNotes: pianoNotes,
+        note:     builtIn?.derived ? "Movable barre shape" : "",
+        builtIn:  true,
       });
     }
   }
-  // Append user voicings (always shown)
+  // User-saved voicings (always shown)
   for (const v of (song.voicings[chordName] || [])) {
     list.push(Object.assign({ builtIn: false }, v));
   }
@@ -2695,9 +2735,9 @@ function renderPopover(target) {
   const pop = ensurePopover();
   if (!popoverState) return;
   const { chordName, song, index } = popoverState;
-  const wantGuitar = !song?.instruments || song.instruments.includes("guitar");
-  const wantPiano  = !song?.instruments || song.instruments.includes("piano");
-  const voicings = wantGuitar ? getVoicings(song, chordName) : [];
+  const wantGuitar = !!song?.instruments?.includes("guitar");
+  const wantPiano  = !!song?.instruments?.includes("piano");
+  const voicings = (wantGuitar || wantPiano) ? getVoicings(song, chordName) : [];
   const current = voicings[index] || null;
   const total = voicings.length;
   // Guitar diagram — only render if we have a voicing for this chord (built-in or custom).
@@ -2712,7 +2752,12 @@ function renderPopover(target) {
       </div>`
     : "";
   const pianoHtml = wantPiano
-    ? `<div class="diag-mini"><div class="label">Piano</div>${svgPiano(chordName, 2, "sm")}</div>`
+    ? `<div class="diag-mini">
+        <div class="label">Piano${current && current.pianoNotes && !current.builtIn ? " · custom" : ""}</div>
+        ${current && current.pianoNotes && current.pianoNotes.length
+          ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "sm")
+          : svgPiano(chordName, 2, "sm")}
+      </div>`
     : "";
   const both = wantGuitar && wantPiano;
   const cyclerHtml = (wantGuitar && total > 1) ? `
@@ -2828,11 +2873,9 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   const initPiano = seed?.pianoNotes ? seed.pianoNotes.map(pc => pcToName(pc)).join(" ") : "";
   const initNote = seed?.note || "";
 
-  // Show only fields relevant to this song's instruments. If neither is set, show both.
-  const wantGuitar = song?.instruments?.includes("guitar");
-  const wantPiano  = song?.instruments?.includes("piano");
-  const showGuitar = wantGuitar || (!wantGuitar && !wantPiano);
-  const showPiano  = wantPiano  || (!wantGuitar && !wantPiano);
+  // Strict: only show fields for instruments actually selected on the song.
+  const showGuitar = !!song?.instruments?.includes("guitar");
+  const showPiano  = !!song?.instruments?.includes("piano");
 
   const bg = document.createElement("div");
   bg.className = "modal-bg";
