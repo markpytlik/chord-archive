@@ -139,10 +139,40 @@
   header .brand .glyph { color: var(--accent); margin-right: 4px; }
   header .grow { flex: 1; }
   header input.search {
-    max-width: 360px; padding: 8px 14px;
+    max-width: 280px; padding: 8px 14px;
     background: var(--panel-2); border-color: transparent;
   }
   header input.search:focus { background: var(--panel); border-color: var(--accent); }
+  header .header-url-input {
+    flex: 1 1 320px; max-width: 460px;
+    padding: 8px 14px;
+    background: var(--panel-2); border-color: transparent;
+  }
+  header .header-url-input:focus { background: var(--panel); border-color: var(--chord); }
+  header .header-menu { position: relative; display: inline-block; }
+  header .header-menu-pop {
+    position: absolute; right: 0; top: calc(100% + 4px);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 4px;
+    display: none;
+    z-index: 8;
+    min-width: 200px;
+  }
+  header .header-menu:focus-within .header-menu-pop,
+  header .header-menu-pop.show { display: block; }
+  header .header-menu-pop button {
+    width: 100%; text-align: left;
+    background: transparent; border: 0;
+    padding: 8px 12px; font-size: 13px;
+    border-radius: var(--radius-sm);
+    color: var(--ink-soft);
+  }
+  header .header-menu-pop button:hover {
+    background: var(--panel-2); color: var(--ink);
+  }
 
   /* ====================== Layout ====================== */
   main {
@@ -603,9 +633,17 @@
   <div class="brand"><span class="glyph">♪</span> Chord <span class="accent">Archive</span></div>
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
-  <button id="btn-new" class="primary">+ New Song</button>
-  <button id="btn-import" title="Import a JSON backup">Import</button>
-  <button id="btn-export" title="Download all songs as JSON">Export</button>
+  <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
+  <button id="header-fetch" class="primary" title="Fetch & import this URL">Import URL</button>
+  <button id="btn-new">+ New Song</button>
+  <div class="header-menu" tabindex="0">
+    <button id="btn-menu" class="ghost" title="More" aria-label="More options" aria-haspopup="true">⋯</button>
+    <div id="menu-pop" class="header-menu-pop">
+      <button id="btn-import">Import JSON backup…</button>
+      <button id="btn-export">Export all as JSON</button>
+      <button id="btn-bookmarklet-shortcut">Get bookmarklet…</button>
+    </div>
+  </div>
 </header>
 
 <main>
@@ -1173,6 +1211,13 @@ function isSectionLabel(line) {
   if (/^[A-Z][A-Za-z]+( \d+)?:$/.test(s)) return true;
   return false;
 }
+// Detect a guitar/bass tab line — they look like  e|--4--3--0--|  or  B|---0---0---|
+function isTabLine(line) {
+  const s = line.trim();
+  if (/^[eBGDAEbgda]?\|[\-\d\.\s|h\/\\\(\)pPxX~]+\|?$/.test(s)) return true;
+  if (/^[eBGDAEbgda]\|/.test(s) && /[-\d]/.test(s)) return true;
+  return false;
+}
 function mergeChordsIntoLyric(chordLine, lyricLine) {
   if (!lyricLine) lyricLine = "";
   const insertions = [];
@@ -1199,7 +1244,9 @@ function mergeChordsIntoLyric(chordLine, lyricLine) {
   let out = "", cursor = 0;
   for (const ins of snapped) {
     out += lyricLine.slice(cursor, ins.col);
-    out += "[" + ins.chord + "]";
+    // If the chord token from the chord line is already bracketed, don't wrap again
+    const inner = /^\[(.+)\]$/.test(ins.chord) ? ins.chord.match(/^\[(.+)\]$/)[1] : ins.chord;
+    out += "[" + inner + "]";
     cursor = ins.col;
   }
   out += lyricLine.slice(cursor);
@@ -1334,12 +1381,14 @@ function parseChordSheet(text) {
     }
     if (isChordLine(ln)) {
       const next = remaining[i + 1];
-      if (next !== undefined && next.trim() && !isChordLine(next) && !isSectionLabel(next)) {
+      // Don't merge a chord line into a tab line — render the chord line standalone instead.
+      if (next !== undefined && next.trim() && !isChordLine(next) && !isSectionLabel(next) && !isTabLine(next)) {
         out.push(mergeChordsIntoLyric(ln, next));
         i += 2;
       } else {
+        // Standalone chord line — preserve already-bracketed tokens, wrap bare ones
         const toks = ln.trim().split(/\s+/);
-        out.push(toks.map(t => "[" + t + "]").join(" "));
+        out.push(toks.map(t => /^\[.+\]$/.test(t) ? t : "[" + t + "]").join(" "));
         i++;
       }
     } else {
@@ -1529,6 +1578,13 @@ function bookmarkletSource() {
               .replace(/\[\/?tab\]/g, "");
     }
     if (/ultimate-guitar\.com/.test(host)) {
+      // og:title is most reliable on UG for title/artist split
+      const og = document.querySelector('meta[property="og:title"]');
+      if (og) {
+        const t = og.getAttribute("content") || "";
+        const m = t.match(/^(.+?)\s+(?:Chords|Chord|Tab|Tabs|Bass|Ukulele|Drum|Pro|Lyrics)\s+(?:by|-|–|—)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
+        if (m) { title = m[1].trim(); artist = m[2].trim(); }
+      }
       const store = document.querySelector(".js-store");
       if (store && store.dataset && store.dataset.content) {
         try {
@@ -1536,19 +1592,15 @@ function bookmarkletSource() {
           const root = data?.store?.page?.data || {};
           const tab = root?.tab_view?.wiki_tab?.content || root?.tab?.wiki_tab?.content;
           if (tab) lyrics = ugToChordPro(tab);
-          const ac = [root?.tab?.artist_name, root?.tab?.artist, root?.tab_view?.versions?.[0]?.artist_name, root?.tab_view?.meta?.artist, root?.tab_view?.song?.artist_name].find(c => typeof c === "string" && c.trim());
-          const tc = [root?.tab?.song_name, root?.tab?.title, root?.tab_view?.versions?.[0]?.song_name, root?.tab_view?.song?.title].find(c => typeof c === "string" && c.trim());
-          if (ac) artist = ac;
-          if (tc) title = tc;
+          if (!artist) {
+            const ac = [root?.tab?.artist_name, root?.tab?.artist, root?.tab_view?.versions?.[0]?.artist_name].find(c => typeof c === "string" && c.trim());
+            if (ac) artist = ac;
+          }
+          if (!title) {
+            const tc = [root?.tab?.song_name, root?.tab?.title, root?.tab_view?.versions?.[0]?.song_name].find(c => typeof c === "string" && c.trim());
+            if (tc) title = tc;
+          }
         } catch (e) {}
-      }
-      if (!artist) {
-        const og = document.querySelector('meta[property="og:title"]');
-        if (og) {
-          const t = og.getAttribute("content") || "";
-          const m = t.match(/^(.+?)\s+(?:Chords|Tab|Bass|Ukulele)?\s*(?:by|-|–|—)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
-          if (m) { if (!title) title = m[1].trim(); artist = m[2].trim(); }
-        }
       }
     }
     if (!lyrics && /e-chords\.com/.test(host)) {
@@ -1728,7 +1780,14 @@ function renderDetail() {
       <div class="detail-actions">
         <button id="btn-edit">Edit</button>
         <button id="btn-duplicate" class="ghost">Duplicate</button>
-        <button id="btn-delete" class="danger">Delete</button>
+        <button id="btn-delete" class="danger" title="Delete song" aria-label="Delete song">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path><path d="M14 11v6"></path>
+            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -1978,7 +2037,8 @@ function setHelper(msg, kind="") {
 }
 
 function blankSong() {
-  return { id: uid(), title: "", artist: "", key: "", capo: 0, instruments: ["guitar"], lyrics: "", notes: "", sourceUrl: "", voicings: {}, createdAt: now(), updatedAt: now() };
+  // Both instruments off by default — user picks per-song what they want diagrams for
+  return { id: uid(), title: "", artist: "", key: "", capo: 0, instruments: [], lyrics: "", notes: "", sourceUrl: "", voicings: {}, createdAt: now(), updatedAt: now() };
 }
 
 // ---- Voicings model ----
@@ -2535,8 +2595,63 @@ async function init() {
   document.getElementById("btn-new").addEventListener("click", () => {
     state.editing = "new"; renderDetail();
   });
-  document.getElementById("btn-export").addEventListener("click", exportJson);
-  document.getElementById("btn-import").addEventListener("click", () => document.getElementById("import-file").click());
+
+  // Header URL import — fetch via proxy, fall back to bookmarklet on CF block
+  async function headerImportUrl() {
+    const url = document.getElementById("header-url").value.trim();
+    if (!url) return;
+    const btn = document.getElementById("header-fetch");
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Fetching…";
+    try {
+      const result = await importFromUrl(url);
+      // Build a draft song and open the editor
+      const parsed = parseChordSheet(result.lyrics || "");
+      const chords = extractChords(parsed.lyrics || "");
+      const detected = detectKey(chords);
+      const draft = Object.assign(blankSong(), {
+        title: cleanScrapedTitle(result.title || parsed.title || ""),
+        artist: cleanScrapedTitle(result.artist || parsed.artist || ""),
+        key: parsed.key || detected || "",
+        lyrics: parsed.lyrics || "",
+        sourceUrl: url,
+      });
+      state.editing = draft;
+      document.getElementById("header-url").value = "";
+      renderDetail();
+    } catch (e) {
+      const useBookmarklet = confirm("Couldn't fetch that URL automatically (most likely Cloudflare bot protection):\n\n" + e.message + "\n\nWant to see the bookmarklet — a one-click button you put in your bookmarks bar that bypasses this?");
+      if (useBookmarklet) {
+        state.editing = "new"; renderDetail();
+        setTimeout(() => openBookmarkletModal(), 50);
+      }
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
+  document.getElementById("header-fetch").addEventListener("click", headerImportUrl);
+  document.getElementById("header-url").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); headerImportUrl(); }
+  });
+
+  // Kebab menu
+  const menuBtn = document.getElementById("btn-menu");
+  const menuPop = document.getElementById("menu-pop");
+  menuBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    menuPop.classList.toggle("show");
+  });
+  document.addEventListener("click", e => {
+    if (!menuPop.contains(e.target) && e.target !== menuBtn) menuPop.classList.remove("show");
+  });
+  document.getElementById("btn-bookmarklet-shortcut").addEventListener("click", () => {
+    menuPop.classList.remove("show");
+    state.editing = "new"; renderDetail();
+    setTimeout(() => openBookmarkletModal(), 50);
+  });
+
+  document.getElementById("btn-export").addEventListener("click", () => { menuPop.classList.remove("show"); exportJson(); });
+  document.getElementById("btn-import").addEventListener("click", () => { menuPop.classList.remove("show"); document.getElementById("import-file").click(); });
   document.getElementById("import-file").addEventListener("change", e => {
     const f = e.target.files[0]; if (f) importJsonFile(f); e.target.value = "";
   });

@@ -110,46 +110,49 @@ function scrapePage() {
   const host = location.hostname;
 
   if (/ultimate-guitar\.com/.test(host)) {
+    // STEP 1 — og:title is the most reliable source for title vs artist on UG.
+    // Format: "Sail To The Moon CHORDS by Radiohead @ Ultimate-Guitar.com"
+    const og = document.querySelector('meta[property="og:title"]');
+    if (og) {
+      const t = og.getAttribute("content") || "";
+      const m = t.match(/^(.+?)\s+(?:Chords|Chord|Tab|Tabs|Bass|Ukulele|Drum|Guitar Pro|Power\s*Tab|Lyrics|Pro)\s+(?:by|–|—|-)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
+      if (m) {
+        title = m[1].trim();
+        artist = m[2].trim();
+      }
+    }
+    // STEP 2 — pull lyrics from the embedded JSON (only place they live)
     const store = document.querySelector(".js-store");
     if (store && store.dataset && store.dataset.content) {
       try {
         const data = JSON.parse(store.dataset.content);
         const root = data?.store?.page?.data || {};
-        const tab = root?.tab_view?.wiki_tab?.content
-                 || root?.tab?.wiki_tab?.content;
-        if (tab) lyrics = ugToChordPro(tab);
-        // Try every artist field UG has used over the years
-        const candidates = [
-          root?.tab?.artist_name,
-          root?.tab?.artist,
-          root?.tab_view?.versions?.[0]?.artist_name,
-          root?.tab_view?.meta?.artist,
-          root?.tab_view?.song?.artist_name,
-          root?.tab?.tab?.artist_name,
-        ];
-        artist = candidates.find(c => typeof c === "string" && c.trim()) || "";
-        const titleCandidates = [
-          root?.tab?.song_name,
-          root?.tab?.title,
-          root?.tab_view?.versions?.[0]?.song_name,
-          root?.tab_view?.song?.title,
-        ];
-        title = titleCandidates.find(c => typeof c === "string" && c.trim()) || "";
+        const tabContent = root?.tab_view?.wiki_tab?.content
+                        || root?.tab?.wiki_tab?.content;
+        if (tabContent) lyrics = ugToChordPro(tabContent);
+        // Only use JSON for title/artist if og:title didn't yield them
+        if (!artist) {
+          const cand = [
+            root?.tab?.artist_name,
+            root?.tab?.artist,
+            root?.tab_view?.versions?.[0]?.artist_name,
+            root?.tab_view?.meta?.artist,
+            root?.tab_view?.song?.artist_name,
+          ].find(c => typeof c === "string" && c.trim());
+          if (cand) artist = cand;
+        }
+        if (!title) {
+          const cand = [
+            root?.tab?.song_name,
+            root?.tab?.title,
+            root?.tab_view?.versions?.[0]?.song_name,
+            root?.tab_view?.song?.title,
+          ].find(c => typeof c === "string" && c.trim());
+          if (cand) title = cand;
+        }
       } catch (e) { /* fall through */ }
     }
-    // Fallback: parse og:title meta tag (UG format: "Sail to the Moon Chords by Radiohead @ Ultimate-Guitar.com")
-    if (!artist) {
-      const og = document.querySelector('meta[property="og:title"]');
-      if (og) {
-        const t = og.getAttribute("content") || "";
-        const m = t.match(/^(.+?)\s+(?:Chords|Tab|Bass|Ukulele|Drum|Guitar Pro|Power\s*Tab|Lyrics)?\s*(?:by|–|—|-)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
-        if (m) {
-          if (!title) title = m[1].trim();
-          artist = m[2].trim();
-        }
-      }
-    }
-    // Last-ditch fallback: <meta itemprop="byArtist">
+    // STEP 3 — last ditch: <meta itemprop="byArtist">
     if (!artist) {
       const ba = document.querySelector('[itemprop="byArtist"]');
       if (ba) artist = (ba.textContent || ba.getAttribute("content") || "").trim();
