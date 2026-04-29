@@ -284,7 +284,9 @@
     color: var(--ink);
   }
   .detail-head h1 .key-inline {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     vertical-align: middle;
     margin-left: 32px;
     margin-bottom: 6px;
@@ -296,10 +298,29 @@
     background: var(--accent-soft);
     color: var(--accent-deep);
     border: 1px solid #ecccc0;
-    padding: 3px 10px;
+    padding: 3px 4px 3px 10px;
     border-radius: 999px;
   }
-  .detail-head h1 .key-inline::before { content: "Key of "; opacity: .7; }
+  .detail-head h1 .key-inline .key-pre { opacity: .7; }
+  .detail-head h1 .key-inline .key-name { font-weight: 700; }
+  .detail-head h1 .key-inline .transpose-btn {
+    background: transparent;
+    border: 0;
+    color: var(--accent-deep);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0 5px;
+    cursor: pointer;
+    border-radius: 999px;
+    font-family: var(--sans);
+    opacity: .55;
+    transition: opacity .12s, background .12s;
+  }
+  .detail-head h1 .key-inline .transpose-btn:hover {
+    opacity: 1;
+    background: rgba(177, 74, 44, .15);
+  }
   .detail-head .title-block { position: relative; padding-right: 32px; }
   .detail-head .source-corner {
     position: absolute;
@@ -945,7 +966,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.7";
+const APP_VERSION = "1.3.8";
 
 //=============================================================
 // STORAGE
@@ -1283,6 +1304,50 @@ function chordNotes(chord) {
 
 function pcToName(pc, preferFlat=false) {
   return (preferFlat ? PC_FLAT : PC_SHARP)[((pc % 12) + 12) % 12];
+}
+
+// ---- Transpose ----
+// Shift a chord name by N semitones, preserving quality and bass note.
+function transposeChord(chordName, semitones) {
+  if (!chordName || !semitones) return chordName;
+  const parsed = splitChord(chordName);
+  if (!parsed) return chordName;
+  const useFlat = parsed.rootStr.includes("b");
+  const newRoot = pcToName(parsed.root + semitones, useFlat);
+  let out = newRoot + parsed.quality;
+  if (parsed.bass !== null) {
+    const useFlatB = parsed.bassStr.includes("b");
+    out += "/" + pcToName(parsed.bass + semitones, useFlatB);
+  }
+  return out;
+}
+// Shift every [chord] inside a ChordPro lyric string.
+function transposeLyrics(text, semitones) {
+  if (!text || !semitones) return text;
+  return text.replace(/\[([^\]]+)\]/g, (_, c) => "[" + transposeChord(c, semitones) + "]");
+}
+// Transpose a key signature like "G" or "F#m" or "Em".
+function transposeKey(keyStr, semitones) {
+  if (!keyStr || !semitones) return keyStr;
+  const parsed = splitChord(keyStr);
+  if (!parsed) return keyStr;
+  const useFlat = parsed.rootStr.includes("b");
+  const newRoot = pcToName(parsed.root + semitones, useFlat);
+  return newRoot + parsed.quality;
+}
+// Transpose an entire song in place. Returns nothing — mutates `song`.
+function transposeSong(song, semitones) {
+  if (!semitones) return;
+  song.lyrics = transposeLyrics(song.lyrics || "", semitones);
+  song.key = transposeKey(song.key || "", semitones);
+  if (song.voicings) {
+    const renamed = {};
+    for (const [name, vs] of Object.entries(song.voicings)) {
+      renamed[transposeChord(name, semitones)] = vs;
+    }
+    song.voicings = renamed;
+  }
+  song.updatedAt = now();
 }
 
 //=============================================================
@@ -2194,7 +2259,11 @@ function renderDetail() {
       <div class="title-block">
         ${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
-        <h1>${escapeHtml(song.title || "Untitled")}${song.key ? `<span class="key-inline" title="Key">${escapeHtml(song.key)}</span>` : ""}</h1>
+        <h1>${escapeHtml(song.title || "Untitled")}<span class="key-inline" title="${song.key ? "Key — click ± to transpose" : "Transpose chords"}">
+          ${song.key ? `<span class="key-pre">Key of </span><span class="key-name">${escapeHtml(song.key)}</span>` : `<span class="key-pre">Transpose</span>`}
+          <button class="transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
+          <button class="transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
+        </span></h1>
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
@@ -2232,6 +2301,17 @@ function renderDetail() {
   `;
   document.getElementById("btn-play").addEventListener("click", () => openPlayMode(song));
   document.getElementById("btn-edit").addEventListener("click", () => startEdit(song));
+
+  // Transpose ± a semitone — shifts every chord in lyrics, updates key + voicings keys
+  el.querySelectorAll(".transpose-btn[data-step]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const step = parseInt(e.currentTarget.dataset.step) || 0;
+      transposeSong(song, step);
+      saveState({ songs: state.songs });
+      renderDetail();
+    });
+  });
   document.getElementById("btn-duplicate").addEventListener("click", () => duplicateSong(song));
   document.getElementById("btn-delete").addEventListener("click", () => deleteSong(song));
   el.querySelectorAll("[data-chord]").forEach(c => {
