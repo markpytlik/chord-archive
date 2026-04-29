@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.10";
+const APP_VERSION = "1.3.11";
 
 //=============================================================
 // STORAGE
@@ -1232,44 +1232,59 @@ function parsePianoNotesString(s) {
   return pcs;
 }
 
-// Build an interactive 12-note (one octave) piano keyboard SVG. Click a key to toggle.
-// onChange(pcs) fires whenever the selected pitch-class set changes.
-function buildClickablePianoKeyboard(initialPcs, onChange) {
+// Build an interactive 2-octave (24 key) piano keyboard SVG. Click a key to toggle.
+// rootPc (optional) gets highlighted in blue. onChange(pcs) fires on selection change.
+function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
   const wrap = document.createElement("div");
   wrap.className = "click-piano";
   const selected = new Set(initialPcs);
+  let currentRootPc = (rootPc === undefined || rootPc === null) ? null : rootPc;
 
-  const whiteW = 36, whiteH = 110, blackW = 22, blackH = 70;
-  const W = whiteW * 7, H = whiteH;
-  const blackKeys = [
+  const OCTAVES = 2;
+  const whiteW = 32, whiteH = 110, blackW = 20, blackH = 70;
+  const totalWhites = 7 * OCTAVES;
+  const W = whiteW * totalWhites, H = whiteH;
+  const whiteOffsets = [0, 2, 4, 5, 7, 9, 11];      // pc within an octave
+  const whiteNames = ["C", "D", "E", "F", "G", "A", "B"];
+  const blackTemplate = [
     { afterWhite: 0, pc: 1,  name: "C#" },
     { afterWhite: 1, pc: 3,  name: "D#" },
     { afterWhite: 3, pc: 6,  name: "F#" },
     { afterWhite: 4, pc: 8,  name: "G#" },
     { afterWhite: 5, pc: 10, name: "A#" },
   ];
-  const whiteKeys = [
-    { i: 0, pc: 0,  name: "C" }, { i: 1, pc: 2,  name: "D" }, { i: 2, pc: 4,  name: "E" },
-    { i: 3, pc: 5,  name: "F" }, { i: 4, pc: 7,  name: "G" }, { i: 5, pc: 9,  name: "A" },
-    { i: 6, pc: 11, name: "B" },
-  ];
 
   function svg() {
-    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer;">`;
-    for (const wk of whiteKeys) {
-      const x = wk.i * whiteW;
-      const isSel = selected.has(wk.pc);
-      const fill = isSel ? "var(--accent)" : "#fff";
-      const labelColor = isSel ? "#fff" : "#888";
-      s += `<rect class="key" data-pc="${wk.pc}" x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
-      s += `<text x="${x + whiteW/2}" y="${whiteH - 12}" text-anchor="middle" font-size="11" fill="${labelColor}" font-family="ui-sans-serif" pointer-events="none">${wk.name}</text>`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer; display:block;">`;
+    // White keys
+    for (let i = 0; i < totalWhites; i++) {
+      const idx = i % 7;
+      const pc = whiteOffsets[idx];
+      const x = i * whiteW;
+      const isSel = selected.has(pc);
+      const isRoot = (currentRootPc !== null && pc === currentRootPc);
+      let fill = "#fff";
+      if (isRoot && isSel) fill = "#1e3a8a";        // root selected: blue
+      else if (isRoot)     fill = "#dde6f7";        // root not selected: pale blue
+      else if (isSel)      fill = "var(--accent)";  // non-root selected: accent rust
+      const labelColor = (isSel && isRoot) ? "#fff" : (isSel ? "#fff" : (isRoot ? "#1e3a8a" : "#888"));
+      s += `<rect class="key" data-pc="${pc}" x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
+      s += `<text x="${x + whiteW/2}" y="${whiteH - 12}" text-anchor="middle" font-size="11" fill="${labelColor}" font-family="ui-sans-serif" pointer-events="none">${whiteNames[idx]}</text>`;
     }
-    for (const bk of blackKeys) {
-      const x = (bk.afterWhite + 1) * whiteW - blackW/2;
-      const isSel = selected.has(bk.pc);
-      const fill = isSel ? "var(--accent)" : "#14161a";
-      s += `<rect class="key" data-pc="${bk.pc}" x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
-      s += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" pointer-events="none">${bk.name}</text>`;
+    // Black keys
+    for (let oct = 0; oct < OCTAVES; oct++) {
+      for (const bk of blackTemplate) {
+        const i = oct * 7 + bk.afterWhite;
+        const x = (i + 1) * whiteW - blackW/2;
+        const isSel = selected.has(bk.pc);
+        const isRoot = (currentRootPc !== null && bk.pc === currentRootPc);
+        let fill = "#14161a";
+        if (isRoot && isSel) fill = "#1e3a8a";
+        else if (isRoot)     fill = "#3b4d76";
+        else if (isSel)      fill = "var(--accent)";
+        s += `<rect class="key" data-pc="${bk.pc}" x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
+        s += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" pointer-events="none">${bk.name}</text>`;
+      }
     }
     s += `</svg>`;
     return s;
@@ -1290,6 +1305,7 @@ function buildClickablePianoKeyboard(initialPcs, onChange) {
   // Public API
   wrap.getSelectedPcs = () => [...selected];
   wrap.setSelectedPcs = (pcs) => { selected.clear(); pcs.forEach(p => selected.add(p)); rerender(); };
+  wrap.setRootPc = (pc) => { currentRootPc = (pc === null || pc === undefined) ? null : pc; rerender(); };
   return wrap;
 }
 
@@ -3063,10 +3079,11 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   const nameEl      = bg.querySelector("#ve-name");
   const notesEl     = bg.querySelector("#ve-notes");
 
-  // If we have a piano mount, build the clickable keyboard
+  // If we have a piano mount, build the clickable keyboard (root highlighted from chord name)
   let clickPiano = null;
   if (pianoMount) {
-    clickPiano = buildClickablePianoKeyboard(pianoPcs, pcs => { pianoPcs = pcs; updateAll(); });
+    const initialRoot = splitChord(chordName)?.root;
+    clickPiano = buildClickablePianoKeyboard(pianoPcs, pcs => { pianoPcs = pcs; updateAll(); }, initialRoot);
     pianoMount.appendChild(clickPiano);
   }
 
@@ -3125,6 +3142,17 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   fretsInput?.addEventListener("input", updateAll);
   bg.querySelector("#ve-chord-name").addEventListener("input", e => {
     e.target.dataset.userEdited = "1";
+    // When user types a recognized chord name, sync the keyboard to that chord's notes
+    // so they get a fresh starting point for the new chord they want to voice.
+    const newName = e.target.value.trim();
+    const parsed = splitChord(newName);
+    if (parsed && clickPiano) {
+      const ivs = qualityToIntervals(parsed.quality);
+      const newPcs = ivs.map(i => (parsed.root + i) % 12);
+      pianoPcs = newPcs;
+      clickPiano.setSelectedPcs(newPcs);
+      clickPiano.setRootPc(parsed.root);
+    }
     updateAll();
   });
   updateAll();
@@ -3146,11 +3174,25 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     // Use whatever the chord-name input currently has (auto-detected OR user-overridden).
     const inputName = bg.querySelector("#ve-chord-name").value.trim();
     const targetName = inputName || chordName;
-    saveVoicing(song, targetName, voicing, isEdit && targetName === chordName ? editIndex : undefined);
+
+    // If the chord was renamed, ask whether to apply the rename to all instances in the lyrics
+    let renameAll = false;
     if (targetName !== chordName) {
-      // Rename chord in lyrics so the new name actually appears
-      song.lyrics = (song.lyrics || "").replace(new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g"), "[" + targetName + "]");
-      // Remove the old voicing if we were editing
+      const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
+      const matches = (song.lyrics || "").match(re) || [];
+      const count = matches.length;
+      if (count > 0) {
+        renameAll = confirm(
+          `You renamed [${chordName}] → [${targetName}].\n\n` +
+          `Apply to ALL ${count} instance${count === 1 ? "" : "s"} of [${chordName}] in this song? (Cancel = keep lyrics unchanged; just save the voicing under the new name.)`
+        );
+      }
+    }
+
+    saveVoicing(song, targetName, voicing, isEdit && targetName === chordName ? editIndex : undefined);
+    if (targetName !== chordName && renameAll) {
+      const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
+      song.lyrics = (song.lyrics || "").replace(re, "[" + targetName + "]");
       if (isEdit) deleteVoicing(song, chordName, editIndex);
     }
     saveState({ songs: state.songs });
