@@ -466,8 +466,8 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
     padding: 16px 18px 12px;
-    min-width: 260px;
-    max-width: 400px;
+    min-width: 320px;
+    max-width: 540px;
     opacity: 0;
     transform: translateY(4px);
     transition: opacity .12s ease, transform .12s ease;
@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.2";
 
 //=============================================================
 // STORAGE
@@ -1226,11 +1226,13 @@ function intervalLabel(semitones) {
 
 // Try to identify a chord name from a set of pitch classes.
 // `preferredRoot` (optional pc) anchors the root if you already know it.
+// `preferFlat` (optional bool) — output flats instead of sharps for accidentals (e.g. Bb instead of A#).
 // Strategies in order: exact → omit-one → add-one → descriptive fallback.
-function chordNameFromPcs(pcs, preferredRoot) {
+function chordNameFromPcs(pcs, preferredRoot, preferFlat) {
   const uniq = [...new Set(pcs.map(pc => ((pc % 12) + 12) % 12))];
   if (uniq.length < 1) return null;
-  if (uniq.length === 1) return pcToName(uniq[0]);
+  const name = (pc) => pcToName(pc, !!preferFlat);
+  if (uniq.length === 1) return name(uniq[0]);
 
   const roots = (preferredRoot !== undefined && preferredRoot !== null)
     ? [((preferredRoot % 12) + 12) % 12, ...uniq.filter(p => p !== preferredRoot)]
@@ -1241,12 +1243,12 @@ function chordNameFromPcs(pcs, preferredRoot) {
     for (const [q, ivs] of CHORD_QUALITY_TEMPLATES) {
       const expected = new Set(ivs.map(i => (root + i) % 12));
       if (expected.size === uniq.length && uniq.every(pc => expected.has(pc))) {
-        return pcToName(root) + q;
+        return name(root) + q;
       }
     }
   }
 
-  // 2. Try omit-one: input is missing ONE note from a known template
+  // 2. Try omit-one
   for (const root of roots) {
     for (const [q, ivs] of CHORD_QUALITY_TEMPLATES) {
       const expected = new Set(ivs.map(i => (root + i) % 12));
@@ -1257,13 +1259,13 @@ function chordNameFromPcs(pcs, preferredRoot) {
           let omit = null;
           if (missInt === 7) omit = "no5";
           else if (missInt === 3 || missInt === 4) omit = "no3";
-          if (omit) return pcToName(root) + q + "(" + omit + ")";
+          if (omit) return name(root) + q + "(" + omit + ")";
         }
       }
     }
   }
 
-  // 3. Try add-one: input has ONE extra note over a known template
+  // 3. Try add-one
   for (const root of roots) {
     for (const [q, ivs] of CHORD_QUALITY_TEMPLATES) {
       const expected = new Set(ivs.map(i => (root + i) % 12));
@@ -1272,19 +1274,19 @@ function chordNameFromPcs(pcs, preferredRoot) {
         const extInt = ((extra - root + 12) % 12);
         const addMap = { 1:"b9", 2:"add9", 3:"#9", 5:"add11", 6:"#11", 8:"b13", 9:"add6", 11:"add maj7" };
         const addName = addMap[extInt];
-        if (addName) return pcToName(root) + q + "(add " + addName.replace("add ", "") + ")";
+        if (addName) return name(root) + q + "(add " + addName.replace("add ", "") + ")";
       }
     }
   }
 
-  // 4. Descriptive fallback — root + interval set
+  // 4. Descriptive fallback
   const rootPc = preferredRoot !== undefined && preferredRoot !== null ? (((preferredRoot % 12) + 12) % 12) : uniq.sort((a,b) => a-b)[0];
   const labels = uniq
     .filter(pc => pc !== rootPc)
     .map(pc => intervalLabel(((pc - rootPc) + 12) % 12))
     .filter(l => l && !l.startsWith("?"));
-  if (labels.length === 0) return pcToName(rootPc);
-  return pcToName(rootPc) + "(" + labels.join(",") + ")";
+  if (labels.length === 0) return name(rootPc);
+  return name(rootPc) + "(" + labels.join(",") + ")";
 }
 
 // Parse a string like "C E G B" or "C4, E4, G4, B4" into pitch classes
@@ -2731,25 +2733,34 @@ function getVoicings(song, chordName) {
   }
   song.voicings = song.voicings || {};
   const list = [];
-  // Built-in suggested voicings — only for complex chords (major/minor user already knows)
-  if (!isSimpleMajorOrMinor(chordName)) {
+  const userVoicings = song.voicings[chordName] || [];
+
+  // User voicings come FIRST so they're the default in the popover
+  for (const v of userVoicings) {
+    list.push(Object.assign({ builtIn: false }, v));
+  }
+
+  // Built-in suggested voicing — only when:
+  //   (a) chord is complex (not plain major/minor — user already knows those)
+  //   (b) user hasn't saved any voicings yet (their custom takes precedence)
+  // Includes guitar shape only if guitar is selected on the song, piano notes only if piano selected.
+  // If no instruments are selected at all, include both so the user gets some suggestion.
+  if (userVoicings.length === 0 && !isSimpleMajorOrMinor(chordName)) {
+    const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
+    const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
     const parsed = splitChord(chordName);
-    const builtIn = lookupShape(chordName);
-    const pianoNotes = parsed ? qualityToIntervals(parsed.quality).map(i => (parsed.root + i) % 12) : null;
-    if (builtIn || pianoNotes) {
+    const builtIn = wantGuitar ? lookupShape(chordName) : null;
+    const pianoNotes = wantPiano && parsed ? qualityToIntervals(parsed.quality).map(i => (parsed.root + i) % 12) : null;
+    if (builtIn || (pianoNotes && pianoNotes.length)) {
       list.push({
-        frets:    builtIn?.frets,
-        fingers:  builtIn?.fingers,
-        barre:    builtIn?.barre,
+        frets:     builtIn?.frets,
+        fingers:   builtIn?.fingers,
+        barre:     builtIn?.barre,
         pianoNotes: pianoNotes,
-        note:     builtIn?.derived ? "Movable barre shape" : "",
-        builtIn:  true,
+        note:      builtIn?.derived ? "Movable barre shape" : "",
+        builtIn:   true,
       });
     }
-  }
-  // User-saved voicings (always shown)
-  for (const v of (song.voicings[chordName] || [])) {
-    list.push(Object.assign({ builtIn: false }, v));
   }
   return list;
 }
@@ -3012,14 +3023,13 @@ function renderPopover(target) {
   const voicings = (wantGuitar || wantPiano) ? getVoicings(song, chordName) : [];
   const current = voicings[index] || null;
   const total = voicings.length;
-  // Guitar diagram — only render if we have a voicing for this chord (built-in or custom).
-  // For simple major/minor with no user voicing, show empty state with Add CTA.
+  // Guitar diagram — bigger in popover (md size) so it's easy to read at a glance
   const guitarHtml = wantGuitar
     ? `<div class="diag-mini">
         <div class="label">Guitar${current && !current.builtIn ? " · custom" : ""}</div>
-        ${current
-          ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "sm")
-          : `<div class="muted small" style="padding:18px 6px; text-align:center; min-width:110px;">No saved voicing<br><span class="micro">click <b>+ Add</b> below</span></div>`
+        ${current && current.frets
+          ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "md")
+          : (current ? "" : `<div class="muted small" style="padding:18px 6px; text-align:center; min-width:130px;">No saved voicing<br><span class="micro">click <b>+ Add</b> below</span></div>`)
         }
       </div>`
     : "";
@@ -3027,8 +3037,8 @@ function renderPopover(target) {
     ? `<div class="diag-mini">
         <div class="label">Piano${current && current.pianoNotes && !current.builtIn ? " · custom" : ""}</div>
         ${current && current.pianoNotes && current.pianoNotes.length
-          ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "sm")
-          : svgPiano(chordName, 2, "sm")}
+          ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "md")
+          : svgPiano(chordName, 2, "md")}
       </div>`
     : "";
   const both = wantGuitar && wantPiano;
@@ -3293,8 +3303,11 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     }
     // Detect chord name from combined input — auto-fills the name field unless user has typed.
     // Anchor on the current chord's root if known, so e.g. {D, G#, A} is parsed as D-rooted.
-    const knownRoot = splitChord(bg.querySelector("#ve-chord-name").value || chordName)?.root;
-    const detected = chordNameFromPcs(allPcs, knownRoot);
+    // Preserve the original chord name's accidental: if the song has [Bb7], new voicings stay Bb (not A#).
+    const currentNameForRoot = bg.querySelector("#ve-chord-name").value || chordName;
+    const knownRoot = splitChord(currentNameForRoot)?.root;
+    const preferFlat = /b/.test(chordName.split("/")[0]);
+    const detected = chordNameFromPcs(allPcs, knownRoot, preferFlat);
     const nameInput = bg.querySelector("#ve-chord-name");
     if (detected && !nameInput.dataset.userEdited) {
       nameInput.value = detected;
@@ -3402,10 +3415,12 @@ function openChordModal(chordName, song) {
       <h3>${escapeHtml(chordName)}</h3>
       <div class="modal-sub">${describeNotes(chordName)}</div>
 
-      <div class="diag-card" style="margin-top:12px;">
-        <h4>Piano (suggested)</h4>
-        <div class="canvas">${svgPiano(chordName)}</div>
-      </div>
+      ${(!song?.instruments?.length || song.instruments.includes("piano")) ? `
+        <div class="diag-card" style="margin-top:12px;">
+          <h4>Piano (suggested)</h4>
+          <div class="canvas">${svgPiano(chordName)}</div>
+        </div>
+      ` : ""}
 
       <div style="display:flex; align-items:center; justify-content:space-between; margin: 18px 0 10px;">
         <h4 style="margin:0; font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; font-weight:600;">Voicings</h4>
@@ -3418,14 +3433,21 @@ function openChordModal(chordName, song) {
         </div>
       ` : `
         <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
-          ${voicings.map((v, i) => `
+          ${voicings.map((v, i) => {
+            // Honor song instruments — don't show guitar diagram on a piano-only song, and vice versa
+            const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
+            const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
+            const showFrets = wantGuitar && v.frets;
+            const showPiano = wantPiano && v.pianoNotes && v.pianoNotes.length;
+            return `
             <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
               <h4>${v.builtIn ? "Built-in" : (v.name ? escapeHtml(v.name) : "Voicing " + i)}</h4>
               <div class="canvas">
-                ${v.frets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm") : ""}
-                ${v.pianoNotes && v.pianoNotes.length ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, 1, "sm")}</div>` : ""}
+                ${showFrets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm") : ""}
+                ${showPiano ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, undefined, "sm")}</div>` : ""}
+                ${!showFrets && !showPiano ? `<div class="muted small" style="text-align:center;">(no diagram for selected instruments)</div>` : ""}
               </div>
-              ${v.frets ? `<div class="meta">${fretsToString(v.frets)}</div>` : ""}
+              ${showFrets ? `<div class="meta">${fretsToString(v.frets)}</div>` : ""}
               ${v.note ? `<div class="meta" style="margin-top:6px; color:var(--ink-soft); font-family:var(--sans); font-size:12px;">${escapeHtml(v.note)}</div>` : ""}
               ${!v.builtIn ? `
                 <div style="display:flex; gap:4px; justify-content:center; margin-top:8px;">
@@ -3434,7 +3456,7 @@ function openChordModal(chordName, song) {
                 </div>
               ` : ""}
             </div>
-          `).join("")}
+          `;}).join("")}
         </div>
       `}
 
