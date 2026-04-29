@@ -1,6 +1,6 @@
 // Cross-browser API: Firefox uses `browser`, Chrome uses `chrome`. The `chrome` namespace works in both.
 const api = (typeof browser !== "undefined") ? browser : chrome;
-const ARCHIVE_URL = "https://songs.markpytlik.com/";
+const ARCHIVE_URL = "https://chordkeeper.markpytlik.com/";
 
 const $ = (id) => document.getElementById(id);
 function setStatus(msg, kind = "") {

@@ -1,6 +1,6 @@
 # Chord Archive — Browser Extension
 
-One-click chord-chart capture for [Chord Archive](https://songs.markpytlik.com/).
+One-click chord-chart capture for [Chord Keeper](https://chordkeeper.markpytlik.com/).
 Same logic as the bookmarklet, but as a permanent toolbar button.
 
 ## What it does
@@ -17,7 +17,7 @@ generic `<pre>`-based fallback for everything else.
 ## Install (Firefox)
 
 Pre-built `.xpi` is at the repo root, versioned per release. Latest:
-[`chord-archive-grabber-1.2.0.xpi`](https://github.com/markpytlik/chord-archive/raw/main/chord-archive-grabber-1.2.0.xpi)
+[`chord-archive-grabber-1.3.4.xpi`](https://github.com/markpytlik/chord-archive/raw/main/chord-archive-grabber-1.3.4.xpi)
 
 Older versions remain in the repo root for rollback if needed.
 
@@ -27,11 +27,11 @@ Three options, in order of permanence:
 ### Option A — Temporary install (lasts until Firefox restarts)
 1. Open `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on…**
-3. Select either the `chord-archive-grabber-1.2.0.xpi` file or `manifest.json` inside this folder.
+3. Select either the `chord-archive-grabber-1.3.4.xpi` file or `manifest.json` inside this folder.
 
 ### Option B — Permanent in Firefox Developer Edition / Nightly / ESR
 1. In `about:config`, set `xpinstall.signatures.required` to `false`.
-2. Drag `chord-archive-grabber-1.2.0.xpi` into Firefox.
+2. Drag `chord-archive-grabber-1.3.4.xpi` into Firefox.
 3. Firefox prompts to install — click **Add**.
 
 ### Option C — Permanent in regular Firefox (signed)

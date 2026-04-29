@@ -1016,7 +1016,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.5";
+const APP_VERSION = "1.4.6";
 
 //=============================================================
 // STORAGE
@@ -2281,11 +2281,11 @@ function bookmarkletSource() {
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
       title, artist, lyrics, sourceUrl: location.href
     }))));
-    const target = "https://songs.markpytlik.com/#new=" + payload;
+    const target = "https://chordkeeper.markpytlik.com/#new=" + payload;
     if (target.length > 500000) {
-      alert("Chord Archive: chart is too large for direct import. Falling back to clipboard.");
+      alert("Chord Keeper: chart is too large for direct import. Falling back to clipboard.");
       navigator.clipboard.writeText(lyrics);
-      window.open("https://songs.markpytlik.com/", "_blank");
+      window.open("https://chordkeeper.markpytlik.com/", "_blank");
       return;
     }
     window.open(target, "_blank");
