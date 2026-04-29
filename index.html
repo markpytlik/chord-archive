@@ -1259,23 +1259,19 @@ async function importFromUrl(url) {
 }
 
 // ----- Bookmarklet — runs in user's logged-in browser, bypasses CF + CORS -----
-// On click: scrape current page, convert to ChordPro, copy to clipboard.
-// User then pastes into Chord Archive's "Parse pasted sheet" box.
+// On click: scrape current page → open Chord Archive with a #new= hash that
+// auto-populates the new-song editor. No clipboard, no paste step.
 function bookmarkletSource() {
   const fn = function() {
-    const log = (...a) => console.log("[chordarchive]", ...a);
     let lyrics = "", title = "", artist = "";
     const host = location.hostname;
-
     function ugToChordPro(s) {
       return s.replace(/\[ch\]([^\[]+)\[\/ch\]/g, (_, c) => "[" + c.trim() + "]")
               .replace(/\[\/?tab\]/g, "");
     }
-
-    // Ultimate Guitar
     if (/ultimate-guitar\.com/.test(host)) {
       const store = document.querySelector(".js-store");
-      if (store) {
+      if (store && store.dataset && store.dataset.content) {
         try {
           const data = JSON.parse(store.dataset.content);
           const tab = data?.store?.page?.data?.tab_view?.wiki_tab?.content
@@ -1286,47 +1282,37 @@ function bookmarkletSource() {
             title = meta?.song_name || "";
             artist = meta?.artist_name || "";
           }
-        } catch (e) { log("UG json parse failed", e); }
+        } catch (e) {}
       }
     }
-    // E-chords
     if (!lyrics && /e-chords\.com/.test(host)) {
       const pre = document.querySelector("pre#core") || document.querySelector("pre");
       if (pre) lyrics = ugToChordPro(pre.textContent);
     }
-    // Generic <pre> — find longest
     if (!lyrics) {
-      const pres = [...document.querySelectorAll("pre")].sort((a,b) => b.textContent.length - a.textContent.length);
-      if (pres[0] && pres[0].textContent.length > 100) lyrics = pres[0].textContent;
+      const pres = [...document.querySelectorAll("pre")]
+        .filter(p => p.textContent.length > 100)
+        .sort((a,b) => b.textContent.length - a.textContent.length);
+      if (pres[0]) lyrics = pres[0].textContent;
     }
-    // Title fallback
     if (!title) {
-      title = document.querySelector("h1")?.textContent?.trim() || document.title.replace(/\s*[\|@\-–—].*/, "").trim();
+      title = document.querySelector("h1")?.textContent?.trim()
+            || document.title.replace(/\s*[\|@\-–—].*/, "").trim();
     }
+    if (!lyrics) { alert("Chord Archive: couldn't find a chord chart on this page."); return; }
 
-    if (!lyrics) {
-      alert("Chord Archive: couldn't find a chord chart on this page.");
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+      title, artist, lyrics, sourceUrl: location.href
+    }))));
+    const target = "https://songs.markpytlik.com/#new=" + payload;
+    if (target.length > 500000) {
+      alert("Chord Archive: chart is too large for direct import. Falling back to clipboard.");
+      navigator.clipboard.writeText(lyrics);
+      window.open("https://songs.markpytlik.com/", "_blank");
       return;
     }
-    let out = "";
-    if (title) out += "{title: " + title.replace(/[{}]/g, "") + "}\n";
-    if (artist) out += "{artist: " + artist.replace(/[{}]/g, "") + "}\n";
-    out += "\n" + lyrics;
-
-    navigator.clipboard.writeText(out).then(() => {
-      const go = confirm("Chord Archive: copied to clipboard (" + lyrics.length + " chars).\nOpen Chord Archive now to paste?");
-      if (go) window.open("https://songs.markpytlik.com/", "_blank");
-    }).catch(e => {
-      // Fallback if clipboard API not available — show in textarea
-      const ta = document.createElement("textarea");
-      ta.value = out;
-      ta.style.cssText = "position:fixed;top:10%;left:10%;width:80%;height:80%;z-index:99999;background:#fff;border:2px solid #b14a2c;padding:12px;font-family:monospace";
-      document.body.appendChild(ta);
-      ta.select();
-      alert("Couldn't auto-copy. Select all (Cmd+A) and copy (Cmd+C), then close.");
-    });
+    window.open(target, "_blank");
   };
-  // Strip whitespace; wrap in IIFE; prefix with javascript:
   const body = "(" + fn.toString().replace(/\s+/g, " ") + ")();";
   return "javascript:" + encodeURIComponent(body);
 }
@@ -1500,13 +1486,15 @@ function renderDetail() {
 }
 
 function renderEditor(el) {
-  const isNew = state.editing === "new";
-  const song = isNew ? blankSong() : Object.assign({}, state.editing);
+  // "new" string OR an unsaved draft object (e.g. from #new= hash) both render as fresh
+  const isImported = state.editing && typeof state.editing === "object" && !state.songs.find(s => s.id === state.editing.id);
+  const isNew = state.editing === "new" || isImported;
+  const song = state.editing === "new" ? blankSong() : Object.assign({}, state.editing);
   el.innerHTML = `
     <div class="detail-head">
       <div class="title-block">
-        <div class="artist">${isNew ? "NEW SONG" : "EDITING"}</div>
-        <h1>${isNew ? "Add a song" : escapeHtml(song.title || "Untitled")}</h1>
+        <div class="artist">${isImported ? "IMPORTED · REVIEW &amp; SAVE" : isNew ? "NEW SONG" : "EDITING"}</div>
+        <h1>${isImported ? escapeHtml(song.title || "Imported song") : isNew ? "Add a song" : escapeHtml(song.title || "Untitled")}</h1>
       </div>
       <div class="detail-actions">
         <button id="btn-cancel" class="ghost">Cancel</button>
@@ -1949,6 +1937,32 @@ function importJsonFile(file) {
 //=============================================================
 // INIT
 //=============================================================
+// Decode a #new=<base64> hash payload from the extension/bookmarklet.
+// Returns a partial song object or null.
+function consumeImportHash() {
+  const h = location.hash;
+  if (!h.startsWith("#new=")) return null;
+  try {
+    const raw = decodeURIComponent(escape(atob(h.slice(5))));
+    const payload = JSON.parse(raw);
+    // Always run the chord-sheet parser — handles inline ChordPro, chord-line-above-lyrics, and ChordPro directives.
+    const parsed = parseChordSheet(payload.lyrics || "");
+    const song = Object.assign(blankSong(), {
+      title: payload.title || parsed.title || "",
+      artist: payload.artist || parsed.artist || "",
+      key: payload.key || parsed.key || "",
+      lyrics: parsed.lyrics || payload.lyrics || "",
+      sourceUrl: payload.sourceUrl || "",
+    });
+    // Clear the hash so reload doesn't double-create
+    history.replaceState(null, "", location.pathname + location.search);
+    return song;
+  } catch (e) {
+    console.warn("Failed to parse #new= payload:", e);
+    return null;
+  }
+}
+
 async function init() {
   const persisted = loadState();
   state.songs = persisted.songs || [];
@@ -1959,6 +1973,13 @@ async function init() {
       saveState({ songs: state.songs });
     }
   }
+
+  // Direct-import from extension/bookmarklet via URL hash
+  const imported = consumeImportHash();
+  if (imported) {
+    state.editing = imported;  // open editor with pre-filled values
+  }
+
   document.getElementById("btn-new").addEventListener("click", () => {
     state.editing = "new"; renderDetail();
   });
