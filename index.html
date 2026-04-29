@@ -303,7 +303,7 @@
   }
   .detail-head h1 .key-inline .key-pre { opacity: .7; }
   .detail-head h1 .key-inline .key-name { font-weight: 500; }
-  .detail-head h1 .key-inline .key-name.transposed { font-style: italic; }
+  .detail-head h1 .key-inline .key-name.transposed { font-style: normal; }
   .detail-head h1 .key-inline .transpose-btn {
     background: transparent;
     border: 0;
@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.13";
+const APP_VERSION = "1.3.14";
 
 //=============================================================
 // STORAGE
@@ -1303,11 +1303,13 @@ function parsePianoNotesString(s) {
 }
 
 // Build an interactive 2-octave (24 key) piano keyboard SVG. Click a key to toggle.
-// rootPc (optional) gets highlighted in blue. onChange(pcs) fires on selection change.
-function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
+// Key positions are absolute (0-23): C in octave 0 = 0, C in octave 1 = 12, etc.
+// rootPc (optional) highlights ALL keys of that pitch class in pale blue (so user can find "home" in either octave).
+// onChange(positions) fires on selection change.
+function buildClickablePianoKeyboard(initialPositions, onChange, rootPc) {
   const wrap = document.createElement("div");
   wrap.className = "click-piano";
-  const selected = new Set(initialPcs);
+  const selected = new Set(initialPositions);
   let currentRootPc = (rootPc === undefined || rootPc === null) ? null : rootPc;
 
   const OCTAVES = 2;
@@ -1326,33 +1328,36 @@ function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
 
   function svg() {
     let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer; display:block;">`;
-    // White keys — selected = blue (#2c5fbf); root = darker blue (#14296b); pale blue if root not selected.
+    // White keys — selected by absolute position; root highlight by pitch-class (visible in both octaves)
     for (let i = 0; i < totalWhites; i++) {
       const idx = i % 7;
+      const oct = Math.floor(i / 7);
       const pc = whiteOffsets[idx];
+      const position = oct * 12 + pc;   // absolute key index (0-23)
       const x = i * whiteW;
-      const isSel = selected.has(pc);
+      const isSel = selected.has(position);
       const isRoot = (currentRootPc !== null && pc === currentRootPc);
       let fill = "#fff";
-      if (isRoot && isSel) fill = "#14296b";        // root selected: darker blue
-      else if (isRoot)     fill = "#dde6f7";        // root not selected: pale blue background
-      else if (isSel)      fill = "#2c5fbf";        // non-root selected: medium blue
+      if (isRoot && isSel) fill = "#14296b";        // root pc + this exact key clicked
+      else if (isRoot)     fill = "#dde6f7";        // root pc, not clicked: pale blue
+      else if (isSel)      fill = "#2c5fbf";        // non-root, clicked: medium blue
       const labelColor = (isSel) ? "#fff" : (isRoot ? "#14296b" : "#888");
-      s += `<rect class="key" data-pc="${pc}" x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
+      s += `<rect class="key" data-pos="${position}" x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
       s += `<text x="${x + whiteW/2}" y="${whiteH - 12}" text-anchor="middle" font-size="11" fill="${labelColor}" font-family="ui-sans-serif" pointer-events="none">${whiteNames[idx]}</text>`;
     }
     // Black keys
     for (let oct = 0; oct < OCTAVES; oct++) {
       for (const bk of blackTemplate) {
         const i = oct * 7 + bk.afterWhite;
+        const position = oct * 12 + bk.pc;
         const x = (i + 1) * whiteW - blackW/2;
-        const isSel = selected.has(bk.pc);
+        const isSel = selected.has(position);
         const isRoot = (currentRootPc !== null && bk.pc === currentRootPc);
         let fill = "#14161a";
         if (isRoot && isSel) fill = "#14296b";
         else if (isRoot)     fill = "#3b4d76";
         else if (isSel)      fill = "#2c5fbf";
-        s += `<rect class="key" data-pc="${bk.pc}" x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
+        s += `<rect class="key" data-pos="${position}" x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
         s += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" pointer-events="none">${bk.name}</text>`;
       }
     }
@@ -1364,17 +1369,17 @@ function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
   rerender();
 
   wrap.addEventListener("click", e => {
-    const k = e.target.closest(".key[data-pc]");
+    const k = e.target.closest(".key[data-pos]");
     if (!k) return;
-    const pc = parseInt(k.getAttribute("data-pc"));
-    if (selected.has(pc)) selected.delete(pc); else selected.add(pc);
+    const pos = parseInt(k.getAttribute("data-pos"));
+    if (selected.has(pos)) selected.delete(pos); else selected.add(pos);
     rerender();
     onChange([...selected]);
   });
 
-  // Public API
-  wrap.getSelectedPcs = () => [...selected];
-  wrap.setSelectedPcs = (pcs) => { selected.clear(); pcs.forEach(p => selected.add(p)); rerender(); };
+  // Public API — positions are absolute key indices 0-23
+  wrap.getSelectedPositions = () => [...selected];
+  wrap.setSelectedPositions = (positions) => { selected.clear(); positions.forEach(p => selected.add(p)); rerender(); };
   wrap.setRootPc = (pc) => { currentRootPc = (pc === null || pc === undefined) ? null : pc; rerender(); };
   return wrap;
 }
@@ -1624,9 +1629,16 @@ const BLACK_KEYS = [
   { afterWhite: 5, pc: 10 },
 ];
 
-// Render a piano keyboard highlighting an explicit set of pitch classes (root optional).
-function svgPianoFromPcs(pcs, rootPc, octaves=2, size="md") {
-  const noteSet = new Set(pcs.map(pc => ((pc % 12) + 12) % 12));
+// Render a piano keyboard highlighting saved voicing positions.
+// `positions` may contain absolute key indices (0-23) for per-key fidelity,
+// OR pitch classes (0-11) for legacy data — these get expanded to all matching keys.
+// `rootPc` highlights the root pitch class in both octaves.
+function svgPianoFromPcs(positions, rootPc, octaves=2, size="md") {
+  // Distinguish: if any position is >=12, the data already includes octave info (per-key mode).
+  // Otherwise treat input as legacy pitch classes (highlight in both octaves).
+  const hasOctave = positions.some(n => n >= 12);
+  const positionSet = new Set(positions);
+  const pcSet = new Set(positions.map(n => ((n % 12) + 12) % 12));
   const dim = size === "sm" ? { whiteW: 18, whiteH: 80, blackW: 11, blackH: 50 } :
               size === "lg" ? { whiteW: 26, whiteH: 110, blackW: 16, blackH: 70 } :
                               { whiteW: 22, whiteH: 100, blackW: 13, blackH: 62 };
@@ -1636,20 +1648,23 @@ function svgPianoFromPcs(pcs, rootPc, octaves=2, size="md") {
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
   for (let i = 0; i < totalWhites; i++) {
     const pc = WHITE_KEYS_PC[i % 7];
-    const isHit = noteSet.has(pc);
+    const oct = Math.floor(i / 7);
+    const position = oct * 12 + pc;
+    const isHit = hasOctave ? positionSet.has(position) : pcSet.has(pc);
     const isRoot = (rootPc !== undefined && pc === rootPc);
     const x = i * whiteW;
-    const fill = isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#fff");
+    const fill = isRoot && isHit ? "#14296b" : (isHit ? "#2c5fbf" : (isRoot ? "#dde6f7" : "#fff"));
     svg += `<rect x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
     if (isHit) svg += `<text x="${x + whiteW/2}" y="${whiteH - 10}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(pc)}</text>`;
   }
   for (let oct = 0; oct < octaves; oct++) {
     for (const bk of BLACK_KEYS) {
       const i = oct * 7 + bk.afterWhite;
+      const position = oct * 12 + bk.pc;
       const x = (i + 1) * whiteW - blackW/2;
-      const isHit = noteSet.has(bk.pc);
+      const isHit = hasOctave ? positionSet.has(position) : pcSet.has(bk.pc);
       const isRoot = (rootPc !== undefined && bk.pc === rootPc);
-      const fill = isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#14161a");
+      const fill = isRoot && isHit ? "#14296b" : (isHit ? "#2c5fbf" : (isRoot ? "#3b4d76" : "#14161a"));
       svg += `<rect x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
       if (isHit) svg += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="8" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(bk.pc)}</text>`;
     }
@@ -3140,7 +3155,10 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
 
   // Live previews + chord-name detection.
   let resolvedName = chordName;
-  let pianoPcs = seed?.pianoNotes ? [...seed.pianoNotes] : [];
+  // Migrate legacy pc-only pianoNotes to absolute positions in octave 0
+  let pianoPcs = seed?.pianoNotes
+    ? seed.pianoNotes.map(n => n < 12 ? n : n)  // absolute positions or pcs (treat 0-11 as oct-0 keys)
+    : [];
   const fretsInput  = showGuitar ? bg.querySelector("#ve-frets") : null;
   const pianoMount  = showPiano  ? bg.querySelector("#ve-piano-kbd") : null;
   const previewG    = showGuitar ? bg.querySelector("#ve-preview-guitar") : null;
@@ -3153,13 +3171,12 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   let clickPiano = null;
   if (pianoMount) {
     const initialRoot = splitChord(chordName)?.root;
-    clickPiano = buildClickablePianoKeyboard(pianoPcs, pcs => { pianoPcs = pcs; updateAll(); }, initialRoot);
+    clickPiano = buildClickablePianoKeyboard(pianoPcs, positions => { pianoPcs = positions; updateAll(); }, initialRoot);
     pianoMount.appendChild(clickPiano);
     const clearBtn = bg.querySelector("#ve-piano-clear");
     if (clearBtn) clearBtn.addEventListener("click", () => {
       pianoPcs = [];
-      clickPiano.setSelectedPcs([]);
-      clickPiano.setRootPc(null);
+      clickPiano.setSelectedPositions([]);
       updateAll();
     });
   }
@@ -3188,9 +3205,11 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     }
     if (showPiano && previewP) {
       if (pianoPcs.length) {
-        previewP.textContent = "Notes: " + pianoPcs.map(pc => pcToName(pc)).join("  ·  ");
+        // Convert absolute positions → pitch classes for the label
+        const pcsForLabel = pianoPcs.map(p => p % 12);
+        previewP.textContent = "Notes: " + pcsForLabel.map(pc => pcToName(pc)).join("  ·  ");
         previewP.className = "helper-msg";
-        allPcs = allPcs.concat(pianoPcs);
+        allPcs = allPcs.concat(pcsForLabel);
       } else {
         previewP.textContent = "Click keys above to build a voicing.";
         previewP.className = "helper-msg";
@@ -3227,9 +3246,10 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     const parsed = splitChord(newName);
     if (parsed && clickPiano) {
       const ivs = qualityToIntervals(parsed.quality);
-      const newPcs = ivs.map(i => (parsed.root + i) % 12);
-      pianoPcs = newPcs;
-      clickPiano.setSelectedPcs(newPcs);
+      // Place each note in its octave-0 position; for notes that fall above the root, keep them in the same octave
+      const positions = ivs.map(i => (parsed.root + i) % 12);  // single-octave starter
+      pianoPcs = positions;
+      clickPiano.setSelectedPositions(positions);
       clickPiano.setRootPc(parsed.root);
     }
     updateAll();
