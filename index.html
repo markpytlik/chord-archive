@@ -302,7 +302,7 @@
     border-radius: 999px;
   }
   .detail-head h1 .key-inline .key-pre { opacity: .7; }
-  .detail-head h1 .key-inline .key-name { font-weight: 600; }
+  .detail-head h1 .key-inline .key-name { font-weight: 500; }
   .detail-head h1 .key-inline .key-name.transposed { font-style: italic; }
   .detail-head h1 .key-inline .transpose-btn {
     background: transparent;
@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.12";
+const APP_VERSION = "1.3.13";
 
 //=============================================================
 // STORAGE
@@ -1180,41 +1180,111 @@ function detectKey(chordNames) {
 }
 
 // Reverse chord lookup: given a set of pitch classes, find a chord name that matches.
-// Tries each note as root with each known quality template.
+// Templates ordered from most specific → most generic.
 const CHORD_QUALITY_TEMPLATES = [
-  ["",      [0, 4, 7]],
-  ["m",     [0, 3, 7]],
-  ["dim",   [0, 3, 6]],
-  ["aug",   [0, 4, 8]],
-  ["sus2",  [0, 2, 7]],
-  ["sus4",  [0, 5, 7]],
-  ["6",     [0, 4, 7, 9]],
-  ["m6",    [0, 3, 7, 9]],
-  ["7",     [0, 4, 7, 10]],
-  ["maj7",  [0, 4, 7, 11]],
-  ["m7",    [0, 3, 7, 10]],
-  ["m7b5",  [0, 3, 6, 10]],
-  ["dim7",  [0, 3, 6, 9]],
-  ["7sus4", [0, 5, 7, 10]],
-  ["add9",  [0, 4, 7, 14 % 12]],
-  ["9",     [0, 4, 7, 10, 14 % 12]],
-  ["maj9",  [0, 4, 7, 11, 14 % 12]],
-  ["m9",    [0, 3, 7, 10, 14 % 12]],
+  // Triads
+  ["",        [0, 4, 7]],
+  ["m",       [0, 3, 7]],
+  ["dim",     [0, 3, 6]],
+  ["aug",     [0, 4, 8]],
+  ["sus2",    [0, 2, 7]],
+  ["sus4",    [0, 5, 7]],
+  // Sevenths
+  ["maj7",    [0, 4, 7, 11]],
+  ["7",       [0, 4, 7, 10]],
+  ["m7",      [0, 3, 7, 10]],
+  ["mMaj7",   [0, 3, 7, 11]],
+  ["m7b5",    [0, 3, 6, 10]],
+  ["dim7",    [0, 3, 6, 9]],
+  ["7b5",     [0, 4, 6, 10]],
+  ["7#5",     [0, 4, 8, 10]],
+  ["7sus4",   [0, 5, 7, 10]],
+  ["maj7#5",  [0, 4, 8, 11]],
+  // Sixths
+  ["6",       [0, 4, 7, 9]],
+  ["m6",      [0, 3, 7, 9]],
+  ["6/9",     [0, 4, 7, 9, 2]],
+  // Add chords
+  ["add9",    [0, 4, 7, 2]],
+  ["madd9",   [0, 3, 7, 2]],
+  ["add11",   [0, 4, 7, 5]],
+  // Ninths
+  ["9",       [0, 4, 7, 10, 2]],
+  ["maj9",    [0, 4, 7, 11, 2]],
+  ["m9",      [0, 3, 7, 10, 2]],
+  ["7b9",     [0, 4, 7, 10, 1]],
+  ["7#9",     [0, 4, 7, 10, 3]],
+  // Power & dyad shapes
+  ["5",       [0, 7]],
+  ["5(b5)",   [0, 6, 7]],   // power chord with added tritone
 ];
 
-function chordNameFromPcs(pcs) {
+function intervalLabel(semitones) {
+  const map = { 0:"1", 1:"b9", 2:"9", 3:"#9/b3", 4:"3", 5:"11", 6:"b5/#11", 7:"5", 8:"b13/#5", 9:"6/13", 10:"b7", 11:"7" };
+  return map[semitones] || ("?" + semitones);
+}
+
+// Try to identify a chord name from a set of pitch classes.
+// `preferredRoot` (optional pc) anchors the root if you already know it.
+// Strategies in order: exact → omit-one → add-one → descriptive fallback.
+function chordNameFromPcs(pcs, preferredRoot) {
   const uniq = [...new Set(pcs.map(pc => ((pc % 12) + 12) % 12))];
-  if (uniq.length < 2) return null;
-  for (const candidateRoot of uniq) {
-    for (const [quality, intervals] of CHORD_QUALITY_TEMPLATES) {
-      const expected = new Set(intervals.map(i => (candidateRoot + i) % 12));
-      if (expected.size !== uniq.length) continue;
-      let match = true;
-      for (const pc of expected) if (!uniq.includes(pc)) { match = false; break; }
-      if (match) return pcToName(candidateRoot) + quality;
+  if (uniq.length < 1) return null;
+  if (uniq.length === 1) return pcToName(uniq[0]);
+
+  const roots = (preferredRoot !== undefined && preferredRoot !== null)
+    ? [((preferredRoot % 12) + 12) % 12, ...uniq.filter(p => p !== preferredRoot)]
+    : uniq;
+
+  // 1. Exact match
+  for (const root of roots) {
+    for (const [q, ivs] of CHORD_QUALITY_TEMPLATES) {
+      const expected = new Set(ivs.map(i => (root + i) % 12));
+      if (expected.size === uniq.length && uniq.every(pc => expected.has(pc))) {
+        return pcToName(root) + q;
+      }
     }
   }
-  return null;
+
+  // 2. Try omit-one: input is missing ONE note from a known template
+  for (const root of roots) {
+    for (const [q, ivs] of CHORD_QUALITY_TEMPLATES) {
+      const expected = new Set(ivs.map(i => (root + i) % 12));
+      if (expected.size === uniq.length + 1) {
+        const missing = [...expected].filter(pc => !uniq.includes(pc));
+        if (missing.length === 1 && uniq.every(pc => expected.has(pc))) {
+          const missInt = ((missing[0] - root + 12) % 12);
+          let omit = null;
+          if (missInt === 7) omit = "no5";
+          else if (missInt === 3 || missInt === 4) omit = "no3";
+          if (omit) return pcToName(root) + q + "(" + omit + ")";
+        }
+      }
+    }
+  }
+
+  // 3. Try add-one: input has ONE extra note over a known template
+  for (const root of roots) {
+    for (const [q, ivs] of CHORD_QUALITY_TEMPLATES) {
+      const expected = new Set(ivs.map(i => (root + i) % 12));
+      if (uniq.length === expected.size + 1 && [...expected].every(pc => uniq.includes(pc))) {
+        const extra = uniq.find(pc => !expected.has(pc));
+        const extInt = ((extra - root + 12) % 12);
+        const addMap = { 1:"b9", 2:"add9", 3:"#9", 5:"add11", 6:"#11", 8:"b13", 9:"add6", 11:"add maj7" };
+        const addName = addMap[extInt];
+        if (addName) return pcToName(root) + q + "(add " + addName.replace("add ", "") + ")";
+      }
+    }
+  }
+
+  // 4. Descriptive fallback — root + interval set
+  const rootPc = preferredRoot !== undefined && preferredRoot !== null ? (((preferredRoot % 12) + 12) % 12) : uniq.sort((a,b) => a-b)[0];
+  const labels = uniq
+    .filter(pc => pc !== rootPc)
+    .map(pc => intervalLabel(((pc - rootPc) + 12) % 12))
+    .filter(l => l && !l.startsWith("?"));
+  if (labels.length === 0) return pcToName(rootPc);
+  return pcToName(rootPc) + "(" + labels.join(",") + ")";
 }
 
 // Parse a string like "C E G B" or "C4, E4, G4, B4" into pitch classes
@@ -3047,7 +3117,7 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
         ` : ""}
         ${showPiano ? `
           <div>
-            <label>Piano voicing <span class="muted">(click the keys you actually play)</span></label>
+            <label>Piano voicing <span class="muted">(click the keys you actually play)</span> <button type="button" id="ve-piano-clear" class="ghost" style="float:right; padding:0 8px; font-size:11px; text-transform:none; letter-spacing:0;">Clear all</button></label>
             <div id="ve-piano-kbd" style="text-align:center; padding:6px 0;"></div>
             <div class="helper-msg" id="ve-preview-piano" style="text-align:center;"></div>
           </div>
@@ -3085,6 +3155,13 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     const initialRoot = splitChord(chordName)?.root;
     clickPiano = buildClickablePianoKeyboard(pianoPcs, pcs => { pianoPcs = pcs; updateAll(); }, initialRoot);
     pianoMount.appendChild(clickPiano);
+    const clearBtn = bg.querySelector("#ve-piano-clear");
+    if (clearBtn) clearBtn.addEventListener("click", () => {
+      pianoPcs = [];
+      clickPiano.setSelectedPcs([]);
+      clickPiano.setRootPc(null);
+      updateAll();
+    });
   }
 
   function fretsToPcs(frets) {
@@ -3120,7 +3197,9 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
       }
     }
     // Detect chord name from combined input — auto-fills the name field unless user has typed.
-    const detected = chordNameFromPcs(allPcs);
+    // Anchor on the current chord's root if known, so e.g. {D, G#, A} is parsed as D-rooted.
+    const knownRoot = splitChord(bg.querySelector("#ve-chord-name").value || chordName)?.root;
+    const detected = chordNameFromPcs(allPcs, knownRoot);
     const nameInput = bg.querySelector("#ve-chord-name");
     if (detected && !nameInput.dataset.userEdited) {
       nameInput.value = detected;
