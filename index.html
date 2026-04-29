@@ -293,6 +293,10 @@
     display: inline-block; position: relative;
     padding-top: 1.7em; vertical-align: baseline;
   }
+  /* Chord-bearing segments need enough horizontal room for the pill so adjacent chords don't overlap */
+  .lyrics .seg:has(.chord) {
+    min-width: 2.5em;
+  }
   .lyrics .seg .chord {
     position: absolute; top: 0; left: 0;
     color: #1a1a1a; font-weight: 700;
@@ -1662,7 +1666,8 @@ function renderLyrics(text) {
       out.push(`<div class="chord-only-row">${html}</div>`);
       continue;
     }
-    // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment
+    // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment.
+    // Each chord-bearing segment gets a min-width sized to its chord name so adjacent pills don't overlap.
     let html = "";
     const re = /\[([^\]]+)\]([^\[]*)|([^\[]+)/g;
     let m;
@@ -1671,7 +1676,9 @@ function renderLyrics(text) {
         const chord = m[1];
         const text = m[2] || "";
         const safeText = text.length === 0 ? "&nbsp;" : escapeHtml(text);
-        html += `<span class="seg"><span class="chord" data-chord="${escapeHtml(chord)}">${escapeHtml(chord)}</span>${safeText}</span>`;
+        // Pill is ~0.7em per char + padding/border. Floor at 2.5em for short names.
+        const minW = Math.max(2.5, chord.length * 0.72 + 0.5).toFixed(2);
+        html += `<span class="seg" style="min-width:${minW}em;"><span class="chord" data-chord="${escapeHtml(chord)}">${escapeHtml(chord)}</span>${safeText}</span>`;
       } else {
         html += `<span class="seg">${escapeHtml(m[3])}</span>`;
       }
@@ -1945,18 +1952,20 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
     setHelper(removed > 0 ? `Stripped ${removed} tablature line${removed === 1 ? "" : "s"}.` : "No tablature lines found.", removed > 0 ? "ok" : "");
   });
 
-  // Instrument toggle pill behavior — click toggles the hidden checkbox + .on class, capo row follows guitar
+  // Instrument toggle — manual toggle so the visual state always matches, even though the
+  // checkbox is visually hidden. Without this, the label/checkbox association can fail to
+  // bubble through `pointer-events:none` on the input.
   document.querySelectorAll(".instrument-toggles .pill-btn").forEach(btn => {
     btn.addEventListener("click", e => {
-      // Let the click propagate to the inner checkbox naturally; just sync the .on class after
-      setTimeout(() => {
-        const cb = btn.querySelector('input[type="checkbox"]');
-        btn.classList.toggle("on", cb.checked);
-        if (btn.dataset.tg === "guitar") {
-          const capoRow = document.getElementById("f-capo-row");
-          if (capoRow) capoRow.style.display = cb.checked ? "" : "none";
-        }
-      }, 0);
+      e.preventDefault();
+      const cb = btn.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      btn.classList.toggle("on", cb.checked);
+      if (btn.dataset.tg === "guitar") {
+        const capoRow = document.getElementById("f-capo-row");
+        if (capoRow) capoRow.style.display = cb.checked ? "" : "none";
+      }
     });
   });
 
@@ -2043,8 +2052,17 @@ function blankSong() {
 
 // ---- Voicings model ----
 // song.voicings[chordName] = [ { frets:[…], pianoNotes:[pc,…]?, note:"…" }, … ]
-// Default voicing #0 is the built-in (lookupShape) — only stored explicitly when user customizes.
-// This getter returns the merged list: built-in first, then user-saved voicings.
+// User-added voicings live in song.voicings.
+// Built-in shapes are auto-included as voicing #0 EXCEPT for simple major/minor triads
+// (since the player already knows those — only complex/jazz/extended chords get auto-diagrams).
+function isSimpleMajorOrMinor(chordName) {
+  const parsed = splitChord(chordName);
+  if (!parsed) return false;
+  if (parsed.bass !== null) return false;  // slash chord — show diagram
+  const q = parsed.quality;
+  return q === "" || q === "M" || q === "maj" || q === "m" || q === "min";
+}
+
 function getVoicings(song, chordName) {
   // Migration shim: old { customShapes, voicingNotes } → new voicings array
   if (song.customShapes || song.voicingNotes) {
@@ -2064,18 +2082,20 @@ function getVoicings(song, chordName) {
   }
   song.voicings = song.voicings || {};
   const list = [];
-  // Always start with the built-in lookup (or note "no built-in" placeholder)
-  const builtIn = lookupShape(chordName);
-  if (builtIn) {
-    list.push({
-      frets: builtIn.frets,
-      fingers: builtIn.fingers,
-      barre: builtIn.barre,
-      note: builtIn.derived ? "Movable barre shape" : "",
-      builtIn: true,
-    });
+  // Built-in shape — but skip for simple major/minor triads
+  if (!isSimpleMajorOrMinor(chordName)) {
+    const builtIn = lookupShape(chordName);
+    if (builtIn) {
+      list.push({
+        frets: builtIn.frets,
+        fingers: builtIn.fingers,
+        barre: builtIn.barre,
+        note: builtIn.derived ? "Movable barre shape" : "",
+        builtIn: true,
+      });
+    }
   }
-  // Append user voicings
+  // Append user voicings (always shown)
   for (const v of (song.voicings[chordName] || [])) {
     list.push(Object.assign({ builtIn: false }, v));
   }
@@ -2223,8 +2243,16 @@ function renderPopover(target) {
   const voicings = wantGuitar ? getVoicings(song, chordName) : [];
   const current = voicings[index] || null;
   const total = voicings.length;
+  // Guitar diagram — only render if we have a voicing for this chord (built-in or custom).
+  // For simple major/minor with no user voicing, show empty state with Add CTA.
   const guitarHtml = wantGuitar
-    ? `<div class="diag-mini"><div class="label">Guitar${current && !current.builtIn ? " · custom" : ""}</div>${svgGuitar(chordName, current ? { frets: current.frets, fingers: current.fingers, barre: current.barre } : null, "sm")}</div>`
+    ? `<div class="diag-mini">
+        <div class="label">Guitar${current && !current.builtIn ? " · custom" : ""}</div>
+        ${current
+          ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "sm")
+          : `<div class="muted small" style="padding:18px 6px; text-align:center; min-width:110px;">No saved voicing<br><span class="micro">click <b>+ Add</b> below</span></div>`
+        }
+      </div>`
     : "";
   const pianoHtml = wantPiano
     ? `<div class="diag-mini"><div class="label">Piano</div>${svgPiano(chordName, 2, "sm")}</div>`
@@ -2243,7 +2271,7 @@ function renderPopover(target) {
       ${current && !current.builtIn ? `
         <button data-action="edit" title="Edit this voicing">Edit</button>
         <button data-action="delete" class="danger" title="Delete this voicing">Delete</button>
-      ` : `<button data-action="edit-from-builtin" title="Customize this chord">Customize</button>`}
+      ` : current && current.builtIn ? `<button data-action="edit-from-builtin" title="Customize this chord">Customize</button>` : ""}
     </div>`;
 
   pop.innerHTML = `
@@ -2431,22 +2459,29 @@ function openChordModal(chordName, song) {
           <h4 style="margin:0; font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; font-weight:600;">Guitar voicings</h4>
           <button id="cm-add" class="primary" style="font-size:13px; padding:5px 12px;">+ Add voicing</button>
         </div>
-        <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
-          ${voicings.map((v, i) => `
-            <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
-              <h4>${v.builtIn ? "Built-in" : "Voicing " + i}</h4>
-              <div class="canvas">${svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm")}</div>
-              <div class="meta">${fretsToString(v.frets)}</div>
-              ${v.note ? `<div class="meta" style="margin-top:6px; color:var(--ink-soft); font-family:var(--sans); font-size:12px;">${escapeHtml(v.note)}</div>` : ""}
-              ${!v.builtIn ? `
-                <div style="display:flex; gap:4px; justify-content:center; margin-top:8px;">
-                  <button class="ghost" data-vaction="edit" style="font-size:11.5px; padding:3px 8px;">Edit</button>
-                  <button class="danger" data-vaction="delete" style="font-size:11.5px; padding:3px 8px;">Delete</button>
-                </div>
-              ` : ""}
-            </div>
-          `).join("")}
-        </div>
+        ${voicings.length === 0 ? `
+          <div class="muted small" style="text-align:center; padding:24px 0; background:var(--panel-2); border-radius:var(--radius);">
+            No voicings saved for ${escapeHtml(chordName)}.<br>
+            <span class="micro">Click <b>+ Add voicing</b> to save a custom shape.</span>
+          </div>
+        ` : `
+          <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+            ${voicings.map((v, i) => `
+              <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
+                <h4>${v.builtIn ? "Built-in" : "Voicing " + i}</h4>
+                <div class="canvas">${svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm")}</div>
+                <div class="meta">${fretsToString(v.frets)}</div>
+                ${v.note ? `<div class="meta" style="margin-top:6px; color:var(--ink-soft); font-family:var(--sans); font-size:12px;">${escapeHtml(v.note)}</div>` : ""}
+                ${!v.builtIn ? `
+                  <div style="display:flex; gap:4px; justify-content:center; margin-top:8px;">
+                    <button class="ghost" data-vaction="edit" style="font-size:11.5px; padding:3px 8px;">Edit</button>
+                    <button class="danger" data-vaction="delete" style="font-size:11.5px; padding:3px 8px;">Delete</button>
+                  </div>
+                ` : ""}
+              </div>
+            `).join("")}
+          </div>
+        `}
       ` : ""}
 
       <div class="actions">

@@ -102,6 +102,24 @@ function cleanScrapedTitle(t) {
 
 // ---------- Page-context scraper ----------
 function scrapePage() {
+  // Recursive search of the embedded JSON for any key matching a regex.
+  function deepFindKey(obj, keyPattern, depth = 0) {
+    if (depth > 8 || !obj || typeof obj !== "object") return null;
+    for (const k of Object.keys(obj)) {
+      if (keyPattern.test(k)) {
+        const v = obj[k];
+        if (typeof v === "string" && v.trim() && v.length < 200) return v.trim();
+      }
+    }
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      if (v && typeof v === "object") {
+        const found = deepFindKey(v, keyPattern, depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
   function ugToChordPro(s) {
     return s.replace(/\[ch\]([^\[]+)\[\/ch\]/g, (_, c) => "[" + c.trim() + "]")
             .replace(/\[\/?tab\]/g, "");
@@ -152,10 +170,34 @@ function scrapePage() {
         }
       } catch (e) { /* fall through */ }
     }
-    // STEP 3 — last ditch: <meta itemprop="byArtist">
+    // STEP 3 — recursive deep-find on the JSON if known paths missed
+    if ((!artist || !title) && store && store.dataset && store.dataset.content) {
+      try {
+        const data = JSON.parse(store.dataset.content);
+        if (!artist) {
+          artist = deepFindKey(data, /^(artist_name|artist|band|musician|performer|song_band|byArtist)$/i) || "";
+        }
+        if (!title) {
+          title = deepFindKey(data, /^(song_name|song_title|title|name|track_name)$/i) || "";
+        }
+      } catch (e) {}
+    }
+    // STEP 4 — last ditch: <meta itemprop="byArtist"> or microdata
     if (!artist) {
       const ba = document.querySelector('[itemprop="byArtist"]');
       if (ba) artist = (ba.textContent || ba.getAttribute("content") || "").trim();
+    }
+    if (!artist) {
+      const ba2 = document.querySelector('[itemprop="performer"]') || document.querySelector('[itemprop="creator"]');
+      if (ba2) artist = (ba2.textContent || ba2.getAttribute("content") || "").trim();
+    }
+    // STEP 5 — UG often has <h1> with "Song Title CHORDS" plus a sibling artist link
+    if (!artist) {
+      const h1 = document.querySelector("h1");
+      if (h1 && h1.parentElement) {
+        const a = h1.parentElement.querySelector('a[href*="/tab/"]');
+        if (a) artist = a.textContent.trim();
+      }
     }
   }
   if (!lyrics && /e-chords\.com/.test(host)) {
