@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Cream background circle -->
+  <circle cx="32" cy="32" r="30" fill="#fbfaf7" stroke="#b14a2c" stroke-width="3"/>
+  <!-- Stylized music note (eighth note) in accent rust -->
+  <g fill="#b14a2c">
+    <!-- Stem -->
+    <rect x="34" y="14" width="3.6" height="29" rx="0.5"/>
+    <!-- Note head (filled ellipse, slight tilt) -->
+    <ellipse cx="26" cy="44" rx="9" ry="6.5" transform="rotate(-22 26 44)"/>
+    <!-- Flag -->
+    <path d="M37.6 14 C 49 19, 50 28, 44 36 C 50 28, 47 19, 37.6 22 Z"/>
+  </g>
+</svg>

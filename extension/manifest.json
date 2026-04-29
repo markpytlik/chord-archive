@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Chord Archive — Grab Chords",
+  "version": "1.0.0",
+  "description": "One-click chord-chart capture for Chord Archive. Works on Ultimate Guitar, E-Chords, Chordie, and any page with a <pre> chord chart.",
+  "icons": {
+    "48":  "icon.svg",
+    "96":  "icon.svg",
+    "128": "icon.svg"
+  },
+  "action": {
+    "default_title": "Grab Chords from this page",
+    "default_icon": "icon.svg",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "chord-archive-grabber@markpytlik.com",
+      "strict_min_version": "109.0"
+    }
+  }
+}
