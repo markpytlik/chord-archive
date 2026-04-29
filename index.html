@@ -1143,6 +1143,40 @@ function mergeChordsIntoLyric(chordLine, lyricLine) {
   out += lyricLine.slice(cursor);
   return out.replace(/\s+$/, "");
 }
+// Convert inline ChordPro ("I [F]sucked the [Am]moon") to chord-line-above-lyric format
+//   "  F          Am
+//    I sucked the moon"
+// The detail view always renders from the ChordPro storage; this is just for the editor.
+function chordProToChordSheet(text) {
+  if (!text) return "";
+  return text.split("\n").map(line => {
+    // Section label
+    const sec = line.match(/^\s*\{([^}]+)\}\s*$/);
+    if (sec) return "[" + sec[1].trim() + "]";
+    // No chords — keep as plain lyric line
+    if (!/\[[^\]]+\]/.test(line)) return line;
+    // Build chord line and lyric line in parallel
+    const parts = line.split(/(\[[^\]]+\])/g).filter(p => p.length > 0);
+    let chordLine = "", lyricLine = "";
+    for (const part of parts) {
+      if (/^\[[^\]]+\]$/.test(part)) {
+        const chord = part.slice(1, -1);
+        // Pad chord line up to current lyric column (or to end of existing chord line + 1, whichever is greater)
+        const targetCol = Math.max(lyricLine.length, chordLine.length === 0 ? 0 : chordLine.length + 1);
+        while (chordLine.length < targetCol) chordLine += " ";
+        chordLine += chord;
+      } else {
+        lyricLine += part;
+      }
+    }
+    chordLine = chordLine.replace(/\s+$/, "");
+    const trimmedLyric = lyricLine.replace(/\s+$/, "");
+    if (!trimmedLyric) return chordLine; // chord-only line
+    if (!chordLine)    return lyricLine; // lyric-only (shouldn't happen since we returned earlier)
+    return chordLine + "\n" + trimmedLyric;
+  }).join("\n");
+}
+
 // After conversion, chord brackets may land mid-word because UG's [ch]F[/ch] (9 chars)
 // shrinks to [F] (3 chars), shifting column alignment. This pass walks each line
 // and moves any chord that landed inside a word back to that word's start.
@@ -1695,15 +1729,16 @@ function renderEditor(el) {
       </div>
 
       <div class="full">
-        <label>Lyrics &amp; Chords</label>
-        <textarea id="f-lyrics" rows="14" placeholder="ChordPro inline format — [Cmaj7] before each lyric segment.
-Section labels: {Verse}, {Chorus}, {Bridge}…
-Or paste a chords-on-line-above-lyrics sheet and click 'Parse paste' below.">${escapeHtml(song.lyrics || "")}</textarea>
+        <label>Lyrics &amp; Chords <span class="muted" style="text-transform:none; letter-spacing:0; font-weight:400;">— chord names go on the line above the lyric, aligned to the word where the chord changes</span></label>
+        <textarea id="f-lyrics" rows="14" placeholder="[Verse 1]
+   F          Am          F          Am
+I sucked the moon...I spoke too soon
+
+Section labels go in [brackets]. Use the monospace font — chord positions align to the lyrics below.">${escapeHtml(chordProToChordSheet(song.lyrics || ""))}</textarea>
         <div class="editor-tools">
-          <button id="t-parse" type="button">Parse pasted sheet →</button>
+          <button id="t-tidy" type="button">Tidy &amp; align ↻</button>
           <button id="t-fill-meta" type="button">Autofill metadata</button>
           <button id="t-fill-lyrics" type="button">Autofill lyrics</button>
-          <button id="t-tidy" type="button" class="ghost">Tidy whitespace</button>
         </div>
         <div class="helper-msg" id="helper"></div>
       </div>
@@ -1720,14 +1755,15 @@ Or paste a chords-on-line-above-lyrics sheet and click 'Parse paste' below.">${e
   });
   document.getElementById("btn-save").addEventListener("click", () => saveEdit(isNew, song));
 
-  document.getElementById("t-parse").addEventListener("click", () => {
+  document.getElementById("t-tidy").addEventListener("click", () => {
     const ta = document.getElementById("f-lyrics");
+    // Round-trip through parseChordSheet → chordProToChordSheet to clean up alignment
     const parsed = parseChordSheet(ta.value);
-    ta.value = parsed.lyrics;
+    ta.value = chordProToChordSheet(parsed.lyrics);
     if (parsed.title && !document.getElementById("f-title").value) document.getElementById("f-title").value = parsed.title;
     if (parsed.artist && !document.getElementById("f-artist").value) document.getElementById("f-artist").value = parsed.artist;
     if (parsed.key && !document.getElementById("f-key").value) document.getElementById("f-key").value = parsed.key;
-    setHelper("Parsed pasted sheet into ChordPro inline format.", "ok");
+    setHelper("Tidied — chords aligned to word starts.", "ok");
   });
 
   document.getElementById("t-bookmarklet").addEventListener("click", () => openBookmarkletModal());
@@ -1799,11 +1835,6 @@ Or paste a chords-on-line-above-lyrics sheet and click 'Parse paste' below.">${e
     }
   });
 
-  document.getElementById("t-tidy").addEventListener("click", () => {
-    const ta = document.getElementById("f-lyrics");
-    ta.value = ta.value.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-    setHelper("Tidied.", "ok");
-  });
 }
 
 function setHelper(msg, kind="") {
@@ -1881,6 +1912,10 @@ function saveEdit(isNew, songSnapshot) {
   const instruments = [];
   if (document.getElementById("f-i-guitar").checked) instruments.push("guitar");
   if (document.getElementById("f-i-piano").checked) instruments.push("piano");
+  // The textarea holds chord-line-above-lyric format; parse it back to ChordPro for storage.
+  const rawLyrics = document.getElementById("f-lyrics").value;
+  const parsedLyrics = parseChordSheet(rawLyrics).lyrics;
+
   const updates = {
     id,
     title: document.getElementById("f-title").value.trim(),
@@ -1889,7 +1924,7 @@ function saveEdit(isNew, songSnapshot) {
     capo: parseInt(document.getElementById("f-capo").value) || 0,
     instruments,
     sourceUrl: document.getElementById("f-source").value.trim(),
-    lyrics: document.getElementById("f-lyrics").value,
+    lyrics: parsedLyrics,
     notes: document.getElementById("f-notes").value,
     updatedAt: now(),
   };
