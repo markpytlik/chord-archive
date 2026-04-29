@@ -1143,6 +1143,51 @@ function mergeChordsIntoLyric(chordLine, lyricLine) {
   out += lyricLine.slice(cursor);
   return out.replace(/\s+$/, "");
 }
+// After conversion, chord brackets may land mid-word because UG's [ch]F[/ch] (9 chars)
+// shrinks to [F] (3 chars), shifting column alignment. This pass walks each line
+// and moves any chord that landed inside a word back to that word's start.
+function snapChordsInLine(line) {
+  if (!/\[[^\]]+\]/.test(line)) return line;
+  // Skip section labels like "{Verse}" — those aren't chord lines
+  if (/^\s*\{[^}]+\}\s*$/.test(line)) return line;
+  const parts = line.split(/(\[[^\]]+\])/g).filter(s => s.length > 0);
+  let result = "";
+  const pending = [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (/^\[[^\]]+\]$/.test(part)) {
+      pending.push(part);
+      continue;
+    }
+    if (pending.length === 0) { result += part; continue; }
+    // We have pending chord(s) coming before this text part.
+    const partFirstIsNonSpace = part.length > 0 && /\S/.test(part[0]);
+    const resultEndsWithNonSpace = result.length > 0 && /\S/.test(result[result.length - 1]);
+    if (partFirstIsNonSpace && resultEndsWithNonSpace) {
+      // Mid-word: snap chord(s) back to the start of the current word.
+      // If there are already chords at that word-start, insert AFTER them so order is preserved.
+      const lastSpace = result.lastIndexOf(" ");
+      const afterSpace = lastSpace + 1; // 0 if no prior space
+      let insertAt = afterSpace;
+      while (insertAt < result.length && result[insertAt] === "[") {
+        const close = result.indexOf("]", insertAt);
+        if (close === -1) break;
+        insertAt = close + 1;
+      }
+      result = result.slice(0, insertAt) + pending.join("") + result.slice(insertAt) + part;
+    } else {
+      result += pending.join("") + part;
+    }
+    pending.length = 0;
+  }
+  // Trailing chords with no following text — leave them at the end
+  if (pending.length) result += pending.join("");
+  return result;
+}
+function snapChordsToWordBoundaries(text) {
+  return text.split("\n").map(snapChordsInLine).join("\n");
+}
+
 function parseChordSheet(text) {
   if (!text || !text.trim()) return { lyrics: "" };
   const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -1192,7 +1237,10 @@ function parseChordSheet(text) {
       i++;
     }
   }
-  return { lyrics: out.join("\n").trim(), title, artist, key };
+  // Snap any mid-word chord brackets back to the start of their word.
+  // Catches the common UG case where [ch]F[/ch] → [F] shifts column alignment.
+  const cleaned = snapChordsToWordBoundaries(out.join("\n")).trim();
+  return { lyrics: cleaned, title, artist, key };
 }
 
 //=============================================================
