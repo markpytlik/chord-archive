@@ -12,7 +12,7 @@
 <meta name="GPTBot" content="noindex, nofollow" />
 <meta name="ClaudeBot" content="noindex, nofollow" />
 <meta name="referrer" content="no-referrer" />
-<title>Chord Archive</title>
+<title>Chord Keeper</title>
 <style>
   /* ====================== Reset & Tokens ====================== */
   :root {
@@ -844,7 +844,7 @@
 <body>
 
 <header>
-  <div class="brand"><span class="glyph">♪</span> Chord <span class="accent">Archive</span><span class="brand-version" id="brand-version" title="App version"></span></div>
+  <div class="brand"><span class="glyph">♪</span> Chord <span class="accent">Keeper</span><span class="brand-version" id="brand-version" title="App version"></span></div>
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
   <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.17";
+const APP_VERSION = "1.4.0";
 
 //=============================================================
 // STORAGE
@@ -1317,7 +1317,7 @@ function buildClickablePianoKeyboard(initialPositions, onChange, rootPc) {
   const noteName = pc => PC_SHARP[pc];
 
   function svg() {
-    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer; display:block;">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer; display:block; max-width:100%; height:auto;">`;
     // White keys — selected by absolute position; root highlight applies wherever that pc appears
     for (let i = 0; i < FE_WHITE_POSITIONS.length; i++) {
       const position = FE_WHITE_POSITIONS[i];
@@ -1552,7 +1552,7 @@ function svgGuitar(chordName, custom, size="md") {
   const stringGap = (W - padX*2) / 5;
   const fretGap = (H - padTop - padBot) / NUM_FRETS;
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
   for (let s = 0; s < 6; s++) {
     const x = padX + s * stringGap;
     const f = frets[s];
@@ -1671,7 +1671,8 @@ function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
                               { whiteW: 22, whiteH: 100, blackW: 13, blackH: 62 };
   const { whiteW, whiteH, blackW, blackH } = dim;
   const W = whiteW * FE_WHITE_POSITIONS.length, H = whiteH;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // Responsive SVG: viewBox handles scaling; max-width:100% prevents overflow inside narrow cards
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
   // White keys
   for (let i = 0; i < FE_WHITE_POSITIONS.length; i++) {
     const pos = FE_WHITE_POSITIONS[i];
@@ -2947,7 +2948,7 @@ function openBookmarkletModal() {
   bg.className = "modal-bg";
   bg.innerHTML = `
     <div class="modal" style="max-width:560px;">
-      <h3>Chord Archive Bookmarklet</h3>
+      <h3>Chord Keeper Bookmarklet</h3>
       <div class="modal-sub">Drag the button below to your bookmarks bar. Then while viewing any chord page (Ultimate Guitar, E-Chords, Chordie, etc.), click it — it copies the chord chart to your clipboard, ready to paste into a new song.</div>
 
       <div style="text-align:center; padding:24px; background:var(--panel-2); border-radius:var(--radius); margin:8px 0;">
@@ -2961,7 +2962,7 @@ function openBookmarkletModal() {
           <li>Drag the orange button up to your bookmarks bar.</li>
           <li>Visit a chord page (e.g. <code>tabs.ultimate-guitar.com/...</code>).</li>
           <li>Click the bookmark → "Chord chart copied to clipboard!" toast.</li>
-          <li>Click "Open Chord Archive now" → paste into the lyrics field → "Parse pasted sheet".</li>
+          <li>Click "Open Chord Keeper now" → paste into the lyrics field → "Parse pasted sheet".</li>
         </ol>
         <p class="micro muted" style="margin:10px 0 0;">Why a bookmarklet? Sites like Ultimate Guitar use Cloudflare bot protection that blocks automated proxies. The bookmarklet runs in your already-logged-in browser, so it works.</p>
       </div>
@@ -3189,6 +3190,10 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
         <label>Chord name <span class="muted">(auto-detected from notes; type to override)</span></label>
         <input id="ve-chord-name" value="${escapeHtml(chordName)}" placeholder="e.g. Cmaj9" />
       </div>
+      <div style="margin-bottom:14px;">
+        <label>Voicing name <span class="muted">(optional, e.g. "Open shape", "Rootless RH", "Drop 2")</span></label>
+        <input id="ve-voicing-name" value="${escapeHtml(seed?.name || "")}" placeholder="e.g. Open shape" />
+      </div>
 
       <div class="modal-form stack">
         ${showGuitar ? `
@@ -3329,7 +3334,10 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
 
   bg.querySelector("#ve-cancel").addEventListener("click", () => bg.remove());
   bg.querySelector("#ve-save").addEventListener("click", () => {
-    const voicing = { note: bg.querySelector("#ve-note").value.trim() };
+    const voicing = {
+      note: bg.querySelector("#ve-note").value.trim(),
+      name: (bg.querySelector("#ve-voicing-name")?.value || "").trim(),
+    };
     if (showGuitar && fretsInput && fretsInput.value.trim()) {
       const frets = stringToFrets(fretsInput.value.trim());
       if (!frets) { alert("Invalid guitar shape — use 6 characters (digits or 'x'). Example: x32010"); return; }
@@ -3412,7 +3420,7 @@ function openChordModal(chordName, song) {
         <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
           ${voicings.map((v, i) => `
             <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
-              <h4>${v.builtIn ? "Built-in" : "Voicing " + i}</h4>
+              <h4>${v.builtIn ? "Built-in" : (v.name ? escapeHtml(v.name) : "Voicing " + i)}</h4>
               <div class="canvas">
                 ${v.frets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm") : ""}
                 ${v.pianoNotes && v.pianoNotes.length ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, 1, "sm")}</div>` : ""}
