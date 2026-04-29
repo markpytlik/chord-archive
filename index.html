@@ -371,6 +371,15 @@
   .lyrics .chord-pill-inline:hover {
     background: #dcdbd6; transform: translateY(-1px);
   }
+  .lyrics .chord-rep {
+    display: inline-block;
+    margin-left: 8px;
+    color: var(--accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-style: italic;
+    font-family: var(--serif);
+  }
 
   /* ====================== Notes & chord index ====================== */
   .info-block {
@@ -646,6 +655,127 @@
     padding: 1px 5px; border-radius: 3px;
   }
 
+  /* ====================== Play mode ====================== */
+  .play-mode {
+    position: fixed; inset: 0; z-index: 50;
+    background: #14161a;
+    color: #e8e6df;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .play-mode .play-controls {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 28px;
+    background: rgba(0,0,0,.4);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .play-mode .play-title {
+    flex: 1; min-width: 0;
+    font-family: var(--serif);
+    font-size: 18px;
+    color: #fff;
+  }
+  .play-mode .play-title .artist {
+    color: #b3a99a; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .08em; font-family: var(--sans);
+    margin-bottom: 2px;
+  }
+  .play-mode button {
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #e8e6df;
+    padding: 7px 14px; border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .play-mode button:hover { background: rgba(255,255,255,.15); }
+  .play-mode button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .play-mode button.primary:hover { background: var(--accent-deep); }
+  .play-mode .speed-controls {
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .play-mode .speed-controls input[type=range] {
+    width: 140px; accent-color: var(--accent);
+    background: transparent; border: 0; padding: 0;
+  }
+  .play-mode .speed-controls .speed-label {
+    font-size: 11px; color: #b3a99a;
+    font-family: var(--mono);
+    width: 56px; text-align: right;
+  }
+  .play-mode .play-content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 20vh 14% 60vh;
+    scroll-behavior: smooth;
+  }
+  .play-mode .play-content::-webkit-scrollbar { width: 6px; }
+  .play-mode .play-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 3px; }
+  .play-mode .lyrics-large {
+    font-family: var(--mono);
+    font-size: 22px;
+    line-height: 1.7;
+    color: #f0eee8;
+    white-space: pre-wrap;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .play-mode .lyrics-large .seg {
+    display: inline-block; position: relative;
+    padding-top: 1.7em; vertical-align: baseline;
+  }
+  .play-mode .lyrics-large .seg:has(.chord) { min-width: 3em; }
+  .play-mode .lyrics-large .seg .chord {
+    position: absolute; top: 0; left: 0;
+    color: #ffb78c;
+    background: rgba(177, 74, 44, .2);
+    border: 1px solid rgba(177, 74, 44, .4);
+    border-radius: 5px;
+    padding: 1px 7px;
+    font-size: 17px;
+    font-weight: 700;
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+  .play-mode .lyrics-large .chord-only-row {
+    display: block;
+    margin: .3em 0 1em;
+  }
+  .play-mode .lyrics-large .chord-pill-inline {
+    display: inline-block;
+    margin-right: 14px;
+    color: #ffb78c;
+    background: rgba(177, 74, 44, .2);
+    border: 1px solid rgba(177, 74, 44, .4);
+    border-radius: 5px;
+    padding: 2px 10px;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: var(--mono);
+  }
+  .play-mode .lyrics-large .chord-rep {
+    margin-left: 14px;
+    color: #d6c89c;
+    font-size: 18px;
+    font-weight: 600;
+    font-style: italic;
+    font-family: var(--serif);
+  }
+  .play-mode .lyrics-large .section-label {
+    color: #ffb78c;
+    font-weight: 700;
+    font-style: normal;
+    margin-top: 1.4em;
+    display: block;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    font-size: 14px;
+    font-family: var(--sans);
+  }
+  .play-mode .lyrics-large .section-label::before { content: "— "; opacity: .5; }
+  .play-mode .lyrics-large .section-label::after  { content: " —"; opacity: .5; }
+
   /* Scrollbars */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -780,7 +910,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.3.2";
 
 //=============================================================
 // STORAGE
@@ -989,6 +1119,59 @@ function detectKey(chordNames) {
   }
   if (!best || bestScore < 1) return null;
   return pcToName(best.root, false) + (best.isMinor ? "m" : "");
+}
+
+// Reverse chord lookup: given a set of pitch classes, find a chord name that matches.
+// Tries each note as root with each known quality template.
+const CHORD_QUALITY_TEMPLATES = [
+  ["",      [0, 4, 7]],
+  ["m",     [0, 3, 7]],
+  ["dim",   [0, 3, 6]],
+  ["aug",   [0, 4, 8]],
+  ["sus2",  [0, 2, 7]],
+  ["sus4",  [0, 5, 7]],
+  ["6",     [0, 4, 7, 9]],
+  ["m6",    [0, 3, 7, 9]],
+  ["7",     [0, 4, 7, 10]],
+  ["maj7",  [0, 4, 7, 11]],
+  ["m7",    [0, 3, 7, 10]],
+  ["m7b5",  [0, 3, 6, 10]],
+  ["dim7",  [0, 3, 6, 9]],
+  ["7sus4", [0, 5, 7, 10]],
+  ["add9",  [0, 4, 7, 14 % 12]],
+  ["9",     [0, 4, 7, 10, 14 % 12]],
+  ["maj9",  [0, 4, 7, 11, 14 % 12]],
+  ["m9",    [0, 3, 7, 10, 14 % 12]],
+];
+
+function chordNameFromPcs(pcs) {
+  const uniq = [...new Set(pcs.map(pc => ((pc % 12) + 12) % 12))];
+  if (uniq.length < 2) return null;
+  for (const candidateRoot of uniq) {
+    for (const [quality, intervals] of CHORD_QUALITY_TEMPLATES) {
+      const expected = new Set(intervals.map(i => (candidateRoot + i) % 12));
+      if (expected.size !== uniq.length) continue;
+      let match = true;
+      for (const pc of expected) if (!uniq.includes(pc)) { match = false; break; }
+      if (match) return pcToName(candidateRoot) + quality;
+    }
+  }
+  return null;
+}
+
+// Parse a string like "C E G B" or "C4, E4, G4, B4" into pitch classes
+function parsePianoNotesString(s) {
+  if (!s || !s.trim()) return [];
+  const tokens = s.replace(/,/g, " ").split(/\s+/).filter(Boolean);
+  const pcs = [];
+  for (const tok of tokens) {
+    const m = tok.match(/^([A-Ga-g])([#b♯♭]?)(\d)?$/);
+    if (!m) continue;
+    const noteName = m[1].toUpperCase() + (m[2] || "").replace("♯", "#").replace("♭", "b");
+    const pc = NOTE_PC[noteName];
+    if (pc !== undefined) pcs.push(pc);
+  }
+  return pcs;
 }
 
 function chordNotes(chord) {
@@ -1594,6 +1777,15 @@ function isCloudflareChallenge(html) {
   return /Just a moment\.\.\./.test(html) || /challenges\.cloudflare\.com/.test(html) || /cf-chl-bypass/.test(html);
 }
 
+// Fallback: extract artist from a UG URL path, e.g. /tab/radiohead/sail-to-the-moon-... → "Radiohead"
+function artistFromUgUrl(url) {
+  try {
+    const m = new URL(url).pathname.match(/^\/tab\/([^\/]+)\//i);
+    if (!m) return null;
+    return m[1].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  } catch (e) { return null; }
+}
+
 async function importFromUrl(url) {
   if (!/^https?:\/\//i.test(url)) throw new Error("Please paste a full URL (https://…)");
   const host = new URL(url).hostname.replace(/^www\./, "");
@@ -1623,6 +1815,10 @@ async function importFromUrl(url) {
     const meta = parseTitleArtistFromHtml(html);
     parsed.title = parsed.title || meta.title;
     parsed.artist = parsed.artist || meta.artist;
+  }
+  // Last resort: pull artist from UG URL path
+  if (isUG && !parsed.artist) {
+    parsed.artist = artistFromUgUrl(url);
   }
   return parsed;
 }
@@ -1706,23 +1902,39 @@ function renderLyrics(text) {
   if (!text) return `<div class="muted">No lyrics yet — click <em>Edit</em> to add some.</div>`;
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const out = [];
+  let lastChordOnlySig = null;   // for condensing repeats
+  let lastChordOnlyIdx = -1;
+  let lastChordOnlyCount = 0;
   for (const line of lines) {
-    if (!line.trim()) { out.push(""); continue; }
+    if (!line.trim()) { out.push(""); lastChordOnlySig = null; continue; }
     const sec = line.match(/^\s*\{([^}]+)\}\s*$/);
     if (sec) {
       out.push(`<span class="section-label">${escapeHtml(sec[1])}</span>`);
+      lastChordOnlySig = null;
       continue;
     }
-    // Chord-only line (e.g. intro/outro chord progression) — render as block of inline pills, no absolute positioning
+    // Chord-only line — render as block of inline pills, condense consecutive identical rows
     if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(line)) {
       const re = /\[([^\]]+)\]/g;
-      let m, html = "";
-      while ((m = re.exec(line)) !== null) {
-        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(m[1])}">${escapeHtml(m[1])}</span>`;
+      const chords = [];
+      let m;
+      while ((m = re.exec(line)) !== null) chords.push(m[1]);
+      const sig = chords.join("|");
+      if (sig === lastChordOnlySig && lastChordOnlyIdx === out.length - 1) {
+        // Same chord set as previous → bump count, replace last entry
+        lastChordOnlyCount++;
+        const html = chords.map(c => `<span class="chord-pill-inline" data-chord="${escapeHtml(c)}">${escapeHtml(c)}</span>`).join("");
+        out[lastChordOnlyIdx] = `<div class="chord-only-row">${html}<span class="chord-rep">× ${lastChordOnlyCount}</span></div>`;
+      } else {
+        const html = chords.map(c => `<span class="chord-pill-inline" data-chord="${escapeHtml(c)}">${escapeHtml(c)}</span>`).join("");
+        out.push(`<div class="chord-only-row">${html}</div>`);
+        lastChordOnlySig = sig;
+        lastChordOnlyIdx = out.length - 1;
+        lastChordOnlyCount = 1;
       }
-      out.push(`<div class="chord-only-row">${html}</div>`);
       continue;
     }
+    lastChordOnlySig = null;
     // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment.
     // Each chord-bearing segment gets a min-width sized to its chord name so adjacent pills don't overlap.
     let html = "";
@@ -1842,6 +2054,7 @@ function renderDetail() {
         <h1>${escapeHtml(song.title || "Untitled")}</h1>
       </div>
       <div class="detail-actions">
+        <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
         <button id="btn-edit">Edit</button>
         <button id="btn-duplicate" class="ghost">Duplicate</button>
         <button id="btn-delete" class="danger" title="Delete song" aria-label="Delete song">
@@ -1876,6 +2089,7 @@ function renderDetail() {
         <div>${chordList.map(c => `<span class="pill chord-pill" data-chord="${escapeHtml(c)}">${escapeHtml(c)}</span>`).join(" ")}</div>
       </div>` : ""}
   `;
+  document.getElementById("btn-play").addEventListener("click", () => openPlayMode(song));
   document.getElementById("btn-edit").addEventListener("click", () => startEdit(song));
   document.getElementById("btn-duplicate").addEventListener("click", () => duplicateSong(song));
   document.getElementById("btn-delete").addEventListener("click", () => deleteSong(song));
@@ -2230,6 +2444,115 @@ function duplicateSong(song) {
 }
 
 //=============================================================
+// PLAY MODE — full-screen auto-scrolling chord/lyric view
+//=============================================================
+let playState = null;
+
+function openPlayMode(song) {
+  hidePopover();
+  const overlay = document.createElement("div");
+  overlay.className = "play-mode";
+  overlay.innerHTML = `
+    <div class="play-controls">
+      <div class="play-title">
+        <div class="artist">${escapeHtml(song.artist || "—")}${song.key ? " · Key " + escapeHtml(song.key) : ""}${song.capo ? " · Capo " + song.capo : ""}</div>
+        <div>${escapeHtml(song.title || "Untitled")}</div>
+      </div>
+      <div class="speed-controls">
+        <button id="play-slower" title="Slower">−</button>
+        <input id="play-speed" type="range" min="0" max="120" step="2" value="20" title="Scroll speed (px/s)" />
+        <button id="play-faster" title="Faster">+</button>
+        <span class="speed-label" id="speed-label">20 px/s</span>
+      </div>
+      <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
+      <button id="play-close" title="Close (Esc)">Close ✕</button>
+    </div>
+    <div class="play-content" id="play-content">
+      <div class="lyrics-large">${renderLyrics(song.lyrics || "")}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const content = overlay.querySelector("#play-content");
+  const speedInput = overlay.querySelector("#play-speed");
+  const speedLabel = overlay.querySelector("#speed-label");
+  const toggleBtn = overlay.querySelector("#play-toggle");
+
+  // Scroll loop driven by requestAnimationFrame; speed in px/s.
+  let isPlaying = false;
+  let speedPxs = parseFloat(speedInput.value) || 20;
+  let lastT = 0;
+  let rafId = null;
+
+  function step(t) {
+    if (!isPlaying) return;
+    if (lastT === 0) lastT = t;
+    const dt = (t - lastT) / 1000;
+    lastT = t;
+    content.scrollTop += speedPxs * dt;
+    // Stop when we hit the bottom
+    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 1) {
+      isPlaying = false;
+      toggleBtn.textContent = "▶ Replay";
+      return;
+    }
+    rafId = requestAnimationFrame(step);
+  }
+  function play() {
+    if (isPlaying) return;
+    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 1) content.scrollTop = 0;
+    isPlaying = true;
+    lastT = 0;
+    toggleBtn.textContent = "⏸ Pause";
+    rafId = requestAnimationFrame(step);
+  }
+  function pause() {
+    isPlaying = false;
+    toggleBtn.textContent = "▶ Play";
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+  function setSpeed(v) {
+    speedPxs = Math.max(0, parseFloat(v) || 0);
+    speedLabel.textContent = `${speedPxs.toFixed(0)} px/s`;
+  }
+  setSpeed(speedInput.value);
+
+  toggleBtn.addEventListener("click", () => isPlaying ? pause() : play());
+  speedInput.addEventListener("input", e => setSpeed(e.target.value));
+  overlay.querySelector("#play-slower").addEventListener("click", () => {
+    speedInput.value = Math.max(0, parseFloat(speedInput.value) - 5);
+    setSpeed(speedInput.value);
+  });
+  overlay.querySelector("#play-faster").addEventListener("click", () => {
+    speedInput.value = Math.min(120, parseFloat(speedInput.value) + 5);
+    setSpeed(speedInput.value);
+  });
+
+  function close() {
+    pause();
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+    playState = null;
+  }
+  function onKey(e) {
+    if (e.key === "Escape") { close(); }
+    else if (e.key === " " || e.code === "Space") {
+      e.preventDefault();
+      isPlaying ? pause() : play();
+    } else if (e.key === "ArrowUp") {
+      speedInput.value = Math.min(120, parseFloat(speedInput.value) + 5);
+      setSpeed(speedInput.value);
+    } else if (e.key === "ArrowDown") {
+      speedInput.value = Math.max(0, parseFloat(speedInput.value) - 5);
+      setSpeed(speedInput.value);
+    }
+  }
+  overlay.querySelector("#play-close").addEventListener("click", close);
+  document.addEventListener("keydown", onKey);
+  playState = { close };
+}
+
+//=============================================================
 // BOOKMARKLET MODAL
 //=============================================================
 function openBookmarkletModal() {
@@ -2374,6 +2697,12 @@ function getUserVoicingIndex(song, chordName, voicing) {
 }
 
 function showPopover(target, chordName, song) {
+  // For plain major/minor chords with no user-added voicing, skip the popover entirely.
+  // The user already knows these — show only when they've explicitly saved a custom voicing.
+  if (isSimpleMajorOrMinor(chordName)) {
+    const v = song?.voicings?.[chordName];
+    if (!v || v.length === 0) return;
+  }
   popoverState = { chordName, song, index: 0 };
   const pop = ensurePopover();
   renderPopover(target);
@@ -2419,27 +2748,43 @@ function attachHoverPopover(rootEl, song) {
 function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   const isEdit = typeof editIndex === "number" && editIndex >= 0;
   const existing = isEdit ? song.voicings?.[chordName]?.[editIndex] : null;
-  // If "Customize" was clicked, seed the form with the built-in shape
   const seed = existing || seedFromBuiltin || null;
-  const initFrets = seed ? fretsToString(seed.frets) : "";
+  const initFrets = seed?.frets ? fretsToString(seed.frets) : "";
+  const initPiano = seed?.pianoNotes ? seed.pianoNotes.map(pc => pcToName(pc)).join(" ") : "";
   const initNote = seed?.note || "";
+
+  // Show only fields relevant to this song's instruments. If neither is set, show both.
+  const wantGuitar = song?.instruments?.includes("guitar");
+  const wantPiano  = song?.instruments?.includes("piano");
+  const showGuitar = wantGuitar || (!wantGuitar && !wantPiano);
+  const showPiano  = wantPiano  || (!wantGuitar && !wantPiano);
 
   const bg = document.createElement("div");
   bg.className = "modal-bg";
   bg.innerHTML = `
-    <div class="modal" style="max-width:520px;">
-      <h3>${isEdit ? "Edit voicing" : "Add voicing"} · ${escapeHtml(chordName)}</h3>
-      <div class="modal-sub">${describeNotes(chordName)}</div>
+    <div class="modal" style="max-width:560px;">
+      <h3>${isEdit ? "Edit voicing" : "Add voicing"} · <span id="ve-name">${escapeHtml(chordName)}</span></h3>
+      <div class="modal-sub" id="ve-notes">${describeNotes(chordName)}</div>
+      <div class="helper-msg" id="ve-detected" style="margin-bottom:10px;"></div>
 
       <div class="modal-form stack">
+        ${showGuitar ? `
+          <div>
+            <label>Guitar shape <span class="muted">(low-E to high-E; <code>x</code> = muted, <code>0</code> = open)</span></label>
+            <input id="ve-frets" placeholder="x32010" value="${escapeHtml(initFrets)}" />
+            <div class="helper-msg" id="ve-preview-guitar" style="text-align:center;"></div>
+          </div>
+        ` : ""}
+        ${showPiano ? `
+          <div>
+            <label>Piano voicing <span class="muted">(notes you actually play, e.g. <code>C E G B</code> or <code>E G B D</code>)</span></label>
+            <input id="ve-piano" placeholder="C E G B" value="${escapeHtml(initPiano)}" />
+            <div class="helper-msg" id="ve-preview-piano" style="text-align:center;"></div>
+          </div>
+        ` : ""}
         <div>
-          <label>Guitar shape <span class="muted">(low-E to high-E; <code>x</code> = muted, <code>0</code> = open)</span></label>
-          <input id="ve-frets" placeholder="x32010" value="${escapeHtml(initFrets)}" />
-          <div class="helper-msg" id="ve-preview"></div>
-        </div>
-        <div>
-          <label>Note for this voicing <span class="muted">(optional)</span></label>
-          <input id="ve-note" placeholder="e.g. open G ringing; rootless RH on piano" value="${escapeHtml(initNote)}" />
+          <label>Note for this voicing <span class="muted">(optional, e.g. "rootless RH; open G ringing")</span></label>
+          <input id="ve-note" placeholder="" value="${escapeHtml(initNote)}" />
         </div>
       </div>
 
@@ -2453,32 +2798,101 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   document.body.appendChild(bg);
   bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
 
-  const fretsInput = bg.querySelector("#ve-frets");
-  const preview = bg.querySelector("#ve-preview");
-  function updatePreview() {
-    const frets = stringToFrets(fretsInput.value.trim());
-    if (!frets) {
-      preview.textContent = fretsInput.value.trim() ? "Invalid shape — use 6 chars (digits or x). Example: x32010" : "";
-      preview.className = "helper-msg err";
+  // Live previews + chord-name detection.
+  // If the user enters notes that imply a different chord, we suggest renaming.
+  let resolvedName = chordName;  // mutable — may change if input implies a different chord
+  const fretsInput  = showGuitar ? bg.querySelector("#ve-frets") : null;
+  const pianoInput  = showPiano  ? bg.querySelector("#ve-piano") : null;
+  const previewG    = showGuitar ? bg.querySelector("#ve-preview-guitar") : null;
+  const previewP    = showPiano  ? bg.querySelector("#ve-preview-piano")  : null;
+  const detectedEl  = bg.querySelector("#ve-detected");
+  const nameEl      = bg.querySelector("#ve-name");
+  const notesEl     = bg.querySelector("#ve-notes");
+
+  function fretsToPcs(frets) {
+    // Open-string pitch classes for standard tuning, low E to high E
+    const open = [4, 9, 2, 7, 11, 4]; // E A D G B E
+    const pcs = [];
+    for (let i = 0; i < 6; i++) {
+      const f = frets[i];
+      if (f >= 0) pcs.push((open[i] + f) % 12);
+    }
+    return pcs;
+  }
+  function updateAll() {
+    let allPcs = [];
+    if (showGuitar && fretsInput) {
+      const frets = stringToFrets(fretsInput.value.trim());
+      if (frets) {
+        previewG.innerHTML = svgGuitar(chordName, { frets }, "sm");
+        previewG.className = "helper-msg";
+        allPcs = allPcs.concat(fretsToPcs(frets));
+      } else {
+        previewG.textContent = fretsInput.value.trim() ? "Invalid shape — use 6 chars: digits or x. Example: x32010" : "";
+        previewG.className = "helper-msg err";
+      }
+    }
+    if (showPiano && pianoInput) {
+      const pcs = parsePianoNotesString(pianoInput.value);
+      if (pcs.length) {
+        // Mini keyboard rendering — temporarily build a chord name from these notes
+        const name = chordNameFromPcs(pcs) || chordName;
+        previewP.innerHTML = svgPiano(name, 2, "sm");
+        previewP.className = "helper-msg";
+        allPcs = allPcs.concat(pcs);
+      } else {
+        previewP.textContent = pianoInput.value.trim() ? "Invalid notes — use note names like C E G B or C# Eb F#" : "";
+        previewP.className = "helper-msg err";
+      }
+    }
+    // Detect chord name from combined input
+    const detected = chordNameFromPcs(allPcs);
+    if (detected && detected !== chordName) {
+      resolvedName = detected;
+      detectedEl.innerHTML = `These notes look like <b>${escapeHtml(detected)}</b> — saving will rename the chord on save.`;
+      detectedEl.className = "helper-msg ok";
+      nameEl.textContent = detected;
+      notesEl.textContent = describeNotes(detected);
     } else {
-      preview.innerHTML = svgGuitar(chordName, { frets }, "sm");
-      preview.className = "helper-msg";
+      resolvedName = chordName;
+      detectedEl.textContent = "";
+      detectedEl.className = "helper-msg";
+      nameEl.textContent = chordName;
+      notesEl.textContent = describeNotes(chordName);
     }
   }
-  fretsInput.addEventListener("input", updatePreview);
-  updatePreview();
+  fretsInput?.addEventListener("input", updateAll);
+  pianoInput?.addEventListener("input", updateAll);
+  updateAll();
 
   bg.querySelector("#ve-cancel").addEventListener("click", () => bg.remove());
   bg.querySelector("#ve-save").addEventListener("click", () => {
-    const frets = stringToFrets(fretsInput.value.trim());
-    if (!frets) { alert("Invalid shape — use 6 characters: digits 0-9 or 'x' (mute). Example: x32010"); return; }
-    const voicing = {
-      frets,
-      note: bg.querySelector("#ve-note").value.trim(),
-    };
-    saveVoicing(song, chordName, voicing, isEdit ? editIndex : undefined);
+    const voicing = { note: bg.querySelector("#ve-note").value.trim() };
+    if (showGuitar && fretsInput && fretsInput.value.trim()) {
+      const frets = stringToFrets(fretsInput.value.trim());
+      if (!frets) { alert("Invalid guitar shape — use 6 characters (digits or 'x'). Example: x32010"); return; }
+      voicing.frets = frets;
+    }
+    if (showPiano && pianoInput && pianoInput.value.trim()) {
+      const pcs = parsePianoNotesString(pianoInput.value);
+      if (!pcs.length) { alert("Invalid piano notes — use note names like 'C E G B'"); return; }
+      voicing.pianoNotes = pcs;
+    }
+    if (!voicing.frets && !voicing.pianoNotes) {
+      alert("Add at least a guitar shape or piano notes."); return;
+    }
+    // Save under the (possibly renamed) chord. If renamed, also rename references in lyrics.
+    const targetName = resolvedName !== chordName && resolvedName ? resolvedName : chordName;
+    saveVoicing(song, targetName, voicing, isEdit && targetName === chordName ? editIndex : undefined);
+    if (targetName !== chordName) {
+      // Rename chord in lyrics so the new name actually appears
+      song.lyrics = (song.lyrics || "").replace(new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g"), "[" + targetName + "]");
+      // Remove the old voicing if we were editing
+      if (isEdit) deleteVoicing(song, chordName, editIndex);
+    }
     saveState({ songs: state.songs });
     bg.remove();
+    if (state.selectedId === song.id) renderDetail();
   });
   if (isEdit) {
     bg.querySelector("#ve-delete").addEventListener("click", () => {
