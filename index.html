@@ -295,6 +295,30 @@
   .lyrics .section-label::before { content: "— "; opacity: .5; }
   .lyrics .section-label::after  { content: " —"; opacity: .5; }
   .lyrics .section-label:first-child { margin-top: 0; }
+  /* Chord-only lines (intros/outros) — render as inline flow of pills, no absolute positioning */
+  .lyrics .chord-only-row {
+    display: inline-block;
+    line-height: 1.8;
+  }
+  .lyrics .chord-only-pill {
+    position: static;
+    display: inline-block;
+    margin-right: 6px;
+    color: #1a1a1a;
+    background: #ededeb;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    font-family: var(--mono);
+    transition: background .1s, transform .1s;
+  }
+  .lyrics .chord-only-pill:hover {
+    background: #dcdbd6; transform: translateY(-1px);
+  }
 
   /* ====================== Notes & chord index ====================== */
   .info-block {
@@ -414,17 +438,39 @@
   .helper-msg.err { color: #b41a1a; }
   .helper-msg.busy { color: var(--accent); }
 
-  .checkbox-row {
-    display: flex; gap: 16px; padding-top: 6px; align-items: center;
+  /* Instrument toggle buttons (replace plain checkboxes) */
+  .instrument-toggles {
+    display: inline-flex; gap: 6px; padding-top: 4px;
   }
-  .checkbox-row label {
-    display: inline-flex; align-items: center; gap: 7px; margin: 0;
-    font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400;
-    color: var(--ink-soft);
+  .instrument-toggles .pill-btn {
     cursor: pointer;
+    user-select: none;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    transition: all .12s ease;
+    display: inline-flex; align-items: center; gap: 6px;
   }
-  .checkbox-row input[type=checkbox] {
-    width: auto; cursor: pointer; accent-color: var(--accent);
+  .instrument-toggles .pill-btn:hover {
+    background: var(--panel-2);
+    color: var(--ink);
+  }
+  .instrument-toggles .pill-btn.on {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    border-color: #ecccc0;
+  }
+  .instrument-toggles .pill-btn.on::before {
+    content: "✓";
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .instrument-toggles input[type=checkbox] {
+    position: absolute; opacity: 0; pointer-events: none;
   }
 
   /* Import-from-URL strip */
@@ -1549,6 +1595,17 @@ function renderLyrics(text) {
       out.push(`<span class="section-label">${escapeHtml(sec[1])}</span>`);
       continue;
     }
+    // Chord-only line (e.g. intro/outro chord progression) — render as inline pills, no absolute positioning
+    if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(line)) {
+      const re = /\[([^\]]+)\]/g;
+      let m, html = "";
+      while ((m = re.exec(line)) !== null) {
+        html += `<span class="chord chord-only-pill" data-chord="${escapeHtml(m[1])}">${escapeHtml(m[1])}</span> `;
+      }
+      out.push(`<span class="chord-only-row">${html.trim()}</span>`);
+      continue;
+    }
+    // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment
     let html = "";
     const re = /\[([^\]]+)\]([^\[]*)|([^\[]+)/g;
     let m;
@@ -1727,30 +1784,22 @@ function renderEditor(el) {
     <div class="editor-grid">
       <div>
         <label>Artist</label>
-        <input id="f-artist" value="${escapeHtml(song.artist || "")}" />
+        <input id="f-artist" value="${escapeHtml(song.artist || "")}" placeholder="e.g. Radiohead" />
       </div>
       <div>
-        <label>Title</label>
-        <input id="f-title" value="${escapeHtml(song.title || "")}" />
-      </div>
-      <div>
-        <label>Key <button type="button" id="t-detect-key" class="ghost" style="float:right; padding:0 6px; font-size:11px; text-transform:none; letter-spacing:0;">auto-detect ↻</button></label>
-        <input id="f-key" value="${escapeHtml(song.key || "")}" placeholder="e.g. G, Em, F#m" />
-      </div>
-      <div>
-        <label>Capo</label>
-        <input id="f-capo" type="number" min="0" max="12" value="${song.capo ?? ""}" placeholder="0" />
+        <label>Title <button type="button" id="t-swap" class="ghost" style="float:right; padding:0 6px; font-size:11px; text-transform:none; letter-spacing:0;" title="Swap artist and title">⇄ swap</button></label>
+        <input id="f-title" value="${escapeHtml(song.title || "")}" placeholder="e.g. Sail to the Moon" />
       </div>
       <div class="full">
         <label>Instruments</label>
-        <div class="checkbox-row">
-          <label><input type="checkbox" id="f-i-guitar" ${song.instruments?.includes("guitar") ? "checked" : ""} /> Guitar</label>
-          <label><input type="checkbox" id="f-i-piano"  ${song.instruments?.includes("piano")  ? "checked" : ""} /> Piano</label>
+        <div class="instrument-toggles">
+          <label class="pill-btn ${song.instruments?.includes("guitar") ? "on" : ""}" data-tg="guitar">
+            <input type="checkbox" id="f-i-guitar" ${song.instruments?.includes("guitar") ? "checked" : ""} /> Guitar
+          </label>
+          <label class="pill-btn ${song.instruments?.includes("piano") ? "on" : ""}" data-tg="piano">
+            <input type="checkbox" id="f-i-piano" ${song.instruments?.includes("piano") ? "checked" : ""} /> Piano
+          </label>
         </div>
-      </div>
-      <div class="full">
-        <label>Source URL</label>
-        <input id="f-source" value="${escapeHtml(song.sourceUrl || "")}" placeholder="https://… (where you originally found it)" />
       </div>
 
       <div class="full">
@@ -1772,6 +1821,20 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
         <label>Phrasings &amp; voicing notes</label>
         <textarea id="f-notes" rows="5" placeholder="e.g. 'Verse uses Em7 voiced 022030 — keep B string ringing.&#10;On piano, root in left hand octaves, voicing in right hand: Em7 = E G B D.'">${escapeHtml(song.notes || "")}</textarea>
       </div>
+
+      <!-- Footer fields — key, capo (guitar-only), source URL -->
+      <div>
+        <label>Key <button type="button" id="t-detect-key" class="ghost" style="float:right; padding:0 6px; font-size:11px; text-transform:none; letter-spacing:0;">auto-detect ↻</button></label>
+        <input id="f-key" value="${escapeHtml(song.key || "")}" placeholder="e.g. G, Em, F#m" />
+      </div>
+      <div id="f-capo-row" style="${song.instruments?.includes("guitar") ? "" : "display:none;"}">
+        <label>Capo</label>
+        <input id="f-capo" type="number" min="0" max="12" value="${song.capo ?? ""}" placeholder="0" style="max-width: 100px;" />
+      </div>
+      <div class="full">
+        <label>Source URL</label>
+        <input id="f-source" value="${escapeHtml(song.sourceUrl || "")}" placeholder="https://… (where you originally found it)" />
+      </div>
     </div>
   `;
 
@@ -1792,6 +1855,46 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
   });
 
   document.getElementById("t-bookmarklet").addEventListener("click", () => openBookmarkletModal());
+
+  // Swap artist <-> title for cases where the scraper got them backwards
+  document.getElementById("t-swap").addEventListener("click", () => {
+    const a = document.getElementById("f-artist");
+    const t = document.getElementById("f-title");
+    [a.value, t.value] = [t.value, a.value];
+    setHelper("Swapped artist and title.", "ok");
+  });
+
+  // Strip tablature lines (e|---0---|, B|---1---|, etc.)
+  document.getElementById("t-strip-tabs").addEventListener("click", () => {
+    const ta = document.getElementById("f-lyrics");
+    // Tab line patterns: starts with one of e B G D A E (case-sensitive guitar/uke strings) or numbers, followed by | and dashes/digits/dots
+    // Common forms:  e|--3--3--|   B|--0--0--|   |---3-2-0---|
+    const before = ta.value.split("\n").length;
+    const cleaned = ta.value
+      .split("\n")
+      .filter(line => !/^\s*[eBGDAEbgda]?\s*\|[-\d\.\s|h\/\\\(\)]+\|?\s*$/.test(line))
+      .filter(line => !/^\s*[eBGDAEbgda]\|/.test(line.trim()))   // catches lines like "e|-4---4--..."
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n");
+    const removed = before - cleaned.split("\n").length;
+    ta.value = cleaned;
+    setHelper(removed > 0 ? `Stripped ${removed} tablature line${removed === 1 ? "" : "s"}.` : "No tablature lines found.", removed > 0 ? "ok" : "");
+  });
+
+  // Instrument toggle pill behavior — click toggles the hidden checkbox + .on class, capo row follows guitar
+  document.querySelectorAll(".instrument-toggles .pill-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      // Let the click propagate to the inner checkbox naturally; just sync the .on class after
+      setTimeout(() => {
+        const cb = btn.querySelector('input[type="checkbox"]');
+        btn.classList.toggle("on", cb.checked);
+        if (btn.dataset.tg === "guitar") {
+          const capoRow = document.getElementById("f-capo-row");
+          if (capoRow) capoRow.style.display = cb.checked ? "" : "none";
+        }
+      }, 0);
+    });
+  });
 
   document.getElementById("t-detect-key").addEventListener("click", () => {
     const lyrics = document.getElementById("f-lyrics").value;
