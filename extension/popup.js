@@ -92,15 +92,45 @@ function scrapePage() {
     if (store && store.dataset && store.dataset.content) {
       try {
         const data = JSON.parse(store.dataset.content);
-        const tab = data?.store?.page?.data?.tab_view?.wiki_tab?.content
-                 || data?.store?.page?.data?.tab?.wiki_tab?.content;
-        const meta = data?.store?.page?.data?.tab;
-        if (tab) {
-          lyrics = ugToChordPro(tab);
-          title = meta?.song_name || "";
-          artist = meta?.artist_name || "";
-        }
+        const root = data?.store?.page?.data || {};
+        const tab = root?.tab_view?.wiki_tab?.content
+                 || root?.tab?.wiki_tab?.content;
+        if (tab) lyrics = ugToChordPro(tab);
+        // Try every artist field UG has used over the years
+        const candidates = [
+          root?.tab?.artist_name,
+          root?.tab?.artist,
+          root?.tab_view?.versions?.[0]?.artist_name,
+          root?.tab_view?.meta?.artist,
+          root?.tab_view?.song?.artist_name,
+          root?.tab?.tab?.artist_name,
+        ];
+        artist = candidates.find(c => typeof c === "string" && c.trim()) || "";
+        const titleCandidates = [
+          root?.tab?.song_name,
+          root?.tab?.title,
+          root?.tab_view?.versions?.[0]?.song_name,
+          root?.tab_view?.song?.title,
+        ];
+        title = titleCandidates.find(c => typeof c === "string" && c.trim()) || "";
       } catch (e) { /* fall through */ }
+    }
+    // Fallback: parse og:title meta tag (UG format: "Sail to the Moon Chords by Radiohead @ Ultimate-Guitar.com")
+    if (!artist) {
+      const og = document.querySelector('meta[property="og:title"]');
+      if (og) {
+        const t = og.getAttribute("content") || "";
+        const m = t.match(/^(.+?)\s+(?:Chords|Tab|Bass|Ukulele|Drum|Guitar Pro|Power\s*Tab|Lyrics)?\s*(?:by|–|—|-)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
+        if (m) {
+          if (!title) title = m[1].trim();
+          artist = m[2].trim();
+        }
+      }
+    }
+    // Last-ditch fallback: <meta itemprop="byArtist">
+    if (!artist) {
+      const ba = document.querySelector('[itemprop="byArtist"]');
+      if (ba) artist = (ba.textContent || ba.getAttribute("content") || "").trim();
     }
   }
   if (!lyrics && /e-chords\.com/.test(host)) {

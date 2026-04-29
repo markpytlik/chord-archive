@@ -265,20 +265,21 @@
   }
   .lyrics .seg .chord {
     position: absolute; top: 0; left: 0;
-    color: var(--chord); font-weight: 700;
-    background: var(--chord-bg);
-    border: 1px solid #d8e0f0;
+    color: #1a1a1a; font-weight: 700;
+    background: #ededeb;
+    border: 1px solid transparent;
     border-radius: 4px;
-    padding: 1px 5px;
+    padding: 1px 6px;
     font-size: 12.5px;
     cursor: pointer;
     white-space: nowrap;
     transition: background .1s, transform .1s, box-shadow .1s;
     user-select: none;
+    font-family: var(--mono);
   }
   .lyrics .seg .chord:hover {
-    background: #d8e1f5; transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(30, 58, 138, .15);
+    background: #dcdbd6; transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
   }
   .lyrics .section-label {
     color: var(--accent);
@@ -321,30 +322,29 @@
     border: 1px solid var(--line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
-    padding: 14px 16px;
-    min-width: 320px;
-    max-width: 380px;
-    pointer-events: none;
+    padding: 16px 18px 12px;
+    min-width: 260px;
+    max-width: 400px;
     opacity: 0;
     transform: translateY(4px);
     transition: opacity .12s ease, transform .12s ease;
+    pointer-events: none;
   }
-  .chord-popover.show { opacity: 1; transform: translateY(0); }
+  .chord-popover.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
   .chord-popover .pop-header {
     font-family: var(--serif);
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 500;
-    color: var(--chord);
-    margin-bottom: 8px;
+    color: var(--ink);
+    text-align: center;
     letter-spacing: -.01em;
+    margin-bottom: 10px;
   }
   .chord-popover .pop-row {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start;
+    display: flex; gap: 14px; align-items: flex-start; justify-content: center;
   }
-  .chord-popover .pop-row.single { grid-template-columns: 1fr; }
-  .chord-popover .diag-mini {
-    text-align: center;
-  }
+  .chord-popover .pop-row.single { justify-content: center; }
+  .chord-popover .diag-mini { text-align: center; }
   .chord-popover .diag-mini .label {
     font-size: 10px;
     color: var(--muted);
@@ -352,10 +352,40 @@
     letter-spacing: .08em;
     margin-bottom: 6px;
   }
-  .chord-popover .voicing-note {
-    grid-column: 1 / -1;
+  .chord-popover .pop-cycler {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
     margin-top: 8px;
-    padding: 8px 12px;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .chord-popover .pop-cycler .arrow {
+    cursor: pointer;
+    background: transparent; border: 0; padding: 4px 8px;
+    color: var(--muted); font-size: 16px; line-height: 1;
+    border-radius: 4px;
+  }
+  .chord-popover .pop-cycler .arrow:hover:not(:disabled) {
+    color: var(--ink); background: var(--panel-2);
+  }
+  .chord-popover .pop-cycler .arrow:disabled { opacity: 0.3; cursor: default; }
+  .chord-popover .pop-cycler .count {
+    min-width: 50px; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .chord-popover .pop-actions {
+    display: flex; gap: 4px; justify-content: center; margin-top: 8px;
+    padding-top: 10px; border-top: 1px solid var(--line-soft);
+  }
+  .chord-popover .pop-actions button {
+    background: transparent; border: 0; color: var(--muted);
+    padding: 4px 8px; font-size: 11.5px; cursor: pointer; border-radius: 4px;
+  }
+  .chord-popover .pop-actions button:hover {
+    background: var(--panel-2); color: var(--ink);
+  }
+  .chord-popover .pop-actions button.danger:hover { color: #b41a1a; background: #fceeed; }
+  .chord-popover .voicing-note {
+    margin-top: 8px;
+    padding: 7px 11px;
     background: var(--warn-soft);
     border-left: 3px solid #f0d9b3;
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
@@ -363,7 +393,6 @@
     color: var(--ink-soft);
     line-height: 1.4;
   }
-  .chord-popover .voicing-note b { color: var(--warn); font-weight: 600; }
 
   /* ====================== Editor ====================== */
   .editor-grid {
@@ -755,6 +784,78 @@ function qualityToIntervals(quality) {
   if (/b13/.test(orig)) ivs.add(20);
 
   return [...ivs].sort((a,b) => a - b);
+}
+
+// ---- Key auto-detection ----
+// Score each major + minor key by how many of the song's chords are diatonic.
+// Bonus weight for matches at the start/end of the chord progression.
+const MAJOR_DIATONIC_QUALITIES = ["", "m", "m", "", "", "m", "dim"]; // I ii iii IV V vi vii°
+const MINOR_DIATONIC_QUALITIES = ["m", "dim", "", "m", "m", "", ""]; // i ii° III iv v VI VII (natural minor)
+const MAJOR_DEGREES = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_DEGREES = [0, 2, 3, 5, 7, 8, 10];
+
+function buildDiatonicSet(rootPc, isMinor) {
+  const degrees = isMinor ? MINOR_DEGREES : MAJOR_DEGREES;
+  const qualities = isMinor ? MINOR_DIATONIC_QUALITIES : MAJOR_DIATONIC_QUALITIES;
+  const out = new Set();
+  for (let i = 0; i < 7; i++) {
+    out.add(((rootPc + degrees[i]) % 12) + ":" + qualities[i]);
+  }
+  return out;
+}
+
+function chordSimpleKey(chord) {
+  // Returns "<rootPc>:<basicQuality>" — basicQuality is "", "m", or "dim"
+  if (!chord) return null;
+  const ivs = qualityToIntervals(chord.quality);
+  const set = new Set(ivs);
+  let q = "";
+  if (set.has(3) && set.has(7))      q = "m";
+  else if (set.has(3) && set.has(6)) q = "dim";
+  else if (set.has(4) && set.has(8)) q = ""; // aug — treat like major for diatonic match
+  // sus / extensions: drop them, treat as major triad
+  return chord.root + ":" + q;
+}
+
+function detectKey(chordNames) {
+  if (!chordNames || !chordNames.length) return null;
+  const parsed = chordNames.map(c => splitChord(c)).filter(Boolean);
+  if (!parsed.length) return null;
+
+  let best = null, bestScore = -Infinity;
+  for (let root = 0; root < 12; root++) {
+    for (const isMinor of [false, true]) {
+      const dia = buildDiatonicSet(root, isMinor);
+      let score = 0;
+      for (const c of parsed) {
+        const key = chordSimpleKey(c);
+        if (dia.has(key)) score += 1;
+      }
+      // First/last chord matching the tonic gets a boost (first is a stronger signal)
+      const tonicKey = root + ":" + (isMinor ? "m" : "");
+      if (chordSimpleKey(parsed[0]) === tonicKey) score += 2.5;
+      if (chordSimpleKey(parsed[parsed.length - 1]) === tonicKey) score += 1.5;
+      // V→I cadence boost: if any consecutive pair is dominant→tonic, strong signal for the key
+      const dominantPc = (root + 7) % 12;
+      const dominantKey = dominantPc + ":";  // major V (works in both major and "harmonic minor" usage)
+      for (let p = 0; p < parsed.length - 1; p++) {
+        if (chordSimpleKey(parsed[p]) === dominantKey && chordSimpleKey(parsed[p+1]) === tonicKey) {
+          score += 1.5; break;
+        }
+      }
+      // Slight preference for major when scores tie (more common in pop/folk)
+      if (!isMinor) score += 0.1;
+      // Prefer simpler keys (fewer accidentals): C major / G major / D major / etc.
+      if ([0, 5, 7, 9, 2, 4].includes(root)) score += 0.05;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = { root, isMinor };
+      }
+    }
+  }
+  if (!best || bestScore < 1) return null;
+  return pcToName(best.root, false) + (best.isMinor ? "m" : "");
 }
 
 function chordNotes(chord) {
@@ -1274,15 +1375,22 @@ function bookmarkletSource() {
       if (store && store.dataset && store.dataset.content) {
         try {
           const data = JSON.parse(store.dataset.content);
-          const tab = data?.store?.page?.data?.tab_view?.wiki_tab?.content
-                   || data?.store?.page?.data?.tab?.wiki_tab?.content;
-          const meta = data?.store?.page?.data?.tab;
-          if (tab) {
-            lyrics = ugToChordPro(tab);
-            title = meta?.song_name || "";
-            artist = meta?.artist_name || "";
-          }
+          const root = data?.store?.page?.data || {};
+          const tab = root?.tab_view?.wiki_tab?.content || root?.tab?.wiki_tab?.content;
+          if (tab) lyrics = ugToChordPro(tab);
+          const ac = [root?.tab?.artist_name, root?.tab?.artist, root?.tab_view?.versions?.[0]?.artist_name, root?.tab_view?.meta?.artist, root?.tab_view?.song?.artist_name].find(c => typeof c === "string" && c.trim());
+          const tc = [root?.tab?.song_name, root?.tab?.title, root?.tab_view?.versions?.[0]?.song_name, root?.tab_view?.song?.title].find(c => typeof c === "string" && c.trim());
+          if (ac) artist = ac;
+          if (tc) title = tc;
         } catch (e) {}
+      }
+      if (!artist) {
+        const og = document.querySelector('meta[property="og:title"]');
+        if (og) {
+          const t = og.getAttribute("content") || "";
+          const m = t.match(/^(.+?)\s+(?:Chords|Tab|Bass|Ukulele)?\s*(?:by|-|–|—)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
+          if (m) { if (!title) title = m[1].trim(); artist = m[2].trim(); }
+        }
       }
     }
     if (!lyrics && /e-chords\.com/.test(host)) {
@@ -1519,7 +1627,7 @@ function renderEditor(el) {
         <input id="f-title" value="${escapeHtml(song.title || "")}" />
       </div>
       <div>
-        <label>Key</label>
+        <label>Key <button type="button" id="t-detect-key" class="ghost" style="float:right; padding:0 6px; font-size:11px; text-transform:none; letter-spacing:0;">auto-detect ↻</button></label>
         <input id="f-key" value="${escapeHtml(song.key || "")}" placeholder="e.g. G, Em, F#m" />
       </div>
       <div>
@@ -1575,6 +1683,19 @@ Or paste a chords-on-line-above-lyrics sheet and click 'Parse paste' below.">${e
   });
 
   document.getElementById("t-bookmarklet").addEventListener("click", () => openBookmarkletModal());
+
+  document.getElementById("t-detect-key").addEventListener("click", () => {
+    const lyrics = document.getElementById("f-lyrics").value;
+    const chords = extractChords(lyrics);
+    if (!chords.length) { setHelper("Add some chords first.", "err"); return; }
+    const k = detectKey(chords);
+    if (k) {
+      document.getElementById("f-key").value = k;
+      setHelper("Detected key: " + k + " (best fit for " + chords.length + " chord" + (chords.length !== 1 ? "s" : "") + ")", "ok");
+    } else {
+      setHelper("Couldn't determine a clear key from this chord set.", "err");
+    }
+  });
 
   document.getElementById("t-fetch").addEventListener("click", async () => {
     const url = document.getElementById("f-url").value.trim();
@@ -1645,7 +1766,66 @@ function setHelper(msg, kind="") {
 }
 
 function blankSong() {
-  return { id: uid(), title: "", artist: "", key: "", capo: 0, instruments: ["guitar"], lyrics: "", notes: "", sourceUrl: "", customShapes: {}, voicingNotes: {}, createdAt: now(), updatedAt: now() };
+  return { id: uid(), title: "", artist: "", key: "", capo: 0, instruments: ["guitar"], lyrics: "", notes: "", sourceUrl: "", voicings: {}, createdAt: now(), updatedAt: now() };
+}
+
+// ---- Voicings model ----
+// song.voicings[chordName] = [ { frets:[…], pianoNotes:[pc,…]?, note:"…" }, … ]
+// Default voicing #0 is the built-in (lookupShape) — only stored explicitly when user customizes.
+// This getter returns the merged list: built-in first, then user-saved voicings.
+function getVoicings(song, chordName) {
+  // Migration shim: old { customShapes, voicingNotes } → new voicings array
+  if (song.customShapes || song.voicingNotes) {
+    song.voicings = song.voicings || {};
+    for (const [name, shape] of Object.entries(song.customShapes || {})) {
+      if (!song.voicings[name]) {
+        song.voicings[name] = [{
+          frets: shape.frets,
+          fingers: shape.fingers,
+          barre: shape.barre,
+          note: (song.voicingNotes || {})[name] || "",
+        }];
+      }
+    }
+    delete song.customShapes;
+    delete song.voicingNotes;
+  }
+  song.voicings = song.voicings || {};
+  const list = [];
+  // Always start with the built-in lookup (or note "no built-in" placeholder)
+  const builtIn = lookupShape(chordName);
+  if (builtIn) {
+    list.push({
+      frets: builtIn.frets,
+      fingers: builtIn.fingers,
+      barre: builtIn.barre,
+      note: builtIn.derived ? "Movable barre shape" : "",
+      builtIn: true,
+    });
+  }
+  // Append user voicings
+  for (const v of (song.voicings[chordName] || [])) {
+    list.push(Object.assign({ builtIn: false }, v));
+  }
+  return list;
+}
+
+function saveVoicing(song, chordName, voicing, index) {
+  song.voicings = song.voicings || {};
+  song.voicings[chordName] = song.voicings[chordName] || [];
+  const arr = song.voicings[chordName];
+  if (typeof index === "number" && index >= 0 && index < arr.length) {
+    arr[index] = voicing;
+  } else {
+    arr.push(voicing);
+  }
+  song.updatedAt = now();
+}
+function deleteVoicing(song, chordName, index) {
+  if (!song.voicings || !song.voicings[chordName]) return;
+  song.voicings[chordName].splice(index, 1);
+  if (song.voicings[chordName].length === 0) delete song.voicings[chordName];
+  song.updatedAt = now();
 }
 function startEdit(song) { state.editing = song; renderDetail(); }
 function saveEdit(isNew, songSnapshot) {
@@ -1738,39 +1918,106 @@ function openBookmarkletModal() {
 }
 
 //=============================================================
-// HOVER POPOVER  (visual phrasings)
+// HOVER POPOVER  (visual phrasings, cycles through voicings)
 //=============================================================
 let popoverEl = null;
 let popoverTimer = null;
+let popoverState = null; // { chordName, song, index }
+
 function ensurePopover() {
   if (popoverEl) return popoverEl;
   popoverEl = document.createElement("div");
   popoverEl.className = "chord-popover";
   document.body.appendChild(popoverEl);
+  // Keep popover open while hovering inside it
+  popoverEl.addEventListener("mouseenter", () => clearTimeout(popoverTimer));
+  popoverEl.addEventListener("mouseleave", () => {
+    clearTimeout(popoverTimer);
+    popoverTimer = setTimeout(hidePopover, 150);
+  });
   return popoverEl;
 }
-function showPopover(target, chordName, song) {
+
+function renderPopover(target) {
   const pop = ensurePopover();
-  const customShape = song?.customShapes?.[chordName];
-  const voicingNote = song?.voicingNotes?.[chordName];
-  const shape = customShape ? { frets: customShape.frets, fingers: customShape.fingers, barre: customShape.barre } : null;
+  if (!popoverState) return;
+  const { chordName, song, index } = popoverState;
   const wantGuitar = !song?.instruments || song.instruments.includes("guitar");
   const wantPiano  = !song?.instruments || song.instruments.includes("piano");
+  const voicings = wantGuitar ? getVoicings(song, chordName) : [];
+  const current = voicings[index] || null;
+  const total = voicings.length;
+  const guitarHtml = wantGuitar
+    ? `<div class="diag-mini"><div class="label">Guitar${current && !current.builtIn ? " · custom" : ""}</div>${svgGuitar(chordName, current ? { frets: current.frets, fingers: current.fingers, barre: current.barre } : null, "sm")}</div>`
+    : "";
+  const pianoHtml = wantPiano
+    ? `<div class="diag-mini"><div class="label">Piano</div>${svgPiano(chordName, 2, "sm")}</div>`
+    : "";
   const both = wantGuitar && wantPiano;
+  const cyclerHtml = (wantGuitar && total > 1) ? `
+    <div class="pop-cycler">
+      <button class="arrow" data-action="prev" ${index === 0 ? "disabled" : ""} title="Previous voicing">‹</button>
+      <span class="count">${index + 1} of ${total}</span>
+      <button class="arrow" data-action="next" ${index === total - 1 ? "disabled" : ""} title="Next voicing">›</button>
+    </div>` : "";
+  const noteHtml = (current && current.note) ? `<div class="voicing-note">${escapeHtml(current.note)}</div>` : "";
+  const actionsHtml = `
+    <div class="pop-actions">
+      <button data-action="add" title="Add a new voicing">+ Add voicing</button>
+      ${current && !current.builtIn ? `
+        <button data-action="edit" title="Edit this voicing">Edit</button>
+        <button data-action="delete" class="danger" title="Delete this voicing">Delete</button>
+      ` : `<button data-action="edit-from-builtin" title="Customize this chord">Customize</button>`}
+    </div>`;
 
   pop.innerHTML = `
-    <div class="pop-header">${escapeHtml(chordName)}${customShape ? ` <span class="badge" style="font-size:11px;color:var(--accent);">· custom shape</span>` : ""}</div>
+    <div class="pop-header">${escapeHtml(chordName)}</div>
     <div class="pop-row ${both ? "" : "single"}">
-      ${wantGuitar ? `<div class="diag-mini"><div class="label">Guitar</div>${svgGuitar(chordName, shape, "sm")}</div>` : ""}
-      ${wantPiano  ? `<div class="diag-mini"><div class="label">Piano</div>${svgPiano(chordName, 2, "sm")}</div>` : ""}
-      ${voicingNote ? `<div class="voicing-note"><b>Your voicing</b> · ${escapeHtml(voicingNote)}</div>` : ""}
+      ${guitarHtml}${pianoHtml}
     </div>
+    ${cyclerHtml}
+    ${noteHtml}
+    ${actionsHtml}
   `;
-  // Position near the chord
+
+  pop.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const action = e.currentTarget.dataset.action;
+      if (action === "prev") { popoverState.index = Math.max(0, index - 1); renderPopover(target); }
+      else if (action === "next") { popoverState.index = Math.min(total - 1, index + 1); renderPopover(target); }
+      else if (action === "add") { hidePopover(); openVoicingEditor(chordName, song, null); }
+      else if (action === "edit") { hidePopover(); openVoicingEditor(chordName, song, getUserVoicingIndex(song, chordName, current)); }
+      else if (action === "edit-from-builtin") { hidePopover(); openVoicingEditor(chordName, song, null, current); }
+      else if (action === "delete") {
+        if (confirm(`Delete this voicing of ${chordName}?`)) {
+          deleteVoicing(song, chordName, getUserVoicingIndex(song, chordName, current));
+          saveState({ songs: state.songs });
+          // After delete, rebuild and re-render at safe index
+          const newVoicings = wantGuitar ? getVoicings(song, chordName) : [];
+          popoverState.index = Math.min(index, newVoicings.length - 1);
+          renderPopover(target);
+        }
+      }
+    });
+  });
+}
+
+function getUserVoicingIndex(song, chordName, voicing) {
+  // Map a popover voicing back to its index in song.voicings[chordName]
+  if (!song.voicings || !song.voicings[chordName]) return -1;
+  return song.voicings[chordName].findIndex(v =>
+    JSON.stringify(v.frets) === JSON.stringify(voicing.frets)
+  );
+}
+
+function showPopover(target, chordName, song) {
+  popoverState = { chordName, song, index: 0 };
+  const pop = ensurePopover();
+  renderPopover(target);
+  // Position
   const rect = target.getBoundingClientRect();
   pop.style.visibility = "hidden";
   pop.classList.add("show");
-  // measure
   const popRect = pop.getBoundingClientRect();
   let top = rect.bottom + 8;
   if (top + popRect.height > window.innerHeight - 8) {
@@ -1782,10 +2029,13 @@ function showPopover(target, chordName, song) {
   pop.style.left = left + "px";
   pop.style.visibility = "visible";
 }
+
 function hidePopover() {
   if (!popoverEl) return;
   popoverEl.classList.remove("show");
+  popoverState = null;
 }
+
 function attachHoverPopover(rootEl, song) {
   rootEl.addEventListener("mouseover", e => {
     const t = e.target.closest(".chord[data-chord]");
@@ -1796,59 +2046,132 @@ function attachHoverPopover(rootEl, song) {
   rootEl.addEventListener("mouseout", e => {
     if (!e.target.closest(".chord[data-chord]")) return;
     clearTimeout(popoverTimer);
-    popoverTimer = setTimeout(hidePopover, 120);
+    popoverTimer = setTimeout(hidePopover, 200);
   });
 }
 
 //=============================================================
-// CHORD MODAL (click)
+// VOICING EDITOR  (add/edit a single voicing)
+//=============================================================
+function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
+  const isEdit = typeof editIndex === "number" && editIndex >= 0;
+  const existing = isEdit ? song.voicings?.[chordName]?.[editIndex] : null;
+  // If "Customize" was clicked, seed the form with the built-in shape
+  const seed = existing || seedFromBuiltin || null;
+  const initFrets = seed ? fretsToString(seed.frets) : "";
+  const initNote = seed?.note || "";
+
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <h3>${isEdit ? "Edit voicing" : "Add voicing"} · ${escapeHtml(chordName)}</h3>
+      <div class="modal-sub">${describeNotes(chordName)}</div>
+
+      <div class="modal-form stack">
+        <div>
+          <label>Guitar shape <span class="muted">(low-E to high-E; <code>x</code> = muted, <code>0</code> = open)</span></label>
+          <input id="ve-frets" placeholder="x32010" value="${escapeHtml(initFrets)}" />
+          <div class="helper-msg" id="ve-preview"></div>
+        </div>
+        <div>
+          <label>Note for this voicing <span class="muted">(optional)</span></label>
+          <input id="ve-note" placeholder="e.g. open G ringing; rootless RH on piano" value="${escapeHtml(initNote)}" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="ve-cancel">Cancel</button>
+        ${isEdit ? `<button id="ve-delete" class="danger">Delete</button>` : ""}
+        <button id="ve-save" class="primary">${isEdit ? "Save" : "Add"}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+
+  const fretsInput = bg.querySelector("#ve-frets");
+  const preview = bg.querySelector("#ve-preview");
+  function updatePreview() {
+    const frets = stringToFrets(fretsInput.value.trim());
+    if (!frets) {
+      preview.textContent = fretsInput.value.trim() ? "Invalid shape — use 6 chars (digits or x). Example: x32010" : "";
+      preview.className = "helper-msg err";
+    } else {
+      preview.innerHTML = svgGuitar(chordName, { frets }, "sm");
+      preview.className = "helper-msg";
+    }
+  }
+  fretsInput.addEventListener("input", updatePreview);
+  updatePreview();
+
+  bg.querySelector("#ve-cancel").addEventListener("click", () => bg.remove());
+  bg.querySelector("#ve-save").addEventListener("click", () => {
+    const frets = stringToFrets(fretsInput.value.trim());
+    if (!frets) { alert("Invalid shape — use 6 characters: digits 0-9 or 'x' (mute). Example: x32010"); return; }
+    const voicing = {
+      frets,
+      note: bg.querySelector("#ve-note").value.trim(),
+    };
+    saveVoicing(song, chordName, voicing, isEdit ? editIndex : undefined);
+    saveState({ songs: state.songs });
+    bg.remove();
+  });
+  if (isEdit) {
+    bg.querySelector("#ve-delete").addEventListener("click", () => {
+      if (!confirm(`Delete this voicing of ${chordName}?`)) return;
+      deleteVoicing(song, chordName, editIndex);
+      saveState({ songs: state.songs });
+      bg.remove();
+    });
+  }
+}
+
+//=============================================================
+// CHORD MODAL (click) — manage all voicings for a chord
 //=============================================================
 function openChordModal(chordName, song) {
   hidePopover();
-  const customShape = song?.customShapes?.[chordName];
-  const shape = customShape ? { frets: customShape.frets, fingers: customShape.fingers, barre: customShape.barre } : null;
-  const voicingNote = song?.voicingNotes?.[chordName];
   const wantGuitar = !song?.instruments || song.instruments.includes("guitar");
   const wantPiano  = !song?.instruments || song.instruments.includes("piano");
+  const voicings = wantGuitar ? getVoicings(song, chordName) : [];
 
   const bg = document.createElement("div");
   bg.className = "modal-bg chord-modal";
   bg.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:680px;">
       <h3>${escapeHtml(chordName)}</h3>
       <div class="modal-sub">${describeNotes(chordName)}</div>
 
-      <div class="diag-grid">
-        <div class="diag-card ${wantGuitar ? "" : "no-show"}">
-          <h4>Guitar${customShape ? ` <span class="badge">· custom</span>` : (lookupShape(chordName)?.derived ? ` <span class="badge">· movable</span>` : "")}</h4>
-          <div class="canvas">${svgGuitar(chordName, shape)}</div>
-          <div class="meta">${shape ? fretsToString(shape.frets) : (lookupShape(chordName) ? fretsToString(lookupShape(chordName).frets) : "—")}</div>
-        </div>
-        <div class="diag-card ${wantPiano ? "" : "no-show"}">
+      ${wantPiano ? `
+        <div class="diag-card" style="margin-top:12px;">
           <h4>Piano</h4>
           <div class="canvas">${svgPiano(chordName)}</div>
-          <div class="meta">2 octaves</div>
         </div>
-      </div>
+      ` : ""}
 
-      ${voicingNote ? `<div class="voicing-strip"><b>Your voicing</b> — ${escapeHtml(voicingNote)}</div>` : ""}
-
-      <div class="modal-form stack">
-        <div>
-          <label>Custom guitar shape for this song</label>
-          <div class="row">
-            <input id="cm-shape" placeholder="x32010 (low-E to high-E; use 'x' for muted)" value="${customShape ? fretsToString(customShape.frets) : ""}" />
-            <button id="cm-save-shape" class="primary">Save shape</button>
-          </div>
+      ${wantGuitar ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin: 18px 0 10px;">
+          <h4 style="margin:0; font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; font-weight:600;">Guitar voicings</h4>
+          <button id="cm-add" class="primary" style="font-size:13px; padding:5px 12px;">+ Add voicing</button>
         </div>
-        <div>
-          <label>Voicing note for ${escapeHtml(chordName)}</label>
-          <div class="row">
-            <input id="cm-note" placeholder="e.g. add 9 on top, leave A string open" value="${escapeHtml(voicingNote || "")}" />
-            <button id="cm-save-note" class="primary">Save note</button>
-          </div>
+        <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+          ${voicings.map((v, i) => `
+            <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
+              <h4>${v.builtIn ? "Built-in" : "Voicing " + i}</h4>
+              <div class="canvas">${svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm")}</div>
+              <div class="meta">${fretsToString(v.frets)}</div>
+              ${v.note ? `<div class="meta" style="margin-top:6px; color:var(--ink-soft); font-family:var(--sans); font-size:12px;">${escapeHtml(v.note)}</div>` : ""}
+              ${!v.builtIn ? `
+                <div style="display:flex; gap:4px; justify-content:center; margin-top:8px;">
+                  <button class="ghost" data-vaction="edit" style="font-size:11.5px; padding:3px 8px;">Edit</button>
+                  <button class="danger" data-vaction="delete" style="font-size:11.5px; padding:3px 8px;">Delete</button>
+                </div>
+              ` : ""}
+            </div>
+          `).join("")}
         </div>
-      </div>
+      ` : ""}
 
       <div class="actions">
         <button id="cm-close">Close</button>
@@ -1858,27 +2181,33 @@ function openChordModal(chordName, song) {
   document.body.appendChild(bg);
   bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
   bg.querySelector("#cm-close").addEventListener("click", () => bg.remove());
-  bg.querySelector("#cm-save-shape").addEventListener("click", () => {
-    const v = bg.querySelector("#cm-shape").value.trim();
-    const frets = stringToFrets(v);
-    if (!frets) { alert("Invalid shape — use 6 characters: digits 0-9 or 'x' (mute). Example: x32010"); return; }
-    if (!song.customShapes) song.customShapes = {};
-    song.customShapes[chordName] = { frets };
-    song.updatedAt = now();
-    saveState({ songs: state.songs });
-    bg.remove();
-    openChordModal(chordName, song);
-  });
-  bg.querySelector("#cm-save-note").addEventListener("click", () => {
-    const v = bg.querySelector("#cm-note").value.trim();
-    if (!song.voicingNotes) song.voicingNotes = {};
-    if (v) song.voicingNotes[chordName] = v;
-    else delete song.voicingNotes[chordName];
-    song.updatedAt = now();
-    saveState({ songs: state.songs });
-    bg.remove();
-    openChordModal(chordName, song);
-  });
+
+  if (wantGuitar) {
+    bg.querySelector("#cm-add").addEventListener("click", () => {
+      bg.remove();
+      openVoicingEditor(chordName, song, null);
+    });
+    bg.querySelectorAll("[data-vaction]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const card = e.currentTarget.closest("[data-vidx]");
+        const i = parseInt(card.dataset.vidx);
+        const v = voicings[i];
+        const userIdx = getUserVoicingIndex(song, chordName, v);
+        const action = e.currentTarget.dataset.vaction;
+        if (action === "edit") {
+          bg.remove();
+          openVoicingEditor(chordName, song, userIdx);
+        } else if (action === "delete") {
+          if (confirm(`Delete this voicing of ${chordName}?`)) {
+            deleteVoicing(song, chordName, userIdx);
+            saveState({ songs: state.songs });
+            bg.remove();
+            openChordModal(chordName, song);
+          }
+        }
+      });
+    });
+  }
 }
 function fretsToString(frets) {
   return frets.map(f => f === -1 ? "x" : String(f)).join("");
@@ -1947,10 +2276,17 @@ function consumeImportHash() {
     const payload = JSON.parse(raw);
     // Always run the chord-sheet parser — handles inline ChordPro, chord-line-above-lyrics, and ChordPro directives.
     const parsed = parseChordSheet(payload.lyrics || "");
+    // Autodetect key from chord set if not provided
+    let key = payload.key || parsed.key || "";
+    if (!key) {
+      const chords = extractChords(parsed.lyrics || payload.lyrics || "");
+      const detected = detectKey(chords);
+      if (detected) key = detected;
+    }
     const song = Object.assign(blankSong(), {
       title: payload.title || parsed.title || "",
       artist: payload.artist || parsed.artist || "",
-      key: payload.key || parsed.key || "",
+      key,
       lyrics: parsed.lyrics || payload.lyrics || "",
       sourceUrl: payload.sourceUrl || "",
     });
