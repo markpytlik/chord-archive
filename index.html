@@ -465,9 +465,9 @@
     border: 1px solid var(--line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
-    padding: 16px 18px 12px;
-    min-width: 320px;
-    max-width: 540px;
+    padding: 18px 22px 14px;
+    min-width: 420px;
+    max-width: 720px;
     opacity: 0;
     transform: translateY(4px);
     transition: opacity .12s ease, transform .12s ease;
@@ -833,6 +833,35 @@
   }
   .play-mode .lyrics-large .section-label::before { content: "— "; opacity: .5; }
   .play-mode .lyrics-large .section-label::after  { content: " —"; opacity: .5; }
+  .play-mode .play-shape-panel {
+    position: fixed;
+    right: 24px;
+    top: 80px;
+    width: 220px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 14px;
+    z-index: 51;
+  }
+  .play-mode .play-shape-panel .play-shape-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--ink);
+    text-align: center;
+    margin-bottom: 8px;
+    letter-spacing: -.01em;
+  }
+  .play-mode .play-shape-panel .play-shape-diagram {
+    text-align: center;
+    min-height: 110px;
+  }
+  .play-mode button.shape-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
 
   /* Scrollbars */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -968,7 +997,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.2";
+const APP_VERSION = "1.4.3";
 
 //=============================================================
 // STORAGE
@@ -2856,11 +2885,16 @@ function openPlayMode(song) {
         <button id="play-faster" title="Faster (↑)">+</button>
         <span class="speed-label" id="speed-label">25 px/s</span>
       </div>
+      <button id="play-shapes" title="Show chord shapes as the song plays">⌗ Shapes</button>
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
     </div>
     <div class="play-content" id="play-content">
       <div class="lyrics-large">${renderLyrics(song.lyrics || "")}</div>
+    </div>
+    <div id="play-shape-panel" class="play-shape-panel" style="display:none;">
+      <div class="play-shape-name" id="play-shape-name">—</div>
+      <div class="play-shape-diagram" id="play-shape-diagram"></div>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -2917,6 +2951,66 @@ function openPlayMode(song) {
 
   toggleBtn.addEventListener("click", () => isPlaying ? pause() : play());
   speedInput.addEventListener("input", e => setSpeed(e.target.value));
+
+  // Chord-shape overlay — toggle, then update on scroll to show the chord nearest the top of the visible area
+  let shapesOn = false;
+  const shapesBtn = overlay.querySelector("#play-shapes");
+  const shapePanel = overlay.querySelector("#play-shape-panel");
+  const shapeName = overlay.querySelector("#play-shape-name");
+  const shapeDiag = overlay.querySelector("#play-shape-diagram");
+  function renderCurrentShape() {
+    if (!shapesOn) return;
+    const allChordEls = [...content.querySelectorAll("[data-chord]")];
+    if (!allChordEls.length) {
+      shapeName.textContent = "—";
+      shapeDiag.innerHTML = "";
+      return;
+    }
+    const contentRect = content.getBoundingClientRect();
+    const focusY = contentRect.top + 60; // a bit below the top of the scroll area
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const el of allChordEls) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < contentRect.top || r.top > contentRect.bottom) continue;
+      const dist = Math.abs(r.top - focusY);
+      if (dist < nearestDist) { nearestDist = dist; nearest = el; }
+    }
+    if (!nearest) {
+      shapeName.textContent = "—";
+      shapeDiag.innerHTML = "";
+      return;
+    }
+    const chord = nearest.dataset.chord;
+    if (shapeName.dataset.last === chord) return; // no change
+    shapeName.dataset.last = chord;
+    shapeName.textContent = chord;
+    const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
+    const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
+    const voicings = getVoicings(song, chord);
+    const v = voicings[0] || null;
+    let html = "";
+    if (wantGuitar && v?.frets) html += svgGuitar(chord, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm");
+    else if (wantGuitar && !isSimpleMajorOrMinor(chord)) {
+      const builtIn = lookupShape(chord);
+      if (builtIn) html += svgGuitar(chord, { frets: builtIn.frets, fingers: builtIn.fingers, barre: builtIn.barre }, "sm");
+    }
+    if (wantPiano) {
+      if (v?.pianoNotes && v.pianoNotes.length) {
+        html += `<div style="margin-top:8px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chord)?.root, undefined, "sm")}</div>`;
+      } else {
+        html += `<div style="margin-top:8px;">${svgPiano(chord, undefined, "sm")}</div>`;
+      }
+    }
+    shapeDiag.innerHTML = html || `<div class="muted small" style="text-align:center;color:#888;">no shape</div>`;
+  }
+  shapesBtn.addEventListener("click", () => {
+    shapesOn = !shapesOn;
+    shapesBtn.classList.toggle("shape-on", shapesOn);
+    shapePanel.style.display = shapesOn ? "" : "none";
+    renderCurrentShape();
+  });
+  content.addEventListener("scroll", () => { if (shapesOn) renderCurrentShape(); });
   overlay.querySelector("#play-slower").addEventListener("click", () => {
     speedInput.value = Math.max(0, parseFloat(speedInput.value) - 2);
     setSpeed(speedInput.value);
@@ -3028,7 +3122,7 @@ function renderPopover(target) {
     ? `<div class="diag-mini">
         <div class="label">Guitar${current && !current.builtIn ? " · custom" : ""}</div>
         ${current && current.frets
-          ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "md")
+          ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "lg")
           : (current ? "" : `<div class="muted small" style="padding:18px 6px; text-align:center; min-width:130px;">No saved voicing<br><span class="micro">click <b>+ Add</b> below</span></div>`)
         }
       </div>`
@@ -3037,8 +3131,8 @@ function renderPopover(target) {
     ? `<div class="diag-mini">
         <div class="label">Piano${current && current.pianoNotes && !current.builtIn ? " · custom" : ""}</div>
         ${current && current.pianoNotes && current.pianoNotes.length
-          ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "md")
-          : svgPiano(chordName, 2, "md")}
+          ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "lg")
+          : svgPiano(chordName, 2, "lg")}
       </div>`
     : "";
   const both = wantGuitar && wantPiano;
@@ -3432,7 +3526,7 @@ function openChordModal(chordName, song) {
           <span class="micro">Click <b>+ Add voicing</b> to save a custom shape.</span>
         </div>
       ` : `
-        <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+        <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
           ${voicings.map((v, i) => {
             // Honor song instruments — don't show guitar diagram on a piano-only song, and vice versa
             const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
@@ -3443,8 +3537,8 @@ function openChordModal(chordName, song) {
             <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
               <h4>${v.builtIn ? "Built-in" : (v.name ? escapeHtml(v.name) : "Voicing " + i)}</h4>
               <div class="canvas">
-                ${showFrets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "sm") : ""}
-                ${showPiano ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, undefined, "sm")}</div>` : ""}
+                ${showFrets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "md") : ""}
+                ${showPiano ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, undefined, "md")}</div>` : ""}
                 ${!showFrets && !showPiano ? `<div class="muted small" style="text-align:center;">(no diagram for selected instruments)</div>` : ""}
               </div>
               ${showFrets ? `<div class="meta">${fretsToString(v.frets)}</div>` : ""}
