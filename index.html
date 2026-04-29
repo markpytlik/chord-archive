@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.16";
+const APP_VERSION = "1.3.17";
 
 //=============================================================
 // STORAGE
@@ -3130,6 +3130,40 @@ function attachHoverPopover(rootEl, song) {
 //=============================================================
 // VOICING EDITOR  (add/edit a single voicing)
 //=============================================================
+// Two-button modal: "Change just this X chord" vs "Change all X chords in the song".
+// `done(renameAll)` is called with true/false depending on which the user picked. Cancel = no save.
+function showRenameChoice(oldName, newName, count, done) {
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.style.zIndex = "30";
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <h3>Rename ${escapeHtml(oldName)} → ${escapeHtml(newName)}?</h3>
+      <div class="modal-sub">
+        Your new voicing implies the chord <b>${escapeHtml(newName)}</b>. There ${count === 1 ? "is" : "are"} ${count} instance${count === 1 ? "" : "s"} of [${escapeHtml(oldName)}] in this song's lyrics.
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:18px;">
+        <button id="rc-just" style="padding:11px 14px; text-align:left; line-height:1.4;">
+          <b>Change just this ${escapeHtml(oldName)} chord</b><br>
+          <span class="muted small">Save the new voicing under <code>${escapeHtml(newName)}</code>. The lyrics keep saying [${escapeHtml(oldName)}] — your old voicings for it stay put.</span>
+        </button>
+        <button id="rc-all" class="primary" style="padding:11px 14px; text-align:left; line-height:1.4;">
+          <b>Change all ${escapeHtml(oldName)} chords in the song</b><br>
+          <span style="opacity:.85;" class="small">Rename every [${escapeHtml(oldName)}] in lyrics to [${escapeHtml(newName)}] and use this new voicing for all of them.</span>
+        </button>
+      </div>
+      <div class="actions">
+        <button id="rc-cancel" class="ghost">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+  bg.querySelector("#rc-just").addEventListener("click", () => { bg.remove(); done(false); });
+  bg.querySelector("#rc-all").addEventListener("click", () => { bg.remove(); done(true); });
+  bg.querySelector("#rc-cancel").addEventListener("click", () => bg.remove());
+}
+
 function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   const isEdit = typeof editIndex === "number" && editIndex >= 0;
   const existing = isEdit ? song.voicings?.[chordName]?.[editIndex] : null;
@@ -3311,29 +3345,29 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     const inputName = bg.querySelector("#ve-chord-name").value.trim();
     const targetName = inputName || chordName;
 
-    // If the chord was renamed, ask whether to apply the rename to all instances in the lyrics
-    let renameAll = false;
+    // Helper that finalizes the save under a particular renameAll choice
+    const doSave = (renameAll) => {
+      saveVoicing(song, targetName, voicing, isEdit && targetName === chordName ? editIndex : undefined);
+      if (targetName !== chordName && renameAll) {
+        const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
+        song.lyrics = (song.lyrics || "").replace(re, "[" + targetName + "]");
+        if (isEdit) deleteVoicing(song, chordName, editIndex);
+      }
+      saveState({ songs: state.songs });
+      bg.remove();
+      if (state.selectedId === song.id) renderDetail();
+    };
+
+    // If chord was renamed AND the original name is in the lyrics, ask which scope to apply.
     if (targetName !== chordName) {
       const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
-      const matches = (song.lyrics || "").match(re) || [];
-      const count = matches.length;
+      const count = ((song.lyrics || "").match(re) || []).length;
       if (count > 0) {
-        renameAll = confirm(
-          `You renamed [${chordName}] → [${targetName}].\n\n` +
-          `Apply to ALL ${count} instance${count === 1 ? "" : "s"} of [${chordName}] in this song? (Cancel = keep lyrics unchanged; just save the voicing under the new name.)`
-        );
+        showRenameChoice(chordName, targetName, count, doSave);
+        return;
       }
     }
-
-    saveVoicing(song, targetName, voicing, isEdit && targetName === chordName ? editIndex : undefined);
-    if (targetName !== chordName && renameAll) {
-      const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
-      song.lyrics = (song.lyrics || "").replace(re, "[" + targetName + "]");
-      if (isEdit) deleteVoicing(song, chordName, editIndex);
-    }
-    saveState({ songs: state.songs });
-    bg.remove();
-    if (state.selectedId === song.id) renderDetail();
+    doSave(false);
   });
   if (isEdit) {
     bg.querySelector("#ve-delete").addEventListener("click", () => {
