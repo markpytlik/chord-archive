@@ -968,7 +968,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.11";
+const APP_VERSION = "1.3.12";
 
 //=============================================================
 // STORAGE
@@ -1256,7 +1256,7 @@ function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
 
   function svg() {
     let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer; display:block;">`;
-    // White keys
+    // White keys — selected = blue (#2c5fbf); root = darker blue (#14296b); pale blue if root not selected.
     for (let i = 0; i < totalWhites; i++) {
       const idx = i % 7;
       const pc = whiteOffsets[idx];
@@ -1264,10 +1264,10 @@ function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
       const isSel = selected.has(pc);
       const isRoot = (currentRootPc !== null && pc === currentRootPc);
       let fill = "#fff";
-      if (isRoot && isSel) fill = "#1e3a8a";        // root selected: blue
-      else if (isRoot)     fill = "#dde6f7";        // root not selected: pale blue
-      else if (isSel)      fill = "var(--accent)";  // non-root selected: accent rust
-      const labelColor = (isSel && isRoot) ? "#fff" : (isSel ? "#fff" : (isRoot ? "#1e3a8a" : "#888"));
+      if (isRoot && isSel) fill = "#14296b";        // root selected: darker blue
+      else if (isRoot)     fill = "#dde6f7";        // root not selected: pale blue background
+      else if (isSel)      fill = "#2c5fbf";        // non-root selected: medium blue
+      const labelColor = (isSel) ? "#fff" : (isRoot ? "#14296b" : "#888");
       s += `<rect class="key" data-pc="${pc}" x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
       s += `<text x="${x + whiteW/2}" y="${whiteH - 12}" text-anchor="middle" font-size="11" fill="${labelColor}" font-family="ui-sans-serif" pointer-events="none">${whiteNames[idx]}</text>`;
     }
@@ -1279,9 +1279,9 @@ function buildClickablePianoKeyboard(initialPcs, onChange, rootPc) {
         const isSel = selected.has(bk.pc);
         const isRoot = (currentRootPc !== null && bk.pc === currentRootPc);
         let fill = "#14161a";
-        if (isRoot && isSel) fill = "#1e3a8a";
+        if (isRoot && isSel) fill = "#14296b";
         else if (isRoot)     fill = "#3b4d76";
-        else if (isSel)      fill = "var(--accent)";
+        else if (isSel)      fill = "#2c5fbf";
         s += `<rect class="key" data-pc="${bk.pc}" x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
         s += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" pointer-events="none">${bk.name}</text>`;
       }
@@ -1569,7 +1569,7 @@ function svgPianoFromPcs(pcs, rootPc, octaves=2, size="md") {
     const isHit = noteSet.has(pc);
     const isRoot = (rootPc !== undefined && pc === rootPc);
     const x = i * whiteW;
-    const fill = isRoot ? "#b14a2c" : (isHit ? "#1e3a8a" : "#fff");
+    const fill = isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#fff");
     svg += `<rect x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
     if (isHit) svg += `<text x="${x + whiteW/2}" y="${whiteH - 10}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(pc)}</text>`;
   }
@@ -1579,7 +1579,7 @@ function svgPianoFromPcs(pcs, rootPc, octaves=2, size="md") {
       const x = (i + 1) * whiteW - blackW/2;
       const isHit = noteSet.has(bk.pc);
       const isRoot = (rootPc !== undefined && bk.pc === rootPc);
-      const fill = isRoot ? "#b14a2c" : (isHit ? "#1e3a8a" : "#14161a");
+      const fill = isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#14161a");
       svg += `<rect x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
       if (isHit) svg += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="8" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(bk.pc)}</text>`;
     }
@@ -1608,7 +1608,7 @@ function svgPiano(chordName, octaves=2, size="md") {
     const isHit = noteSet.has(pc);
     const isRoot = (pc === rootPc);
     const x = i * whiteW;
-    const fill = isRoot ? "#b14a2c" : (isHit ? "#1e3a8a" : "#fff");
+    const fill = isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#fff");
     svg += `<rect x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
     if (isHit) {
       svg += `<text x="${x + whiteW/2}" y="${whiteH - 10}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(pc)}</text>`;
@@ -1620,7 +1620,7 @@ function svgPiano(chordName, octaves=2, size="md") {
       const x = (i + 1) * whiteW - blackW/2;
       const isHit = noteSet.has(bk.pc);
       const isRoot = (bk.pc === rootPc);
-      const fill = isRoot ? "#b14a2c" : (isHit ? "#1e3a8a" : "#14161a");
+      const fill = isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#14161a");
       svg += `<rect x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
       if (isHit) {
         svg += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="8" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(bk.pc)}</text>`;
