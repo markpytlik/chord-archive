@@ -283,6 +283,23 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
+  .detail-head h1 .key-inline {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 14px;
+    margin-bottom: 6px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    border: 1px solid #ecccc0;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .detail-head h1 .key-inline::before { content: "Key "; opacity: .7; }
   .detail-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
   .meta-row {
@@ -910,7 +927,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.3";
+const APP_VERSION = "1.3.4";
 
 //=============================================================
 // STORAGE
@@ -2063,7 +2080,7 @@ function renderDetail() {
     <div class="detail-head">
       <div class="title-block">
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
-        <h1>${escapeHtml(song.title || "Untitled")}</h1>
+        <h1>${escapeHtml(song.title || "Untitled")}${song.key ? `<span class="key-inline" title="Key">${escapeHtml(song.key)}</span>` : ""}</h1>
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
@@ -2081,7 +2098,6 @@ function renderDetail() {
     </div>
 
     <div class="meta-row">
-      ${song.key ? `<span class="pill accent">Key ${escapeHtml(song.key)}</span>` : ""}
       ${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}
       ${(song.instruments || []).map(i => `<span class="pill ${i}">${i}</span>`).join("")}
       ${song.sourceUrl ? `<a class="pill" style="text-decoration:none;" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener">source ↗</a>` : ""}
@@ -2388,7 +2404,7 @@ function saveEdit(isNew, songSnapshot) {
     instruments,
     sourceUrl: document.getElementById("f-source").value.trim(),
     lyrics: parsedLyrics,
-    notes: song.notes || "",  // notes textarea was removed from editor; preserve existing value
+    notes: songSnapshot.notes || "",  // notes textarea was removed from editor; preserve existing value
     updatedAt: now(),
   };
   if (!updates.title) { setHelper("A title is required.", "err"); return; }
