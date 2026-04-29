@@ -15,6 +15,13 @@ async function getActiveTab() {
 }
 
 async function init() {
+  // Show actual extension version from manifest (no hardcoding)
+  try {
+    const manifest = api.runtime.getManifest();
+    const v = $("version");
+    if (v) v.textContent = manifest.version;
+  } catch (e) {}
+
   const tab = await getActiveTab();
   const url = tab?.url || "";
   let host = "(no page)";

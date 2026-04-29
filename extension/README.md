@@ -16,8 +16,10 @@ generic `<pre>`-based fallback for everything else.
 
 ## Install (Firefox)
 
-Pre-built `.xpi` is at the repo root:
-[`chord-archive-grabber.xpi`](https://github.com/markpytlik/chord-archive/raw/main/chord-archive-grabber.xpi)
+Pre-built `.xpi` is at the repo root, versioned per release. Latest:
+[`chord-archive-grabber-1.2.0.xpi`](https://github.com/markpytlik/chord-archive/raw/main/chord-archive-grabber-1.2.0.xpi)
+
+Older versions remain in the repo root for rollback if needed.
 
 Firefox doesn't permanently install unsigned `.xpi` files in regular Firefox.
 Three options, in order of permanence:
@@ -25,11 +27,11 @@ Three options, in order of permanence:
 ### Option A — Temporary install (lasts until Firefox restarts)
 1. Open `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on…**
-3. Select either the `chord-archive-grabber.xpi` file or `manifest.json` inside this folder.
+3. Select either the `chord-archive-grabber-1.2.0.xpi` file or `manifest.json` inside this folder.
 
 ### Option B — Permanent in Firefox Developer Edition / Nightly / ESR
 1. In `about:config`, set `xpinstall.signatures.required` to `false`.
-2. Drag `chord-archive-grabber.xpi` into Firefox.
+2. Drag `chord-archive-grabber-1.2.0.xpi` into Firefox.
 3. Firefox prompts to install — click **Add**.
 
 ### Option C — Permanent in regular Firefox (signed)
