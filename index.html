@@ -286,7 +286,7 @@
   .detail-head h1 .key-inline {
     display: inline-block;
     vertical-align: middle;
-    margin-left: 14px;
+    margin-left: 32px;
     margin-bottom: 6px;
     font-family: var(--sans);
     font-size: 12px;
@@ -299,7 +299,23 @@
     padding: 3px 10px;
     border-radius: 999px;
   }
-  .detail-head h1 .key-inline::before { content: "Key "; opacity: .7; }
+  .detail-head h1 .key-inline::before { content: "Key of "; opacity: .7; }
+  .detail-head h1 .source-inline {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 12px;
+    margin-bottom: 6px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--muted);
+    padding: 0 2px 1px;
+    transition: color .12s, border-color .12s;
+  }
+  .detail-head h1 .source-inline:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  .detail-head h1 .source-inline::after { content: " ↗"; font-size: 11px; opacity: .8; }
   .detail-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
   .meta-row {
@@ -927,7 +943,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.5";
+const APP_VERSION = "1.3.6";
 
 //=============================================================
 // STORAGE
@@ -1189,6 +1205,67 @@ function parsePianoNotesString(s) {
     if (pc !== undefined) pcs.push(pc);
   }
   return pcs;
+}
+
+// Build an interactive 12-note (one octave) piano keyboard SVG. Click a key to toggle.
+// onChange(pcs) fires whenever the selected pitch-class set changes.
+function buildClickablePianoKeyboard(initialPcs, onChange) {
+  const wrap = document.createElement("div");
+  wrap.className = "click-piano";
+  const selected = new Set(initialPcs);
+
+  const whiteW = 36, whiteH = 110, blackW = 22, blackH = 70;
+  const W = whiteW * 7, H = whiteH;
+  const blackKeys = [
+    { afterWhite: 0, pc: 1,  name: "C#" },
+    { afterWhite: 1, pc: 3,  name: "D#" },
+    { afterWhite: 3, pc: 6,  name: "F#" },
+    { afterWhite: 4, pc: 8,  name: "G#" },
+    { afterWhite: 5, pc: 10, name: "A#" },
+  ];
+  const whiteKeys = [
+    { i: 0, pc: 0,  name: "C" }, { i: 1, pc: 2,  name: "D" }, { i: 2, pc: 4,  name: "E" },
+    { i: 3, pc: 5,  name: "F" }, { i: 4, pc: 7,  name: "G" }, { i: 5, pc: 9,  name: "A" },
+    { i: 6, pc: 11, name: "B" },
+  ];
+
+  function svg() {
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer;">`;
+    for (const wk of whiteKeys) {
+      const x = wk.i * whiteW;
+      const isSel = selected.has(wk.pc);
+      const fill = isSel ? "var(--accent)" : "#fff";
+      const labelColor = isSel ? "#fff" : "#888";
+      s += `<rect class="key" data-pc="${wk.pc}" x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
+      s += `<text x="${x + whiteW/2}" y="${whiteH - 12}" text-anchor="middle" font-size="11" fill="${labelColor}" font-family="ui-sans-serif" pointer-events="none">${wk.name}</text>`;
+    }
+    for (const bk of blackKeys) {
+      const x = (bk.afterWhite + 1) * whiteW - blackW/2;
+      const isSel = selected.has(bk.pc);
+      const fill = isSel ? "var(--accent)" : "#14161a";
+      s += `<rect class="key" data-pc="${bk.pc}" x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1" />`;
+      s += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" pointer-events="none">${bk.name}</text>`;
+    }
+    s += `</svg>`;
+    return s;
+  }
+
+  function rerender() { wrap.innerHTML = svg(); }
+  rerender();
+
+  wrap.addEventListener("click", e => {
+    const k = e.target.closest(".key[data-pc]");
+    if (!k) return;
+    const pc = parseInt(k.getAttribute("data-pc"));
+    if (selected.has(pc)) selected.delete(pc); else selected.add(pc);
+    rerender();
+    onChange([...selected]);
+  });
+
+  // Public API
+  wrap.getSelectedPcs = () => [...selected];
+  wrap.setSelectedPcs = (pcs) => { selected.clear(); pcs.forEach(p => selected.add(p)); rerender(); };
+  return wrap;
 }
 
 function chordNotes(chord) {
@@ -2080,7 +2157,7 @@ function renderDetail() {
     <div class="detail-head">
       <div class="title-block">
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
-        <h1>${escapeHtml(song.title || "Untitled")}${song.key ? `<span class="key-inline" title="Key">${escapeHtml(song.key)}</span>` : ""}</h1>
+        <h1>${escapeHtml(song.title || "Untitled")}${song.key ? `<span class="key-inline" title="Key">${escapeHtml(song.key)}</span>` : ""}${song.sourceUrl ? `<a class="source-inline" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source">source</a>` : ""}</h1>
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
@@ -2100,7 +2177,6 @@ function renderDetail() {
     <div class="meta-row">
       ${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}
       ${(song.instruments || []).map(i => `<span class="pill ${i}">${i}</span>`).join("")}
-      ${song.sourceUrl ? `<a class="pill" style="text-decoration:none;" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener">source ↗</a>` : ""}
     </div>
 
     <div class="lyrics" id="lyrics-view">${renderLyrics(song.lyrics || "")}</div>
@@ -2453,9 +2529,9 @@ function openPlayMode(song) {
       </div>
       <div class="speed-controls">
         <button id="play-slower" title="Slower (↓)">−</button>
-        <input id="play-speed" type="range" min="0" max="40" step="1" value="15" title="Scroll speed (px/s)" />
+        <input id="play-speed" type="range" min="0" max="40" step="1" value="25" title="Scroll speed (px/s)" />
         <button id="play-faster" title="Faster (↑)">+</button>
-        <span class="speed-label" id="speed-label">15 px/s</span>
+        <span class="speed-label" id="speed-label">25 px/s</span>
       </div>
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
@@ -2471,18 +2547,21 @@ function openPlayMode(song) {
   const speedLabel = overlay.querySelector("#speed-label");
   const toggleBtn = overlay.querySelector("#play-toggle");
 
-  // Scroll loop driven by requestAnimationFrame; speed in px/s.
+  // Scroll loop with a virtual accumulator — scrollTop rounds to int each frame,
+  // which would lose sub-pixel motion at low speeds. Track the float position separately.
   let isPlaying = false;
   let speedPxs = parseFloat(speedInput.value) || 20;
   let lastT = 0;
   let rafId = null;
+  let virtualScroll = 0;
 
   function step(t) {
     if (!isPlaying) return;
     if (lastT === 0) lastT = t;
     const dt = (t - lastT) / 1000;
     lastT = t;
-    content.scrollTop += speedPxs * dt;
+    virtualScroll += speedPxs * dt;
+    content.scrollTop = virtualScroll;
     // Stop when we hit the bottom
     if (content.scrollTop + content.clientHeight >= content.scrollHeight - 1) {
       isPlaying = false;
@@ -2493,7 +2572,10 @@ function openPlayMode(song) {
   }
   function play() {
     if (isPlaying) return;
-    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 1) content.scrollTop = 0;
+    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 1) {
+      content.scrollTop = 0;
+    }
+    virtualScroll = content.scrollTop;
     isPlaying = true;
     lastT = 0;
     toggleBtn.textContent = "⏸ Pause";
@@ -2770,8 +2852,8 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
         ` : ""}
         ${showPiano ? `
           <div>
-            <label>Piano voicing <span class="muted">(notes you actually play, e.g. <code>C E G B</code> or <code>E G B D</code>)</span></label>
-            <input id="ve-piano" placeholder="C E G B" value="${escapeHtml(initPiano)}" />
+            <label>Piano voicing <span class="muted">(click the keys you actually play)</span></label>
+            <div id="ve-piano-kbd" style="text-align:center; padding:6px 0;"></div>
             <div class="helper-msg" id="ve-preview-piano" style="text-align:center;"></div>
           </div>
         ` : ""}
@@ -2792,19 +2874,25 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
   bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
 
   // Live previews + chord-name detection.
-  // If the user enters notes that imply a different chord, we suggest renaming.
-  let resolvedName = chordName;  // mutable — may change if input implies a different chord
+  let resolvedName = chordName;
+  let pianoPcs = seed?.pianoNotes ? [...seed.pianoNotes] : [];
   const fretsInput  = showGuitar ? bg.querySelector("#ve-frets") : null;
-  const pianoInput  = showPiano  ? bg.querySelector("#ve-piano") : null;
+  const pianoMount  = showPiano  ? bg.querySelector("#ve-piano-kbd") : null;
   const previewG    = showGuitar ? bg.querySelector("#ve-preview-guitar") : null;
   const previewP    = showPiano  ? bg.querySelector("#ve-preview-piano")  : null;
   const detectedEl  = bg.querySelector("#ve-detected");
   const nameEl      = bg.querySelector("#ve-name");
   const notesEl     = bg.querySelector("#ve-notes");
 
+  // If we have a piano mount, build the clickable keyboard
+  let clickPiano = null;
+  if (pianoMount) {
+    clickPiano = buildClickablePianoKeyboard(pianoPcs, pcs => { pianoPcs = pcs; updateAll(); });
+    pianoMount.appendChild(clickPiano);
+  }
+
   function fretsToPcs(frets) {
-    // Open-string pitch classes for standard tuning, low E to high E
-    const open = [4, 9, 2, 7, 11, 4]; // E A D G B E
+    const open = [4, 9, 2, 7, 11, 4]; // E A D G B e — open-string pitch classes
     const pcs = [];
     for (let i = 0; i < 6; i++) {
       const f = frets[i];
@@ -2825,24 +2913,21 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
         previewG.className = "helper-msg err";
       }
     }
-    if (showPiano && pianoInput) {
-      const pcs = parsePianoNotesString(pianoInput.value);
-      if (pcs.length) {
-        // Mini keyboard rendering — temporarily build a chord name from these notes
-        const name = chordNameFromPcs(pcs) || chordName;
-        previewP.innerHTML = svgPiano(name, 2, "sm");
+    if (showPiano && previewP) {
+      if (pianoPcs.length) {
+        previewP.textContent = "Notes: " + pianoPcs.map(pc => pcToName(pc)).join("  ·  ");
         previewP.className = "helper-msg";
-        allPcs = allPcs.concat(pcs);
+        allPcs = allPcs.concat(pianoPcs);
       } else {
-        previewP.textContent = pianoInput.value.trim() ? "Invalid notes — use note names like C E G B or C# Eb F#" : "";
-        previewP.className = "helper-msg err";
+        previewP.textContent = "Click keys above to build a voicing.";
+        previewP.className = "helper-msg";
       }
     }
     // Detect chord name from combined input
     const detected = chordNameFromPcs(allPcs);
     if (detected && detected !== chordName) {
       resolvedName = detected;
-      detectedEl.innerHTML = `These notes look like <b>${escapeHtml(detected)}</b> — saving will rename the chord on save.`;
+      detectedEl.innerHTML = `These notes look like <b>${escapeHtml(detected)}</b> — saving will rename the chord.`;
       detectedEl.className = "helper-msg ok";
       nameEl.textContent = detected;
       notesEl.textContent = describeNotes(detected);
@@ -2855,7 +2940,6 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     }
   }
   fretsInput?.addEventListener("input", updateAll);
-  pianoInput?.addEventListener("input", updateAll);
   updateAll();
 
   bg.querySelector("#ve-cancel").addEventListener("click", () => bg.remove());
@@ -2866,10 +2950,8 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
       if (!frets) { alert("Invalid guitar shape — use 6 characters (digits or 'x'). Example: x32010"); return; }
       voicing.frets = frets;
     }
-    if (showPiano && pianoInput && pianoInput.value.trim()) {
-      const pcs = parsePianoNotesString(pianoInput.value);
-      if (!pcs.length) { alert("Invalid piano notes — use note names like 'C E G B'"); return; }
-      voicing.pianoNotes = pcs;
+    if (showPiano && pianoPcs.length) {
+      voicing.pianoNotes = pianoPcs.slice();
     }
     if (!voicing.frets && !voicing.pianoNotes) {
       alert("Add at least a guitar shape or piano notes."); return;
