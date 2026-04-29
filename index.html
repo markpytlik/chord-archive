@@ -672,11 +672,11 @@
     padding: 1px 5px; border-radius: 3px;
   }
 
-  /* ====================== Play mode (pure white on black) ====================== */
+  /* ====================== Play mode (white background, dark text) ====================== */
   .play-mode {
     position: fixed; inset: 0; z-index: 50;
-    background: #000;
-    color: #fff;
+    background: #ffffff;
+    color: #14161a;
     display: flex; flex-direction: column;
     overflow: hidden;
   }
@@ -684,40 +684,40 @@
     flex: 0 0 auto;
     display: flex; align-items: center; gap: 14px;
     padding: 14px 28px;
-    background: #000;
-    border-bottom: 1px solid #1a1a1a;
+    background: #fafaf7;
+    border-bottom: 1px solid var(--line);
   }
   .play-mode .play-title {
     flex: 1; min-width: 0;
     font-family: var(--serif);
     font-size: 18px;
-    color: #fff;
+    color: var(--ink);
   }
   .play-mode .play-title .artist {
-    color: #888; font-size: 12px;
+    color: var(--muted); font-size: 12px;
     text-transform: uppercase; letter-spacing: .08em; font-family: var(--sans);
     margin-bottom: 2px;
   }
   .play-mode button {
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    color: #fff;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink);
     padding: 7px 14px; border-radius: 6px;
     font-size: 13px;
     cursor: pointer;
   }
-  .play-mode button:hover { background: #262626; }
-  .play-mode button.primary { background: #fff; border-color: #fff; color: #000; }
-  .play-mode button.primary:hover { background: #ddd; border-color: #ddd; }
+  .play-mode button:hover { background: var(--panel-2); }
+  .play-mode button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .play-mode button.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
   .play-mode .speed-controls {
     display: inline-flex; align-items: center; gap: 8px;
   }
   .play-mode .speed-controls input[type=range] {
-    width: 160px; accent-color: #fff;
+    width: 160px; accent-color: var(--accent);
     background: transparent; border: 0; padding: 0;
   }
   .play-mode .speed-controls .speed-label {
-    font-size: 11px; color: #888;
+    font-size: 11px; color: var(--muted);
     font-family: var(--mono);
     width: 64px; text-align: right;
   }
@@ -725,15 +725,15 @@
     flex: 1 1 auto;
     overflow-y: auto;
     padding: 20vh 14% 60vh;
-    scroll-behavior: auto; /* avoid smooth-scroll fighting auto-scroll loop */
+    scroll-behavior: auto;
   }
   .play-mode .play-content::-webkit-scrollbar { width: 6px; }
-  .play-mode .play-content::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  .play-mode .play-content::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
   .play-mode .lyrics-large {
     font-family: var(--mono);
     font-size: 24px;
     line-height: 1.7;
-    color: #fff;
+    color: var(--ink);
     white-space: pre-wrap;
     max-width: 980px;
     margin: 0 auto;
@@ -745,9 +745,9 @@
   .play-mode .lyrics-large .seg:has(.chord) { min-width: 3em; }
   .play-mode .lyrics-large .seg .chord {
     position: absolute; top: 0; left: 0;
-    color: #fff;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    color: #1a1a1a;
+    background: #ededeb;
+    border: 1px solid transparent;
     border-radius: 5px;
     padding: 1px 7px;
     font-size: 17px;
@@ -762,9 +762,9 @@
   .play-mode .lyrics-large .chord-pill-inline {
     display: inline-block;
     margin-right: 14px;
-    color: #fff;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    color: #1a1a1a;
+    background: #ededeb;
+    border: 1px solid transparent;
     border-radius: 5px;
     padding: 2px 10px;
     font-size: 20px;
@@ -773,14 +773,14 @@
   }
   .play-mode .lyrics-large .chord-rep {
     margin-left: 14px;
-    color: #999;
+    color: var(--accent);
     font-size: 20px;
     font-weight: 600;
     font-style: italic;
     font-family: var(--serif);
   }
   .play-mode .lyrics-large .section-label {
-    color: #aaa;
+    color: var(--accent);
     font-weight: 700;
     font-style: normal;
     margin-top: 1.4em;
@@ -927,7 +927,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.3.4";
+const APP_VERSION = "1.3.5";
 
 //=============================================================
 // STORAGE
@@ -2121,7 +2121,7 @@ function renderDetail() {
   document.getElementById("btn-edit").addEventListener("click", () => startEdit(song));
   document.getElementById("btn-duplicate").addEventListener("click", () => duplicateSong(song));
   document.getElementById("btn-delete").addEventListener("click", () => deleteSong(song));
-  el.querySelectorAll(".chord[data-chord], .pill[data-chord]").forEach(c => {
+  el.querySelectorAll("[data-chord]").forEach(c => {
     c.addEventListener("click", e => openChordModal(e.currentTarget.dataset.chord, song));
   });
   attachHoverPopover(el, song);
@@ -2453,9 +2453,9 @@ function openPlayMode(song) {
       </div>
       <div class="speed-controls">
         <button id="play-slower" title="Slower (↓)">−</button>
-        <input id="play-speed" type="range" min="0" max="500" step="5" value="80" title="Scroll speed (px/s)" />
+        <input id="play-speed" type="range" min="0" max="40" step="1" value="15" title="Scroll speed (px/s)" />
         <button id="play-faster" title="Faster (↑)">+</button>
-        <span class="speed-label" id="speed-label">80 px/s</span>
+        <span class="speed-label" id="speed-label">15 px/s</span>
       </div>
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
@@ -2513,11 +2513,11 @@ function openPlayMode(song) {
   toggleBtn.addEventListener("click", () => isPlaying ? pause() : play());
   speedInput.addEventListener("input", e => setSpeed(e.target.value));
   overlay.querySelector("#play-slower").addEventListener("click", () => {
-    speedInput.value = Math.max(0, parseFloat(speedInput.value) - 20);
+    speedInput.value = Math.max(0, parseFloat(speedInput.value) - 2);
     setSpeed(speedInput.value);
   });
   overlay.querySelector("#play-faster").addEventListener("click", () => {
-    speedInput.value = Math.min(500, parseFloat(speedInput.value) + 20);
+    speedInput.value = Math.min(40, parseFloat(speedInput.value) + 2);
     setSpeed(speedInput.value);
   });
 
@@ -2533,10 +2533,10 @@ function openPlayMode(song) {
       e.preventDefault();
       isPlaying ? pause() : play();
     } else if (e.key === "ArrowUp") {
-      speedInput.value = Math.min(120, parseFloat(speedInput.value) + 5);
+      speedInput.value = Math.min(40, parseFloat(speedInput.value) + 2);
       setSpeed(speedInput.value);
     } else if (e.key === "ArrowDown") {
-      speedInput.value = Math.max(0, parseFloat(speedInput.value) - 5);
+      speedInput.value = Math.max(0, parseFloat(speedInput.value) - 2);
       setSpeed(speedInput.value);
     }
   }
@@ -2723,13 +2723,13 @@ function hidePopover() {
 
 function attachHoverPopover(rootEl, song) {
   rootEl.addEventListener("mouseover", e => {
-    const t = e.target.closest(".chord[data-chord]");
+    const t = e.target.closest("[data-chord]");
     if (!t) return;
     clearTimeout(popoverTimer);
     popoverTimer = setTimeout(() => showPopover(t, t.dataset.chord, song), 220);
   });
   rootEl.addEventListener("mouseout", e => {
-    if (!e.target.closest(".chord[data-chord]")) return;
+    if (!e.target.closest("[data-chord]")) return;
     clearTimeout(popoverTimer);
     popoverTimer = setTimeout(hidePopover, 200);
   });
