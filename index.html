@@ -135,7 +135,7 @@
     letter-spacing: -.01em;
     color: var(--ink);
   }
-  header .brand .accent { color: var(--accent); font-style: italic; }
+  header .brand .accent { color: var(--accent); font-style: italic; font-size: 1.2em; }
   header .brand .glyph { color: var(--accent); margin-right: 4px; }
   header .brand-version {
     font-family: var(--mono);
@@ -1016,7 +1016,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.4";
+const APP_VERSION = "1.4.5";
 
 //=============================================================
 // STORAGE
@@ -1602,7 +1602,7 @@ function svgGuitar(chordName, custom, size="md") {
   const stringGap = (W - padX*2) / 5;
   const fretGap = (H - padTop - padBot) / NUM_FRETS;
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
   for (let s = 0; s < 6; s++) {
     const x = padX + s * stringGap;
     const f = frets[s];
@@ -1721,8 +1721,9 @@ function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
                               { whiteW: 22, whiteH: 100, blackW: 13, blackH: 62 };
   const { whiteW, whiteH, blackW, blackH } = dim;
   const W = whiteW * FE_WHITE_POSITIONS.length, H = whiteH;
-  // Responsive SVG: viewBox handles scaling; max-width:100% prevents overflow inside narrow cards
-  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
+  // Explicit width/height so SVG has intrinsic pixel size when not constrained by container.
+  // Combined with max-width:100% it stays responsive in narrow contexts.
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
   // White keys
   for (let i = 0; i < FE_WHITE_POSITIONS.length; i++) {
     const pos = FE_WHITE_POSITIONS[i];
@@ -3547,18 +3548,20 @@ function openChordModal(chordName, song) {
       ` : `
         <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));">
           ${voicings.map((v, i) => {
-            // Honor song instruments — don't show guitar diagram on a piano-only song, and vice versa
-            const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
-            const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
-            const showFrets = wantGuitar && v.frets;
-            const showPiano = wantPiano && v.pianoNotes && v.pianoNotes.length;
+            // Honor song instruments — but if the voicing has data only for the OTHER instrument,
+            // still show it (otherwise the card is mysteriously empty).
+            const sel = song?.instruments?.length ? song.instruments : ["guitar", "piano"];
+            const hasFrets = v.frets && v.frets.length;
+            const hasPiano = v.pianoNotes && v.pianoNotes.length;
+            const showFrets = hasFrets && (sel.includes("guitar") || !hasPiano);
+            const showPiano = hasPiano && (sel.includes("piano")  || !hasFrets);
             return `
             <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
               <h4>${v.builtIn ? "Built-in" : (v.name ? escapeHtml(v.name) : "Voicing " + i)}</h4>
               <div class="canvas">
                 ${showFrets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "md") : ""}
                 ${showPiano ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, undefined, "md")}</div>` : ""}
-                ${!showFrets && !showPiano ? `<div class="muted small" style="text-align:center;">(no diagram for selected instruments)</div>` : ""}
+                ${!hasFrets && !hasPiano ? `<div class="muted small" style="text-align:center;">(this voicing has no notes saved — click <b>Edit</b> to add some)</div>` : ""}
               </div>
               ${showFrets ? `<div class="meta">${fretsToString(v.frets)}</div>` : ""}
               ${v.note ? `<div class="meta" style="margin-top:6px; color:var(--ink-soft); font-family:var(--sans); font-size:12px;">${escapeHtml(v.note)}</div>` : ""}
