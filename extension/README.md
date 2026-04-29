@@ -16,23 +16,26 @@ generic `<pre>`-based fallback for everything else.
 
 ## Install (Firefox)
 
-Firefox doesn't allow self-signed extensions to run permanently outside the AMO
-store. Two options:
+Pre-built `.xpi` is at the repo root:
+[`chord-archive-grabber.xpi`](https://github.com/markpytlik/chord-archive/raw/main/chord-archive-grabber.xpi)
+
+Firefox doesn't permanently install unsigned `.xpi` files in regular Firefox.
+Three options, in order of permanence:
 
 ### Option A — Temporary install (lasts until Firefox restarts)
 1. Open `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on…**
-3. Select `manifest.json` inside this folder.
+3. Select either the `chord-archive-grabber.xpi` file or `manifest.json` inside this folder.
 
-Good for testing. You'll need to re-load it on each Firefox restart.
+### Option B — Permanent in Firefox Developer Edition / Nightly / ESR
+1. In `about:config`, set `xpinstall.signatures.required` to `false`.
+2. Drag `chord-archive-grabber.xpi` into Firefox.
+3. Firefox prompts to install — click **Add**.
 
-### Option B — Permanent (Firefox Developer Edition or Nightly only)
-1. Open `about:config`, set `xpinstall.signatures.required` to `false`.
-2. Zip the contents of this folder (just the files, not the parent folder).
-   Rename to `chord-archive.xpi`.
-3. Drag the `.xpi` into Firefox.
-
-For everyday use, signing the extension and submitting to AMO is the right path.
+### Option C — Permanent in regular Firefox (signed)
+Submit the `.xpi` to [addons.mozilla.org](https://addons.mozilla.org/developers/) for
+signing. Free; requires a Mozilla account. Can list it as "self-distribution" only
+if you don't want it public.
 
 ## Install (Chrome / Edge / Brave)
 
