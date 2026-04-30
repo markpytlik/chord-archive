@@ -912,16 +912,19 @@
   }
   .play-mode .lyrics-large .section-label::before { content: "— "; opacity: .5; }
   .play-mode .lyrics-large .section-label::after  { content: " —"; opacity: .5; }
-  /* Chord-change marker — hidden in the regular view, visible only in play mode */
+  /* Line wrappers — block layout; blank rows get explicit height since we no longer rely on \n + pre-wrap */
+  .lyric-line { display: block; }
+  .lyric-blank { min-height: 1em; }
+  /* Chord-change dot — invisible by default; shown only on the active line in play mode (sync with shape panel). */
   .lyric-dot { display: none; }
-  .play-mode .lyrics-large .lyric-dot {
+  .play-mode .lyrics-large .lyric-line.has-chord.active .lyric-dot {
     display: inline-block;
     color: var(--accent);
     font-size: 12px;
     line-height: 1;
     margin-right: 14px;
     margin-left: -22px;
-    opacity: .55;
+    opacity: .85;
     vertical-align: middle;
     transform: translateY(-1px);
   }
@@ -1163,7 +1166,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.6";
+const APP_VERSION = "1.5.7";
 
 //=============================================================
 // STORAGE
@@ -2544,8 +2547,8 @@ function renderLyrics(text) {
     occCount[chord] = v + 1;
     return v;
   };
-  // Tiny dot prefix marking lines that contain a chord (or chord change) — only visible in play mode.
-  // Lets the eye lock on to lines where something happens vs lines that just continue the previous chord.
+  // Each line is wrapped in `.lyric-line` so play mode can mark the focused one with `.active`.
+  // The dot marker sits inside each chord-bearing line but is only revealed via CSS on `.active`.
   const dot = `<span class="lyric-dot" aria-hidden="true">●</span>`;
   for (const line of lines) {
     if (typeof line === "object" && line.kind === "chord-only") {
@@ -2557,13 +2560,13 @@ function renderLyrics(text) {
         html += `<span class="chord-pill-inline" data-chord="${escapeHtml(ch)}" data-occ="${occ}">${escapeHtml(ch)}</span>`;
       }
       const repHtml = line.count > 1 ? `<span class="chord-rep">× ${line.count}</span>` : "";
-      out.push(`<div class="chord-only-row">${dot}${html}${repHtml}</div>`);
+      out.push(`<div class="lyric-line chord-only-row has-chord">${dot}${html}${repHtml}</div>`);
       continue;
     }
-    if (!line.trim()) { out.push(""); continue; }
+    if (!line.trim()) { out.push(`<div class="lyric-line lyric-blank"></div>`); continue; }
     const sec = line.match(/^\s*\{([^}]+)\}\s*$/);
     if (sec) {
-      out.push(`<span class="section-label">${escapeHtml(sec[1])}</span>`);
+      out.push(`<div class="lyric-line section-row"><span class="section-label">${escapeHtml(sec[1])}</span></div>`);
       continue;
     }
     // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment.
@@ -2586,9 +2589,9 @@ function renderLyrics(text) {
         html += `<span class="seg">${escapeHtml(m[3])}</span>`;
       }
     }
-    out.push(hasChord ? `${dot}${html}` : html);
+    out.push(`<div class="lyric-line${hasChord ? " has-chord" : ""}">${hasChord ? dot : ""}${html}</div>`);
   }
-  return out.join("\n");
+  return out.join("");
 }
 function extractChords(text) {
   if (!text) return [];
@@ -3312,10 +3315,20 @@ function openPlayMode(song) {
       const dist = Math.abs(r.top - focusY);
       if (dist < nearestDist) { nearestDist = dist; focused = el; }
     }
+    // Mark the focused chord's line as active so CSS can show the dot ONLY there.
+    // Done BEFORE the early return so the dot still shows even when shapes panel is closed.
+    const newActive = focused ? focused.closest(".lyric-line") : null;
+    const prevActive = content.querySelector(".lyric-line.active");
+    if (prevActive !== newActive) {
+      if (prevActive) prevActive.classList.remove("active");
+      if (newActive) newActive.classList.add("active");
+    }
     if (!focused) {
       shapeDiag.innerHTML = "";
       return;
     }
+    // Shape panel is gated separately — if it's off, we still want the line marker.
+    if (!shapesOn) return;
     // Find every chord pill on the SAME LINE as the focused one (by similar top coordinate)
     // — then dedupe by name preserving order, so a line "D A#maj7 Cadd9 D" yields three shapes.
     const focusedTop = focused.getBoundingClientRect().top;
@@ -3378,7 +3391,10 @@ function openPlayMode(song) {
     delete shapeDiag.dataset.last;
     renderCurrentShape();
   });
-  content.addEventListener("scroll", () => { if (shapesOn) renderCurrentShape(); });
+  // Always run on scroll — the active-line marker (dot) needs to update even when shapes are off.
+  content.addEventListener("scroll", renderCurrentShape);
+  // Light up the initial active line on entry (before any scroll).
+  setTimeout(renderCurrentShape, 0);
 
   // Resize the shape panel — drag the bottom handle to set its height (clamped 100..70vh).
   const resizeHandle = overlay.querySelector("#play-shape-resize");
