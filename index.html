@@ -1095,7 +1095,63 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #dcd6c5; border-radius: 5px; }
   ::-webkit-scrollbar-thumb:hover { background: #c5beac; }
+  /* Auth area in header */
+  header .auth-area {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-left: 8px;
+  }
+  header .auth-area .user-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--panel-2); color: var(--ink);
+    font-size: 12px; font-family: var(--sans);
+    cursor: pointer;
+  }
+  header .auth-area .user-chip:hover { background: #ece8db; }
+  header .auth-area .user-chip .user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  header .auth-area .user-menu {
+    position: absolute; top: 100%; right: 0; margin-top: 6px;
+    min-width: 220px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.10);
+    display: none; z-index: 20;
+  }
+  header .auth-area.open .user-menu { display: block; }
+  header .auth-area .user-menu .user-email { padding: 8px 10px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  header .auth-area .user-menu button {
+    width: 100%; text-align: left; padding: 8px 10px;
+    background: transparent; border: 0; border-radius: 6px;
+    font: inherit; cursor: pointer; color: var(--ink);
+  }
+  header .auth-area .user-menu button:hover { background: var(--panel-2); }
+  /* Sign-in modal: tabs + form */
+  .auth-modal .tabs {
+    display: flex; gap: 4px; margin-bottom: 16px;
+    background: var(--panel-2); padding: 4px; border-radius: 8px;
+  }
+  .auth-modal .tabs button {
+    flex: 1; padding: 8px; border: 0; background: transparent;
+    border-radius: 6px; font: inherit; cursor: pointer; color: var(--muted);
+  }
+  .auth-modal .tabs button.active { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.06); font-weight: 600; }
+  .auth-modal label { display: block; margin: 12px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .auth-modal input[type=email],
+  .auth-modal input[type=password] {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 6px;
+    font: inherit; box-sizing: border-box;
+  }
+  .auth-modal .auth-msg { margin-top: 12px; padding: 10px 12px; border-radius: 6px; font-size: 13px; display: none; }
+  .auth-modal .auth-msg.show { display: block; }
+  .auth-modal .auth-msg.err { background: #fceeed; color: #b41a1a; border: 1px solid #ebd2d2; }
+  .auth-modal .auth-msg.ok  { background: #e6f3eb; color: var(--good); border: 1px solid #c8dec8; }
+  .auth-modal .auth-msg.busy { background: var(--accent-soft); color: var(--accent-deep); border: 1px solid #ecccc0; }
+  .auth-modal .actions { margin-top: 18px; }
+  .auth-modal .actions .primary { width: 100%; padding: 11px; }
+  .auth-modal .small-link { background: transparent; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 
@@ -1113,6 +1169,9 @@
       <button id="btn-export">Export all as JSON</button>
       <button id="btn-bookmarklet-shortcut">Get bookmarklet…</button>
     </div>
+  </div>
+  <div id="auth-area" class="auth-area">
+    <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>
   </div>
 </header>
 
@@ -1224,7 +1283,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "3.0.0";
 
 //=============================================================
 // STORAGE
@@ -1239,9 +1298,255 @@ function loadState() {
   } catch (e) { console.warn(e); }
   return { version: SCHEMA_VERSION, songs: [] };
 }
-function saveState(state) {
-  state.version = SCHEMA_VERSION;
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+function saveState(s) {
+  s.version = SCHEMA_VERSION;
+  localStorage.setItem(STORE_KEY, JSON.stringify(s));
+  // If signed in, also push to cloud (fire-and-forget; localStorage is the offline mirror).
+  if (auth.user && auth.client) {
+    cloudSyncOut(s.songs);
+  }
+}
+
+//=============================================================
+// AUTH + CLOUD SYNC (Supabase)
+//=============================================================
+const SUPABASE_URL = "https://mjgctqprbecwkdinpcbp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_qUqhxr3NQ6OW-7Wd287RtQ_YM9QkcXE";
+
+const auth = {
+  client: null,
+  user: null,        // { id, email } when signed in
+  initialized: false,
+  // Track which song IDs we've already synced to cloud this session, to avoid storms
+  knownIds: new Set(),
+};
+
+function initAuth() {
+  if (typeof window.supabase === "undefined") {
+    console.warn("Supabase SDK not loaded — running in localStorage-only mode");
+    return;
+  }
+  auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true },
+  });
+  // Listen for sign-in / sign-out events
+  auth.client.auth.onAuthStateChange(async (event, session) => {
+    if (session) {
+      auth.user = { id: session.user.id, email: session.user.email };
+      await onSignIn();
+    } else {
+      auth.user = null;
+      onSignOut();
+    }
+    renderAuthArea();
+  });
+  // Restore current session on page load
+  auth.client.auth.getSession().then(async ({ data: { session } }) => {
+    auth.initialized = true;
+    if (session) {
+      auth.user = { id: session.user.id, email: session.user.email };
+      await onSignIn();
+    }
+    renderAuthArea();
+  });
+}
+
+// On sign-in: fetch this user's cloud library and replace the local view.
+// First-time sign-in (no cloud rows yet) seeds the cloud with whatever local songs exist
+// (typically the seed library or anything the user added as a guest).
+async function onSignIn() {
+  if (!auth.client || !auth.user) return;
+  const { data, error } = await auth.client.from("songs").select("data, updated_at");
+  if (error) { console.warn("Cloud fetch failed:", error); return; }
+  if (data && data.length) {
+    state.songs = data.map(r => r.data);
+    auth.knownIds = new Set(state.songs.map(s => s.id));
+  } else {
+    // First sign-in — push USER-ADDED local songs (not the public seed library) as starter content.
+    const userAdded = state.songs.filter(s => !String(s.id || "").startsWith("seed-"));
+    if (userAdded.length) {
+      const rows = userAdded.map(song => ({ id: song.id, user_id: auth.user.id, data: song, updated_at: new Date(song.updatedAt || Date.now()).toISOString() }));
+      const { error: upErr } = await auth.client.from("songs").upsert(rows);
+      if (upErr) console.warn("Cloud seed-from-local failed:", upErr);
+      state.songs = userAdded;
+      auth.knownIds = new Set(userAdded.map(s => s.id));
+    } else {
+      state.songs = [];
+      auth.knownIds = new Set();
+    }
+  }
+  saveState({ songs: state.songs }); // mirror to localStorage cache
+  renderList(); renderDetail();
+}
+
+// On sign-out: clear the offline cache (so a shared browser doesn't leak the previous user's
+// library) and restore the public seed library as the guest view.
+function onSignOut() {
+  auth.knownIds = new Set();
+  state.selectedId = null;
+  state.editing = false;
+  state.undoStack = [];
+  localStorage.removeItem(STORE_KEY);
+  state.songs = [];
+  fetchSeed().then(seed => {
+    if (seed && Array.isArray(seed.songs)) state.songs = seed.songs;
+    renderList(); renderDetail();
+  });
+}
+
+// Push the full song list to cloud — upserts new/changed, deletes anything that's been removed locally.
+let cloudSyncTimer = null;
+async function cloudSyncOut(songs) {
+  if (!auth.client || !auth.user) return;
+  // Debounce — coalesce rapid mutations into a single round trip.
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(async () => {
+    try {
+      const rows = songs.map(song => ({
+        id: song.id,
+        user_id: auth.user.id,
+        data: song,
+        updated_at: new Date(song.updatedAt || Date.now()).toISOString(),
+      }));
+      if (rows.length) {
+        await auth.client.from("songs").upsert(rows);
+      }
+      // Detect deletions: any ID that was previously in cloud but isn't in current state
+      const currentIds = new Set(songs.map(s => s.id));
+      const removed = [...auth.knownIds].filter(id => !currentIds.has(id));
+      if (removed.length) {
+        await auth.client.from("songs").delete().in("id", removed);
+      }
+      auth.knownIds = currentIds;
+    } catch (e) { console.warn("Cloud sync failed:", e); }
+  }, 600);
+}
+
+// --------- Auth UI ---------
+function renderAuthArea() {
+  const area = document.getElementById("auth-area");
+  if (!area) return;
+  if (auth.user) {
+    area.innerHTML = `
+      <button class="user-chip" id="user-chip" title="Signed in as ${escapeHtml(auth.user.email)}">
+        <span class="user-dot"></span>${escapeHtml(auth.user.email)}
+      </button>
+      <div class="user-menu">
+        <div class="user-email">${escapeHtml(auth.user.email)}</div>
+        <button id="btn-signout">Sign out</button>
+      </div>
+    `;
+    document.getElementById("user-chip").addEventListener("click", e => {
+      e.stopPropagation();
+      area.classList.toggle("open");
+    });
+    document.getElementById("btn-signout").addEventListener("click", async () => {
+      area.classList.remove("open");
+      await auth.client.auth.signOut();
+    });
+    // Click anywhere else closes the menu
+    document.addEventListener("click", () => area.classList.remove("open"), { once: true });
+  } else {
+    area.innerHTML = `<button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>`;
+    document.getElementById("btn-signin").addEventListener("click", openAuthModal);
+  }
+}
+
+function openAuthModal() {
+  if (!auth.client) {
+    alert("Auth isn't loaded — check your network connection and refresh.");
+    return;
+  }
+  let mode = "signin"; // or "signup"
+  const bg = document.createElement("div");
+  bg.className = "modal-bg auth-modal";
+  function render() {
+    bg.innerHTML = `
+      <div class="modal" style="max-width:420px;">
+        <h3>${mode === "signin" ? "Sign in" : "Create your account"}</h3>
+        <div class="modal-sub">${mode === "signin" ? "Sign in to sync your songs to the cloud." : "Free account — your songs stay private to you."}</div>
+        <div class="tabs">
+          <button data-tab="signin" class="${mode === "signin" ? "active" : ""}">Sign in</button>
+          <button data-tab="signup" class="${mode === "signup" ? "active" : ""}">Sign up</button>
+        </div>
+        <label for="auth-email">Email</label>
+        <input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" />
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" autocomplete="${mode === "signin" ? "current-password" : "new-password"}" placeholder="${mode === "signup" ? "At least 6 characters" : ""}" />
+        <div id="auth-msg" class="auth-msg"></div>
+        <div class="actions">
+          <button id="auth-go" class="primary">${mode === "signin" ? "Sign in" : "Create account"}</button>
+        </div>
+        <div style="margin-top: 12px; text-align: center; font-size: 12px; color: var(--muted);">
+          ${mode === "signin"
+            ? `<button class="small-link" id="auth-magic">Email me a sign-in link instead</button>`
+            : `By signing up you agree this is a personal project with no warranty of any kind.`}
+        </div>
+        <div class="actions" style="margin-top: 8px;">
+          <button id="auth-cancel" class="ghost">Cancel</button>
+        </div>
+      </div>
+    `;
+    bg.querySelectorAll("[data-tab]").forEach(b => {
+      b.addEventListener("click", () => { mode = b.dataset.tab; render(); });
+    });
+    bg.querySelector("#auth-cancel").addEventListener("click", () => bg.remove());
+    bg.querySelector("#auth-go").addEventListener("click", () => doAuth(mode, bg));
+    const magic = bg.querySelector("#auth-magic");
+    if (magic) magic.addEventListener("click", () => doMagic(bg));
+    bg.querySelector("#auth-password").addEventListener("keydown", e => {
+      if (e.key === "Enter") doAuth(mode, bg);
+    });
+  }
+  render();
+  document.body.appendChild(bg);
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+  setTimeout(() => bg.querySelector("#auth-email").focus(), 50);
+}
+
+function setAuthMsg(bg, kind, text) {
+  const el = bg.querySelector("#auth-msg");
+  el.className = "auth-msg show " + kind;
+  el.textContent = text;
+}
+
+async function doAuth(mode, bg) {
+  const email = bg.querySelector("#auth-email").value.trim();
+  const password = bg.querySelector("#auth-password").value;
+  if (!email || !password) { setAuthMsg(bg, "err", "Email and password are both required."); return; }
+  setAuthMsg(bg, "busy", mode === "signin" ? "Signing in…" : "Creating account…");
+  try {
+    if (mode === "signin") {
+      const { error } = await auth.client.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      setAuthMsg(bg, "ok", "Signed in. Loading your library…");
+      setTimeout(() => bg.remove(), 600);
+    } else {
+      const { data, error } = await auth.client.auth.signUp({ email, password });
+      if (error) throw error;
+      if (data.user && !data.session) {
+        setAuthMsg(bg, "ok", "Check your inbox — we sent a confirmation link to verify your email.");
+      } else {
+        setAuthMsg(bg, "ok", "Account created. Loading your library…");
+        setTimeout(() => bg.remove(), 600);
+      }
+    }
+  } catch (e) {
+    setAuthMsg(bg, "err", e.message || "Something went wrong.");
+  }
+}
+
+async function doMagic(bg) {
+  const email = bg.querySelector("#auth-email").value.trim();
+  if (!email) { setAuthMsg(bg, "err", "Type your email first."); return; }
+  setAuthMsg(bg, "busy", "Sending sign-in link…");
+  try {
+    const { error } = await auth.client.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
+    if (error) throw error;
+    setAuthMsg(bg, "ok", `Sent a sign-in link to ${email}. Check your inbox and click the link.`);
+  } catch (e) {
+    setAuthMsg(bg, "err", e.message || "Couldn't send the link.");
+  }
 }
 async function fetchSeed() {
   const inline = document.getElementById("seed-data");
@@ -4365,6 +4670,10 @@ async function init() {
       saveState({ songs: state.songs });
     }
   }
+
+  // Initialize Supabase auth — this'll fire onSignIn/onSignOut once the session is restored.
+  initAuth();
+  renderAuthArea();
 
   // Direct-import from extension/bookmarklet via URL hash
   const imported = consumeImportHash();
