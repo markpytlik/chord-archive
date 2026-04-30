@@ -915,18 +915,25 @@
   /* Line wrappers — block layout; blank rows get explicit height since we no longer rely on \n + pre-wrap */
   .lyric-line { display: block; }
   .lyric-blank { min-height: 1em; }
-  /* Chord-change dot — invisible by default; shown only on the active line in play mode (sync with shape panel). */
+  /* Active-line marker — bold, eye-catching dot that sits in the gutter on whichever line you're playing.
+     Big enough to spot in peripheral vision while watching the chord shapes; pulses softly. */
   .lyric-dot { display: none; }
   .play-mode .lyrics-large .lyric-line.has-chord.active .lyric-dot {
     display: inline-block;
     color: var(--accent);
-    font-size: 12px;
+    font-size: 28px;
     line-height: 1;
-    margin-right: 14px;
-    margin-left: -22px;
-    opacity: .85;
+    margin-right: 18px;
+    margin-left: -44px;
+    opacity: 1;
     vertical-align: middle;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    text-shadow: 0 0 12px rgba(177, 74, 44, .35);
+    animation: lyric-dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes lyric-dot-pulse {
+    0%, 100% { opacity: 1; transform: translateY(-2px) scale(1); }
+    50%      { opacity: .65; transform: translateY(-2px) scale(.85); }
   }
   /* Shape panel — its OWN row above the scrolling lyrics, so it never visually covers lyrics text.
      Height is user-resizable via the bottom drag handle (defaults set in JS at 220px). */
@@ -1166,7 +1173,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.7";
+const APP_VERSION = "1.5.8";
 
 //=============================================================
 // STORAGE
@@ -1762,6 +1769,9 @@ const GUITAR_SHAPES = {
   "Am/E":  { frets:[0,0,2,2,1,0] },
 };
 
+// Movable barre templates — frets relative to "barre at fret 0" (i.e. root at open E or open A).
+// E-shape: root on string 0 (low E, pc 4). Barre across all 6 strings.
+// A-shape: root on string 1 (A, pc 9). Low E muted; barre across strings 1–5.
 const E_SHAPE_TEMPLATES = {
   "":    [0,2,2,1,0,0],
   "m":   [0,2,2,0,0,0],
@@ -1769,28 +1779,68 @@ const E_SHAPE_TEMPLATES = {
   "m7":  [0,2,0,0,0,0],
   "maj7":[0,2,1,1,0,0],
   "sus4":[0,2,2,2,0,0],
+  "sus2":[0,2,4,4,0,0],
+  "6":   [0,2,2,1,2,0],
+  "m6":  [0,2,2,0,2,0],
+  "9":   [0,2,0,1,0,2],
+  "m9":  [0,2,0,0,0,2],
+  "maj9":[0,2,1,1,0,2],
+  "add9":[0,2,4,1,0,0],
 };
+const A_SHAPE_TEMPLATES = {
+  "":    [-1,0,2,2,2,0],
+  "m":   [-1,0,2,2,1,0],
+  "7":   [-1,0,2,0,2,0],
+  "m7":  [-1,0,2,0,1,0],
+  "maj7":[-1,0,2,1,2,0],
+  "sus4":[-1,0,2,2,3,0],
+  "sus2":[-1,0,2,2,0,0],
+  "6":   [-1,0,2,2,2,2],
+  "m6":  [-1,0,2,2,1,2],
+  "9":   [-1,0,2,4,3,0],
+  "m9":  [-1,0,2,4,1,0],
+  "maj9":[-1,0,2,4,2,0],
+  "add9":[-1,0,2,4,2,0],
+};
+
+// Map a parsed chord quality string to one of the template keys above.
+function qualityToShapeKey(q) {
+  if (q === "" || q === "M" || q === "maj") return "";
+  if (q === "m" || q === "min") return "m";
+  if (q === "7") return "7";
+  if (/^m7$|^min7$/.test(q)) return "m7";
+  if (/^maj7$|^M7$/.test(q)) return "maj7";
+  if (/^sus4?$/.test(q)) return "sus4";
+  if (q === "sus2") return "sus2";
+  if (q === "6") return "6";
+  if (q === "m6" || q === "min6") return "m6";
+  if (q === "9") return "9";
+  if (q === "m9" || q === "min9") return "m9";
+  if (q === "maj9" || q === "M9") return "maj9";
+  if (q === "add9") return "add9";
+  return null;
+}
 
 function lookupShape(chordName) {
   if (GUITAR_SHAPES[chordName]) return GUITAR_SHAPES[chordName];
   const parsed = splitChord(chordName);
   if (!parsed) return null;
-  const q = parsed.quality;
-  let key = null;
-  if (q === "" || q === "M" || q === "maj") key = "";
-  else if (q === "m" || q === "min") key = "m";
-  else if (q === "7") key = "7";
-  else if (/^m7$|^min7$/.test(q)) key = "m7";
-  else if (/^maj7$|^M7$/.test(q)) key = "maj7";
-  else if (/^sus4?$/.test(q)) key = "sus4";
+  const key = qualityToShapeKey(parsed.quality);
   if (key === null) return null;
-  const tpl = E_SHAPE_TEMPLATES[key];
-  if (!tpl) return null;
 
-  const offset = ((parsed.root - 4) + 12) % 12;
-  if (offset === 0) return { frets: tpl.slice(), derived: true };
-  const frets = tpl.map(f => f === -1 ? -1 : f + offset);
-  return { frets, derived: true, barre: { fret: offset, from: 0, to: 5 } };
+  // Try E-shape (root on low E, pc 4) and A-shape (root on A, pc 9).
+  // Pick whichever puts the barre at a lower fret — easier to play, more idiomatic position.
+  // Tie-break: prefer E-shape (more familiar to most players).
+  const candidates = [];
+  if (E_SHAPE_TEMPLATES[key]) candidates.push({ tpl: E_SHAPE_TEMPLATES[key], offset: ((parsed.root - 4) + 12) % 12, fromString: 0 });
+  if (A_SHAPE_TEMPLATES[key]) candidates.push({ tpl: A_SHAPE_TEMPLATES[key], offset: ((parsed.root - 9) + 12) % 12, fromString: 1 });
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.offset - b.offset);
+  const pick = candidates[0];
+
+  if (pick.offset === 0) return { frets: pick.tpl.slice(), derived: true };
+  const frets = pick.tpl.map(f => f === -1 ? -1 : f + pick.offset);
+  return { frets, derived: true, barre: { fret: pick.offset, from: pick.fromString, to: 5 } };
 }
 
 //=============================================================
@@ -3075,26 +3125,27 @@ function getVoicings(song, chordName, occ) {
     list.push(Object.assign({ builtIn: false }, v));
   }
 
-  // Built-in suggested voicing — only when:
-  //   (a) chord is complex (not plain major/minor — user already knows those)
-  //   (b) no user voicings AND no per-occurrence override
-  // Includes guitar shape only if guitar is selected on the song, piano notes only if piano selected.
-  // If no instruments are selected at all, include both so the user gets some suggestion.
-  if (list.length === 0 && !isSimpleMajorOrMinor(chordName)) {
+  // Built-in suggested voicing — when no user voicing exists.
+  // Show suggestion for ALL chords when guitar-only is selected (since guitarists benefit from a shape
+  // even for plain major/minor); skip simple triads otherwise (pianists usually know them).
+  if (list.length === 0) {
     const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
     const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
-    const parsed = splitChord(chordName);
-    const builtIn = wantGuitar ? lookupShape(chordName) : null;
-    const pianoNotes = wantPiano && parsed ? qualityToIntervals(parsed.quality).map(i => (parsed.root + i) % 12) : null;
-    if (builtIn || (pianoNotes && pianoNotes.length)) {
-      list.push({
-        frets:     builtIn?.frets,
-        fingers:   builtIn?.fingers,
-        barre:     builtIn?.barre,
-        pianoNotes: pianoNotes,
-        note:      builtIn?.derived ? "Movable barre shape" : "",
-        builtIn:   true,
-      });
+    const isGuitarOnly = wantGuitar && !wantPiano;
+    if (isGuitarOnly || !isSimpleMajorOrMinor(chordName)) {
+      const parsed = splitChord(chordName);
+      const builtIn = wantGuitar ? lookupShape(chordName) : null;
+      const pianoNotes = wantPiano && parsed ? qualityToIntervals(parsed.quality).map(i => (parsed.root + i) % 12) : null;
+      if (builtIn || (pianoNotes && pianoNotes.length)) {
+        list.push({
+          frets:     builtIn?.frets,
+          fingers:   builtIn?.fingers,
+          barre:     builtIn?.barre,
+          pianoNotes: pianoNotes,
+          note:      builtIn?.derived ? "Movable barre shape" : "",
+          builtIn:   true,
+        });
+      }
     }
   }
   return list;
