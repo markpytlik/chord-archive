@@ -1016,7 +1016,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.6";
+const APP_VERSION = "1.4.7";
 
 //=============================================================
 // STORAGE
@@ -2327,12 +2327,22 @@ function renderLyrics(text) {
   }
 
   const out = [];
+  // Per-chord-name occurrence counter so each pill carries its 0-based instance index.
+  // The voicing editor uses this to scope a phrasing change to "just this G" vs "all Gs".
+  const occCount = {};
+  const nextOcc = (chord) => {
+    const v = occCount[chord] || 0;
+    occCount[chord] = v + 1;
+    return v;
+  };
   for (const line of lines) {
     if (typeof line === "object" && line.kind === "chord-only") {
       const re = /\[([^\]]+)\]/g;
       let m, html = "";
       while ((m = re.exec(line.text)) !== null) {
-        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(m[1])}">${escapeHtml(m[1])}</span>`;
+        const ch = m[1];
+        const occ = nextOcc(ch);
+        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(ch)}" data-occ="${occ}">${escapeHtml(ch)}</span>`;
       }
       const repHtml = line.count > 1 ? `<span class="chord-rep">× ${line.count}</span>` : "";
       out.push(`<div class="chord-only-row">${html}${repHtml}</div>`);
@@ -2352,11 +2362,12 @@ function renderLyrics(text) {
     while ((m = re.exec(line)) !== null) {
       if (m[1] !== undefined) {
         const chord = m[1];
+        const occ = nextOcc(chord);
         const text = m[2] || "";
         const safeText = text.length === 0 ? "&nbsp;" : escapeHtml(text);
         // Pill is ~0.7em per char + padding/border. Floor at 2.5em for short names.
         const minW = Math.max(2.5, chord.length * 0.72 + 0.5).toFixed(2);
-        html += `<span class="seg" style="min-width:${minW}em;"><span class="chord" data-chord="${escapeHtml(chord)}">${escapeHtml(chord)}</span>${safeText}</span>`;
+        html += `<span class="seg" style="min-width:${minW}em;"><span class="chord" data-chord="${escapeHtml(chord)}" data-occ="${occ}">${escapeHtml(chord)}</span>${safeText}</span>`;
       } else {
         html += `<span class="seg">${escapeHtml(m[3])}</span>`;
       }
@@ -2763,7 +2774,23 @@ function isSimpleMajorOrMinor(chordName) {
   return q === "" || q === "M" || q === "maj" || q === "m" || q === "min";
 }
 
-function getVoicings(song, chordName) {
+// Build the human-readable label shown above each diagram in the popover/voicing card.
+function voicingLabel(v) {
+  if (!v) return "";
+  if (v.perOccurrence) return v.name ? v.name + " · this spot" : "Just this spot";
+  if (v.builtIn) return "Standard";
+  return v.name ? v.name : "Custom";
+}
+
+// Replace only the Nth occurrence of [chordName] in lyrics with [newName].
+function replaceNthChord(lyrics, chordName, n, newName) {
+  if (!lyrics) return lyrics || "";
+  const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
+  let count = 0;
+  return lyrics.replace(re, (m) => (count++ === n) ? "[" + newName + "]" : m);
+}
+
+function getVoicings(song, chordName, occ) {
   // Migration shim: old { customShapes, voicingNotes } → new voicings array
   if (song.customShapes || song.voicingNotes) {
     song.voicings = song.voicings || {};
@@ -2781,20 +2808,28 @@ function getVoicings(song, chordName) {
     delete song.voicingNotes;
   }
   song.voicings = song.voicings || {};
+  song.positionVoicings = song.positionVoicings || {};
   const list = [];
   const userVoicings = song.voicings[chordName] || [];
 
-  // User voicings come FIRST so they're the default in the popover
+  // Per-occurrence override — only for the specific position the user opened the popover from.
+  // Comes FIRST so it's the default-shown voicing at that pill.
+  if (typeof occ === "number" && occ >= 0) {
+    const ov = song.positionVoicings[chordName + "@" + occ];
+    if (ov) list.push(Object.assign({}, ov, { builtIn: false, perOccurrence: true }));
+  }
+
+  // User voicings come next so they're the default everywhere else
   for (const v of userVoicings) {
     list.push(Object.assign({ builtIn: false }, v));
   }
 
   // Built-in suggested voicing — only when:
   //   (a) chord is complex (not plain major/minor — user already knows those)
-  //   (b) user hasn't saved any voicings yet (their custom takes precedence)
+  //   (b) no user voicings AND no per-occurrence override
   // Includes guitar shape only if guitar is selected on the song, piano notes only if piano selected.
   // If no instruments are selected at all, include both so the user gets some suggestion.
-  if (userVoicings.length === 0 && !isSimpleMajorOrMinor(chordName)) {
+  if (list.length === 0 && !isSimpleMajorOrMinor(chordName)) {
     const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
     const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
     const parsed = splitChord(chordName);
@@ -3131,16 +3166,17 @@ function ensurePopover() {
 function renderPopover(target) {
   const pop = ensurePopover();
   if (!popoverState) return;
-  const { chordName, song, index } = popoverState;
+  const { chordName, song, index, occ } = popoverState;
   const wantGuitar = !!song?.instruments?.includes("guitar");
   const wantPiano  = !!song?.instruments?.includes("piano");
-  const voicings = (wantGuitar || wantPiano) ? getVoicings(song, chordName) : [];
+  const voicings = (wantGuitar || wantPiano) ? getVoicings(song, chordName, occ) : [];
   const current = voicings[index] || null;
   const total = voicings.length;
+  const labelTail = current ? ` · ${escapeHtml(voicingLabel(current))}` : "";
   // Guitar diagram — bigger in popover (md size) so it's easy to read at a glance
   const guitarHtml = wantGuitar
     ? `<div class="diag-mini">
-        <div class="label">Guitar${current && !current.builtIn ? " · custom" : ""}</div>
+        <div class="label">Guitar${labelTail}</div>
         ${current && current.frets
           ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "lg")
           : (current ? "" : `<div class="muted small" style="padding:18px 6px; text-align:center; min-width:130px;">No saved voicing<br><span class="micro">click <b>+ Add</b> below</span></div>`)
@@ -3149,7 +3185,7 @@ function renderPopover(target) {
     : "";
   const pianoHtml = wantPiano
     ? `<div class="diag-mini">
-        <div class="label">Piano${current && current.pianoNotes && !current.builtIn ? " · custom" : ""}</div>
+        <div class="label">Piano${labelTail}</div>
         ${current && current.pianoNotes && current.pianoNotes.length
           ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "lg")
           : svgPiano(chordName, 2, "lg")}
@@ -3187,16 +3223,31 @@ function renderPopover(target) {
       const action = e.currentTarget.dataset.action;
       if (action === "prev") { popoverState.index = Math.max(0, index - 1); renderPopover(target); }
       else if (action === "next") { popoverState.index = Math.min(total - 1, index + 1); renderPopover(target); }
-      else if (action === "add") { hidePopover(); openVoicingEditor(chordName, song, null); }
-      else if (action === "edit") { hidePopover(); openVoicingEditor(chordName, song, getUserVoicingIndex(song, chordName, current)); }
-      else if (action === "edit-from-builtin") { hidePopover(); openVoicingEditor(chordName, song, null, current); }
+      else if (action === "add") { hidePopover(); openVoicingEditor(chordName, song, null, null, occ); }
+      else if (action === "edit") {
+        hidePopover();
+        if (current.perOccurrence) {
+          // Editing a per-occurrence voicing — seed editor with it; on save it'll either overwrite or promote to global.
+          openVoicingEditor(chordName, song, null, current, occ);
+        } else {
+          openVoicingEditor(chordName, song, getUserVoicingIndex(song, chordName, current), null, occ);
+        }
+      }
+      else if (action === "edit-from-builtin") { hidePopover(); openVoicingEditor(chordName, song, null, current, occ); }
       else if (action === "delete") {
         if (confirm(`Delete this voicing of ${chordName}?`)) {
-          deleteVoicing(song, chordName, getUserVoicingIndex(song, chordName, current));
+          if (current.perOccurrence) {
+            pushUndo(song);
+            song.positionVoicings = song.positionVoicings || {};
+            delete song.positionVoicings[chordName + "@" + occ];
+            song.updatedAt = now();
+          } else {
+            deleteVoicing(song, chordName, getUserVoicingIndex(song, chordName, current));
+          }
           saveState({ songs: state.songs });
           // After delete, rebuild and re-render at safe index
-          const newVoicings = wantGuitar ? getVoicings(song, chordName) : [];
-          popoverState.index = Math.min(index, newVoicings.length - 1);
+          const newVoicings = wantGuitar ? getVoicings(song, chordName, occ) : [];
+          popoverState.index = Math.min(index, Math.max(0, newVoicings.length - 1));
           renderPopover(target);
         }
       }
@@ -3212,8 +3263,9 @@ function getUserVoicingIndex(song, chordName, voicing) {
   );
 }
 
-function showPopover(target, chordName, song) {
-  popoverState = { chordName, song, index: 0 };
+function showPopover(target, chordName, song, occ) {
+  const safeOcc = (typeof occ === "number" && occ >= 0) ? occ : null;
+  popoverState = { chordName, song, index: 0, occ: safeOcc };
   const pop = ensurePopover();
   renderPopover(target);
   // Position
@@ -3242,8 +3294,9 @@ function attachHoverPopover(rootEl, song) {
   rootEl.addEventListener("mouseover", e => {
     const t = e.target.closest("[data-chord]");
     if (!t) return;
+    const occ = t.dataset.occ !== undefined ? parseInt(t.dataset.occ, 10) : null;
     clearTimeout(popoverTimer);
-    popoverTimer = setTimeout(() => showPopover(t, t.dataset.chord, song), 220);
+    popoverTimer = setTimeout(() => showPopover(t, t.dataset.chord, song, occ), 220);
   });
   rootEl.addEventListener("mouseout", e => {
     if (!e.target.closest("[data-chord]")) return;
@@ -3256,25 +3309,39 @@ function attachHoverPopover(rootEl, song) {
 // VOICING EDITOR  (add/edit a single voicing)
 //=============================================================
 // Two-button modal: "Change just this X chord" vs "Change all X chords in the song".
-// `done(renameAll)` is called with true/false depending on which the user picked. Cancel = no save.
-function showRenameChoice(oldName, newName, count, done) {
+// done(scope) is called with "this" or "all" depending on which the user picked. Cancel = no save.
+//   opts: { oldName, newName, count, renamed, canApplyToOne, done }
+//   - renamed: chord name actually changed (e.g. Gm → G); affects copy
+//   - canApplyToOne: whether the editor knows which specific occurrence the user opened
+//                    (i.e. came from a chord pill, not from a global "+ Add voicing" entry)
+function showScopeChoice(opts) {
+  const { oldName, newName, count, renamed, canApplyToOne, done } = opts;
   const bg = document.createElement("div");
   bg.className = "modal-bg";
   bg.style.zIndex = "30";
+  const title = renamed
+    ? `Rename ${escapeHtml(oldName)} → ${escapeHtml(newName)}?`
+    : `Change voicing of ${escapeHtml(oldName)}?`;
+  const sub = `${count === 1 ? "There is 1 instance" : `There are ${count} instances`} of <b>[${escapeHtml(oldName)}]</b> in this song's lyrics.`;
+  const justBtn = canApplyToOne ? `
+    <button id="rc-just" style="padding:11px 14px; text-align:left; line-height:1.4;">
+      <b>Change just this ${escapeHtml(oldName)} chord</b><br>
+      <span class="muted small">${renamed
+        ? `Rename only this one instance to [${escapeHtml(newName)}] and use this voicing here. Other ${escapeHtml(oldName)} chords stay as they are.`
+        : `Use this voicing only at this spot. Other ${escapeHtml(oldName)} chords keep their previous voicing.`}</span>
+    </button>` : "";
+  const allCopy = renamed
+    ? `Rename every [${escapeHtml(oldName)}] in the lyrics to [${escapeHtml(newName)}] and apply this voicing to all of them.`
+    : `Apply this voicing to every [${escapeHtml(oldName)}] in this song.`;
   bg.innerHTML = `
     <div class="modal" style="max-width:480px;">
-      <h3>Rename ${escapeHtml(oldName)} → ${escapeHtml(newName)}?</h3>
-      <div class="modal-sub">
-        Your new voicing implies the chord <b>${escapeHtml(newName)}</b>. There ${count === 1 ? "is" : "are"} ${count} instance${count === 1 ? "" : "s"} of [${escapeHtml(oldName)}] in this song's lyrics.
-      </div>
+      <h3>${title}</h3>
+      <div class="modal-sub">${sub}</div>
       <div style="display:flex; flex-direction:column; gap:10px; margin-top:18px;">
-        <button id="rc-just" style="padding:11px 14px; text-align:left; line-height:1.4;">
-          <b>Change just this ${escapeHtml(oldName)} chord</b><br>
-          <span class="muted small">Save the new voicing under <code>${escapeHtml(newName)}</code>. The lyrics keep saying [${escapeHtml(oldName)}] — your old voicings for it stay put.</span>
-        </button>
+        ${justBtn}
         <button id="rc-all" class="primary" style="padding:11px 14px; text-align:left; line-height:1.4;">
           <b>Change all ${escapeHtml(oldName)} chords in the song</b><br>
-          <span style="opacity:.85;" class="small">Rename every [${escapeHtml(oldName)}] in lyrics to [${escapeHtml(newName)}] and use this new voicing for all of them.</span>
+          <span style="opacity:.85;" class="small">${allCopy}</span>
         </button>
       </div>
       <div class="actions">
@@ -3284,15 +3351,17 @@ function showRenameChoice(oldName, newName, count, done) {
   `;
   document.body.appendChild(bg);
   bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
-  bg.querySelector("#rc-just").addEventListener("click", () => { bg.remove(); done(false); });
-  bg.querySelector("#rc-all").addEventListener("click", () => { bg.remove(); done(true); });
+  if (canApplyToOne) bg.querySelector("#rc-just").addEventListener("click", () => { bg.remove(); done("this"); });
+  bg.querySelector("#rc-all").addEventListener("click", () => { bg.remove(); done("all"); });
   bg.querySelector("#rc-cancel").addEventListener("click", () => bg.remove());
 }
 
-function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
+function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
   const isEdit = typeof editIndex === "number" && editIndex >= 0;
   const existing = isEdit ? song.voicings?.[chordName]?.[editIndex] : null;
   const seed = existing || seedFromBuiltin || null;
+  // Did the user open this editor from a specific chord pill? (vs the global "+ Add voicing" path)
+  const knowOcc = typeof occ === "number" && occ >= 0;
   const initFrets = seed?.frets ? fretsToString(seed.frets) : "";
   const initPiano = seed?.pianoNotes ? seed.pianoNotes.map(pc => pcToName(pc)).join(" ") : "";
   const initNote = seed?.note || "";
@@ -3479,30 +3548,67 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin) {
     // Use whatever the chord-name input currently has (auto-detected OR user-overridden).
     const inputName = bg.querySelector("#ve-chord-name").value.trim();
     const targetName = inputName || chordName;
+    const renamed = targetName !== chordName;
 
-    // Helper that finalizes the save under a particular renameAll choice
-    const doSave = (renameAll) => {
-      saveVoicing(song, targetName, voicing, isEdit && targetName === chordName ? editIndex : undefined);
-      if (targetName !== chordName && renameAll) {
-        const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
-        song.lyrics = (song.lyrics || "").replace(re, "[" + targetName + "]");
-        if (isEdit) deleteVoicing(song, chordName, editIndex);
+    const escName = chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const occRe = new RegExp("\\[" + escName + "\\]", "g");
+    const totalOccs = ((song.lyrics || "").match(occRe) || []).length;
+
+    // Finalize the save under a chosen scope: "this" (only this occurrence) or "all" (every instance).
+    const doSave = (scope) => {
+      pushUndo(song);
+      song.positionVoicings = song.positionVoicings || {};
+      if (scope === "this" && knowOcc) {
+        // Per-occurrence: store voicing keyed by chord-name + occurrence index.
+        // If renamed, also rewrite this single occurrence in the lyrics so the pill reads as the new chord.
+        if (renamed) {
+          song.lyrics = replaceNthChord(song.lyrics, chordName, occ, targetName);
+          song.positionVoicings[targetName + "@" + occ] = voicing;
+          // Don't touch song.voicings — we only changed this one spot.
+        } else {
+          song.positionVoicings[chordName + "@" + occ] = voicing;
+        }
+        // If we were editing a global voicing and the user said "just this one", leave the global alone.
+        song.updatedAt = now();
+      } else {
+        // "all" — global voicing for every chord by this name in this song.
+        saveVoicing(song, targetName, voicing, isEdit && !renamed ? editIndex : undefined);
+        // If we're editing what was a per-occurrence override, clear it so the new global takes over here too.
+        if (knowOcc && song.positionVoicings[chordName + "@" + occ]) {
+          delete song.positionVoicings[chordName + "@" + occ];
+        }
+        if (renamed) {
+          song.lyrics = (song.lyrics || "").replace(occRe, "[" + targetName + "]");
+          if (isEdit) deleteVoicing(song, chordName, editIndex);
+          // Clean any per-occurrence overrides under the OLD name — the chord name is gone now.
+          for (const k of Object.keys(song.positionVoicings)) {
+            if (k.startsWith(chordName + "@")) delete song.positionVoicings[k];
+          }
+        }
       }
       saveState({ songs: state.songs });
       bg.remove();
       if (state.selectedId === song.id) renderDetail();
     };
 
-    // If chord was renamed AND the original name is in the lyrics, ask which scope to apply.
-    if (targetName !== chordName) {
-      const re = new RegExp("\\[" + chordName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]", "g");
-      const count = ((song.lyrics || "").match(re) || []).length;
-      if (count > 0) {
-        showRenameChoice(chordName, targetName, count, doSave);
-        return;
-      }
+    // When to ask which scope to apply:
+    //   - rename + at least one [chordName] in lyrics
+    //   - same name + 2+ instances and we know which one the user clicked on
+    const askOnRename = renamed && totalOccs > 0;
+    const askOnPhrasing = !renamed && knowOcc && totalOccs > 1;
+    if (askOnRename || askOnPhrasing) {
+      showScopeChoice({
+        oldName: chordName,
+        newName: targetName,
+        count: totalOccs,
+        renamed,
+        canApplyToOne: knowOcc,
+        done: doSave,
+      });
+      return;
     }
-    doSave(false);
+    // No ambiguity (single instance, no rename, or chord doesn't appear in lyrics) — just save globally.
+    doSave("all");
   });
   if (isEdit) {
     bg.querySelector("#ve-delete").addEventListener("click", () => {
