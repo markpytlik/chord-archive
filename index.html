@@ -1111,7 +1111,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.3";
+const APP_VERSION = "1.5.4";
 
 //=============================================================
 // STORAGE
@@ -3137,7 +3137,6 @@ function openPlayMode(song) {
       <button id="play-close" title="Close (Esc)">Close ✕</button>
     </div>
     <div id="play-shape-panel" class="play-shape-panel" style="display:none; height:220px;">
-      <div class="play-shape-name" id="play-shape-name">—</div>
       <div class="play-shape-diagram" id="play-shape-diagram"></div>
       <div class="panel-resize" id="play-shape-resize" title="Drag to resize"></div>
     </div>
@@ -3213,13 +3212,11 @@ function openPlayMode(song) {
   let shapesOn = false;
   const shapesBtn = overlay.querySelector("#play-shapes");
   const shapePanel = overlay.querySelector("#play-shape-panel");
-  const shapeName = overlay.querySelector("#play-shape-name");
   const shapeDiag = overlay.querySelector("#play-shape-diagram");
   function renderCurrentShape() {
     if (!shapesOn) return;
     const allChordEls = [...content.querySelectorAll("[data-chord]")];
     if (!allChordEls.length) {
-      shapeName.textContent = "—";
       shapeDiag.innerHTML = "";
       return;
     }
@@ -3235,7 +3232,6 @@ function openPlayMode(song) {
       if (dist < nearestDist) { nearestDist = dist; focused = el; }
     }
     if (!focused) {
-      shapeName.textContent = "—";
       shapeDiag.innerHTML = "";
       return;
     }
@@ -3260,8 +3256,8 @@ function openPlayMode(song) {
     const panelH = shapePanel.clientHeight;
     const panelW = shapePanel.clientWidth;
     const sig = lineChords.map(c => c.name).join("|") + "@" + panelH + "x" + panelW;
-    if (shapeName.dataset.last === sig) return;
-    shapeName.dataset.last = sig;
+    if (shapeDiag.dataset.last === sig) return;
+    shapeDiag.dataset.last = sig;
 
     // Pick a size class that fits — fewer chords + taller/wider panel = larger shapes.
     // (svgGuitar/svgPianoFromPcs accept "sm" | "md" | "lg".)
@@ -3299,17 +3295,13 @@ function openPlayMode(song) {
       }
       html += `<div class="shape-cell"><div class="shape-cell-name">${escapeHtml(name)}</div>${cellInner || `<div class="muted small">no shape</div>`}</div>`;
     }
-    // The big chord name on the left now shows the line's first chord (still the focused one) —
-    // helps anchor the eye when the line wraps off-screen.
-    shapeName.textContent = lineChords[0]?.name || "—";
     shapeDiag.innerHTML = html;
   }
   shapesBtn.addEventListener("click", () => {
     shapesOn = !shapesOn;
     shapesBtn.classList.toggle("shape-on", shapesOn);
     shapePanel.style.display = shapesOn ? "flex" : "none";
-    // Force re-eval on next show even if last chord was the same name
-    delete shapeName.dataset.last;
+    delete shapeDiag.dataset.last;
     renderCurrentShape();
   });
   content.addEventListener("scroll", () => { if (shapesOn) renderCurrentShape(); });
@@ -3330,7 +3322,7 @@ function openPlayMode(song) {
     shapePanel.style.height = newH + "px";
     // Re-pick the size class so shapes scale up/down with the panel height.
     if (shapesOn) {
-      delete shapeName.dataset.last; // bypass the "no change" early return
+      delete shapeDiag.dataset.last; // bypass the "no change" early return
       renderCurrentShape();
     }
   });
@@ -3611,15 +3603,16 @@ function showScopeChoice(opts) {
     ? `Rename ${escapeHtml(oldName)} → ${escapeHtml(newName)}?`
     : `Change voicing of ${escapeHtml(oldName)}?`;
   const sub = `${count === 1 ? "There is 1 instance" : `There are ${count} instances`} of <b>[${escapeHtml(oldName)}]</b> in this song's lyrics.`;
+  // Rename (if any) is always applied globally — the modal only governs voicing scope.
   const justBtn = canApplyToOne ? `
     <button id="rc-just" style="padding:11px 14px; text-align:left; line-height:1.4;">
-      <b>Change just this ${escapeHtml(oldName)} chord</b><br>
+      <b>Just this ${escapeHtml(newName)} chord</b><br>
       <span class="muted small">${renamed
-        ? `Rename only this one instance to [${escapeHtml(newName)}] and use this voicing here. Other ${escapeHtml(oldName)} chords stay as they are.`
+        ? `Use this voicing only at this spot. The chord renames everywhere in the lyrics, but other instances keep their previous voicing.`
         : `Use this voicing only at this spot. Other ${escapeHtml(oldName)} chords keep their previous voicing.`}</span>
     </button>` : "";
   const allCopy = renamed
-    ? `Rename every [${escapeHtml(oldName)}] in the lyrics to [${escapeHtml(newName)}] and apply this voicing to all of them.`
+    ? `Use this voicing for every ${escapeHtml(newName)} (the chord is renamed everywhere in the lyrics).`
     : `Apply this voicing to every [${escapeHtml(oldName)}] in this song.`;
   bg.innerHTML = `
     <div class="modal" style="max-width:480px;">
@@ -3843,37 +3836,38 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
     const totalOccs = ((song.lyrics || "").match(occRe) || []).length;
 
     // Finalize the save under a chosen scope: "this" (only this occurrence) or "all" (every instance).
+    // RENAME is always global — if the chord-name changed, every [oldName] in the lyrics becomes [newName].
+    // Scope only governs voicing application (per-position override vs global).
     const doSave = (scope) => {
       pushUndo(song);
       song.positionVoicings = song.positionVoicings || {};
-      if (scope === "this" && knowOcc) {
-        // Per-occurrence: store voicing keyed by chord-name + occurrence index.
-        // If renamed, also rewrite this single occurrence in the lyrics so the pill reads as the new chord.
-        if (renamed) {
-          song.lyrics = replaceNthChord(song.lyrics, chordName, occ, targetName);
-          song.positionVoicings[targetName + "@" + occ] = voicing;
-          // Don't touch song.voicings — we only changed this one spot.
-        } else {
-          song.positionVoicings[chordName + "@" + occ] = voicing;
-        }
-        // If we were editing a global voicing and the user said "just this one", leave the global alone.
-        song.updatedAt = now();
-      } else {
-        // "all" — global voicing for every chord by this name in this song.
-        saveVoicing(song, targetName, voicing, isEdit && !renamed ? editIndex : undefined);
-        // If we're editing what was a per-occurrence override, clear it so the new global takes over here too.
-        if (knowOcc && song.positionVoicings[chordName + "@" + occ]) {
-          delete song.positionVoicings[chordName + "@" + occ];
-        }
-        if (renamed) {
-          song.lyrics = (song.lyrics || "").replace(occRe, "[" + targetName + "]");
-          if (isEdit) deleteVoicing(song, chordName, editIndex);
-          // Clean any per-occurrence overrides under the OLD name — the chord name is gone now.
-          for (const k of Object.keys(song.positionVoicings)) {
-            if (k.startsWith(chordName + "@")) delete song.positionVoicings[k];
+
+      // Always-on rename in lyrics + migrate per-occurrence keys to the new name.
+      if (renamed && totalOccs > 0) {
+        song.lyrics = (song.lyrics || "").replace(occRe, "[" + targetName + "]");
+        for (const k of Object.keys(song.positionVoicings)) {
+          if (k.startsWith(chordName + "@")) {
+            const suffix = k.slice(chordName.length); // "@N"
+            song.positionVoicings[targetName + suffix] = song.positionVoicings[k];
+            delete song.positionVoicings[k];
           }
         }
+        // Drop the edited voicing from the OLD name (it's moving under targetName below).
+        if (isEdit) deleteVoicing(song, chordName, editIndex);
       }
+
+      // Apply the new voicing per scope.
+      if (scope === "this" && knowOcc) {
+        song.positionVoicings[targetName + "@" + occ] = voicing;
+      } else {
+        // Global voicing for every chord by this name in this song.
+        saveVoicing(song, targetName, voicing, isEdit && !renamed ? editIndex : undefined);
+        // Clear any leftover per-occurrence override at this position so the new global wins.
+        if (knowOcc) {
+          delete song.positionVoicings[targetName + "@" + occ];
+        }
+      }
+      song.updatedAt = now();
       saveState({ songs: state.songs });
       bg.remove();
       if (state.selectedId === song.id) renderDetail();
