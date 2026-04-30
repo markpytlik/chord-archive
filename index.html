@@ -912,6 +912,19 @@
   }
   .play-mode .lyrics-large .section-label::before { content: "— "; opacity: .5; }
   .play-mode .lyrics-large .section-label::after  { content: " —"; opacity: .5; }
+  /* Chord-change marker — hidden in the regular view, visible only in play mode */
+  .lyric-dot { display: none; }
+  .play-mode .lyrics-large .lyric-dot {
+    display: inline-block;
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1;
+    margin-right: 14px;
+    margin-left: -22px;
+    opacity: .55;
+    vertical-align: middle;
+    transform: translateY(-1px);
+  }
   /* Shape panel — its OWN row above the scrolling lyrics, so it never visually covers lyrics text.
      Height is user-resizable via the bottom drag handle (defaults set in JS at 220px). */
   .play-mode .play-shape-panel {
@@ -1150,7 +1163,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.5";
+const APP_VERSION = "1.5.6";
 
 //=============================================================
 // STORAGE
@@ -2531,6 +2544,9 @@ function renderLyrics(text) {
     occCount[chord] = v + 1;
     return v;
   };
+  // Tiny dot prefix marking lines that contain a chord (or chord change) — only visible in play mode.
+  // Lets the eye lock on to lines where something happens vs lines that just continue the previous chord.
+  const dot = `<span class="lyric-dot" aria-hidden="true">●</span>`;
   for (const line of lines) {
     if (typeof line === "object" && line.kind === "chord-only") {
       const re = /\[([^\]]+)\]/g;
@@ -2541,7 +2557,7 @@ function renderLyrics(text) {
         html += `<span class="chord-pill-inline" data-chord="${escapeHtml(ch)}" data-occ="${occ}">${escapeHtml(ch)}</span>`;
       }
       const repHtml = line.count > 1 ? `<span class="chord-rep">× ${line.count}</span>` : "";
-      out.push(`<div class="chord-only-row">${html}${repHtml}</div>`);
+      out.push(`<div class="chord-only-row">${dot}${html}${repHtml}</div>`);
       continue;
     }
     if (!line.trim()) { out.push(""); continue; }
@@ -2553,10 +2569,12 @@ function renderLyrics(text) {
     // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment.
     // Each chord-bearing segment gets a min-width sized to its chord name so adjacent pills don't overlap.
     let html = "";
+    let hasChord = false;
     const re = /\[([^\]]+)\]([^\[]*)|([^\[]+)/g;
     let m;
     while ((m = re.exec(line)) !== null) {
       if (m[1] !== undefined) {
+        hasChord = true;
         const chord = m[1];
         const occ = nextOcc(chord);
         const text = m[2] || "";
@@ -2568,7 +2586,7 @@ function renderLyrics(text) {
         html += `<span class="seg">${escapeHtml(m[3])}</span>`;
       }
     }
-    out.push(html);
+    out.push(hasChord ? `${dot}${html}` : html);
   }
   return out.join("\n");
 }
