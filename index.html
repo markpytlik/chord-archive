@@ -898,19 +898,19 @@
   }
   .play-mode .lyrics-large .section-label::before { content: "— "; opacity: .5; }
   .play-mode .lyrics-large .section-label::after  { content: " —"; opacity: .5; }
+  /* Shape panel — its OWN row above the scrolling lyrics, so it never visually covers lyrics text.
+     Height is user-resizable via the bottom drag handle (defaults set in JS at 220px). */
   .play-mode .play-shape-panel {
-    position: sticky;
-    top: 0;
-    left: 0;
-    z-index: 51;
-    background: rgba(255, 255, 255, .96);
+    flex: 0 0 auto;
+    position: relative;
+    background: #fafaf7;
     border-bottom: 1px solid var(--line);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: 18px 14% 18px 14%;
+    padding: 18px 14% 22px 14%;
     display: flex;
     align-items: flex-start;
     gap: 28px;
+    overflow: hidden;
+    min-height: 100px;
   }
   .play-mode .play-shape-panel .play-shape-name {
     font-family: var(--serif);
@@ -927,10 +927,27 @@
     align-items: flex-start;
     gap: 22px;
     flex: 1 1 auto;
+    overflow: auto;
   }
   .play-mode .play-shape-panel .play-shape-diagram > * + * {
     margin-left: 0;
   }
+  /* Drag handle for resizing the shape panel */
+  .play-mode .play-shape-panel .panel-resize {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 8px;
+    cursor: ns-resize;
+    background: linear-gradient(to bottom, transparent, rgba(0,0,0,.04));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .play-mode .play-shape-panel .panel-resize::after {
+    content: ""; display: block;
+    width: 36px; height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+  }
+  .play-mode .play-shape-panel .panel-resize:hover::after { background: var(--muted); }
   .play-mode button.shape-on {
     background: var(--accent);
     border-color: var(--accent);
@@ -1081,7 +1098,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.5.2";
 
 //=============================================================
 // STORAGE
@@ -1878,10 +1895,11 @@ function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
 function svgPiano(chordName, _octavesIgnored, size="md") {
   const parsed = splitChord(chordName);
   if (!parsed) return `<div class="muted small">No piano diagram for ${escapeHtml(chordName)}</div>`;
-  // Show ONLY the chord's actual notes (root + intervals) once, stacked from the root.
+  // Pass the raw pitch classes — svgPianoFromPcs's normalizePianoNotes will stack them once
+  // ascending from the root. (Pre-stacking here caused a double-stack bug where positions like
+  // [4, 8, 11] were re-interpreted as pitch classes B/E/G# instead of A/C#/E.)
   const pcs = chordNotes(parsed).map(n => n.pc);
-  const positions = stackChordFromRoot(pcs, parsed.root);
-  return svgPianoFromPcs(positions, parsed.root, undefined, size);
+  return svgPianoFromPcs(pcs, parsed.root, undefined, size);
 }
 
 // Legacy function body retained below but never executed (kept for reference / dead-code-elim by build):
@@ -2723,7 +2741,11 @@ function renderDetail() {
   document.getElementById("btn-duplicate").addEventListener("click", () => duplicateSong(song));
   document.getElementById("btn-delete").addEventListener("click", () => deleteSong(song));
   el.querySelectorAll("[data-chord]").forEach(c => {
-    c.addEventListener("click", e => openChordModal(e.currentTarget.dataset.chord, song));
+    c.addEventListener("click", e => {
+      const t = e.currentTarget;
+      const occ = t.dataset.occ !== undefined ? parseInt(t.dataset.occ, 10) : null;
+      openChordModal(t.dataset.chord, song, isNaN(occ) ? null : occ);
+    });
   });
   attachHoverPopover(el, song);
 }
@@ -3100,11 +3122,12 @@ function openPlayMode(song) {
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
     </div>
+    <div id="play-shape-panel" class="play-shape-panel" style="display:none; height:220px;">
+      <div class="play-shape-name" id="play-shape-name">—</div>
+      <div class="play-shape-diagram" id="play-shape-diagram"></div>
+      <div class="panel-resize" id="play-shape-resize" title="Drag to resize"></div>
+    </div>
     <div class="play-content" id="play-content">
-      <div id="play-shape-panel" class="play-shape-panel" style="display:none;">
-        <div class="play-shape-name" id="play-shape-name">—</div>
-        <div class="play-shape-diagram" id="play-shape-diagram"></div>
-      </div>
       <div class="lyrics-large">${renderLyrics(song.lyrics || "")}</div>
     </div>
   `;
@@ -3218,10 +3241,33 @@ function openPlayMode(song) {
   shapesBtn.addEventListener("click", () => {
     shapesOn = !shapesOn;
     shapesBtn.classList.toggle("shape-on", shapesOn);
-    shapePanel.style.display = shapesOn ? "" : "none";
+    shapePanel.style.display = shapesOn ? "flex" : "none";
+    // Force re-eval on next show even if last chord was the same name
+    delete shapeName.dataset.last;
     renderCurrentShape();
   });
   content.addEventListener("scroll", () => { if (shapesOn) renderCurrentShape(); });
+
+  // Resize the shape panel — drag the bottom handle to set its height (clamped 100..70vh).
+  const resizeHandle = overlay.querySelector("#play-shape-resize");
+  let dragStartY = 0, dragStartH = 0, dragging = false;
+  resizeHandle.addEventListener("mousedown", e => {
+    e.preventDefault();
+    dragging = true;
+    dragStartY = e.clientY;
+    dragStartH = shapePanel.getBoundingClientRect().height;
+    document.body.style.userSelect = "none";
+  });
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const newH = Math.max(100, Math.min(window.innerHeight * 0.7, dragStartH + (e.clientY - dragStartY)));
+    shapePanel.style.height = newH + "px";
+  });
+  document.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = "";
+  });
   overlay.querySelector("#play-slower").addEventListener("click", () => {
     speedInput.value = Math.max(0, parseFloat(speedInput.value) - 2);
     setSpeed(speedInput.value);
@@ -3792,12 +3838,13 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
 //=============================================================
 // CHORD MODAL (click) — manage all voicings for a chord
 //=============================================================
-function openChordModal(chordName, song) {
+function openChordModal(chordName, song, occ) {
   hidePopover();
   // Chord modal manages YOUR saved voicings only — auto/built-in suggestions only appear in the hover popover
   // (where they're labeled "Standard"). Showing them here was confusing because there's nothing to delete.
   const userVoicings = (song.voicings && song.voicings[chordName]) || [];
   const voicings = userVoicings.map(v => Object.assign({ builtIn: false }, v));
+  const knowOcc = typeof occ === "number" && occ >= 0;
 
   const bg = document.createElement("div");
   bg.className = "modal-bg chord-modal";
@@ -3863,7 +3910,7 @@ function openChordModal(chordName, song) {
   bg.querySelector("#cm-close").addEventListener("click", () => bg.remove());
   bg.querySelector("#cm-add").addEventListener("click", () => {
     bg.remove();
-    openVoicingEditor(chordName, song, null);
+    openVoicingEditor(chordName, song, null, null, knowOcc ? occ : undefined);
   });
   bg.querySelectorAll("[data-vaction]").forEach(btn => {
     btn.addEventListener("click", e => {
@@ -3874,13 +3921,13 @@ function openChordModal(chordName, song) {
       const action = e.currentTarget.dataset.vaction;
       if (action === "edit") {
         bg.remove();
-        openVoicingEditor(chordName, song, userIdx);
+        openVoicingEditor(chordName, song, userIdx, null, knowOcc ? occ : undefined);
       } else if (action === "delete") {
         if (confirm(`Delete this voicing of ${chordName}?`)) {
           deleteVoicing(song, chordName, userIdx);
           saveState({ songs: state.songs });
           bg.remove();
-          openChordModal(chordName, song);
+          openChordModal(chordName, song, knowOcc ? occ : null);
         }
       }
     });
