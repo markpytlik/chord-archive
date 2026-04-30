@@ -793,6 +793,20 @@
     background: #fafaf7;
     border-bottom: 1px solid var(--line);
   }
+  /* Scrub slider — slim full-width row that lets the user drag through the song's scroll position */
+  .play-mode .play-scrub {
+    flex: 0 0 auto;
+    padding: 4px 28px 6px;
+    background: #fafaf7;
+    border-bottom: 1px solid var(--line);
+  }
+  .play-mode .play-scrub input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+    background: transparent;
+    border: 0;
+    margin: 0;
+  }
   .play-mode .play-title {
     flex: 1; min-width: 0;
     font-family: var(--serif);
@@ -830,7 +844,7 @@
   .play-mode .play-content {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 20vh 14% 60vh;
+    padding: 32px 14% 50vh;
     scroll-behavior: auto;
   }
   .play-mode .play-content::-webkit-scrollbar { width: 6px; }
@@ -924,19 +938,24 @@
   }
   .play-mode .play-shape-panel .play-shape-diagram {
     display: flex;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    align-items: stretch;
+    flex-wrap: nowrap;
     gap: 22px;
     flex: 1 1 auto;
-    overflow: auto;
-    align-content: flex-start;
+    height: 100%;
+    overflow: hidden;
+    align-content: stretch;
   }
   .play-mode .play-shape-panel .play-shape-diagram .shape-cell {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    flex: 0 0 auto;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
   }
   .play-mode .play-shape-panel .play-shape-diagram .shape-cell .shape-cell-name {
     font-family: var(--serif);
@@ -944,6 +963,18 @@
     color: var(--ink);
     line-height: 1;
     letter-spacing: -.005em;
+    flex: 0 0 auto;
+  }
+  /* The chord diagrams themselves should stretch to fill the remaining cell height after the name */
+  .play-mode .play-shape-panel .play-shape-diagram .shape-cell .shape-svgs {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
   }
   /* Drag handle for resizing the shape panel */
   .play-mode .play-shape-panel .panel-resize {
@@ -968,14 +999,22 @@
   }
 
   /* Scrollbars */
-  /* Inside popovers / voicing cards / shape overlay — render SVGs at their intrinsic pixel size,
+  /* Inside popovers / voicing cards — render SVGs at their intrinsic pixel size,
      overriding the responsive `max-width:100%` style baked into the SVG markup. */
   .chord-popover .diag-mini svg,
-  .diag-card .canvas svg,
-  .play-shape-panel svg {
+  .diag-card .canvas svg {
     max-width: none !important;
     width: auto !important;
     height: auto !important;
+  }
+  /* Play-mode shape panel — opposite: scale shapes UP to fill available cell space,
+     so the panel's height isn't wasted on whitespace below small fixed-size diagrams. */
+  .play-mode .play-shape-panel svg {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    display: block;
   }
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -1111,7 +1150,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.4";
+const APP_VERSION = "1.5.5";
 
 //=============================================================
 // STORAGE
@@ -3136,6 +3175,9 @@ function openPlayMode(song) {
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
     </div>
+    <div class="play-scrub">
+      <input type="range" id="play-scrub-slider" min="0" max="1000" step="1" value="0" title="Scrub through the song" aria-label="Scrub position" />
+    </div>
     <div id="play-shape-panel" class="play-shape-panel" style="display:none; height:220px;">
       <div class="play-shape-diagram" id="play-shape-diagram"></div>
       <div class="panel-resize" id="play-shape-resize" title="Drag to resize"></div>
@@ -3208,6 +3250,27 @@ function openPlayMode(song) {
   }
   overlay.querySelector("#play-rewind").addEventListener("click", rewind);
 
+  // Scrub slider — tracks scroll position; dragging it jumps to that position.
+  const scrubInput = overlay.querySelector("#play-scrub-slider");
+  let scrubbing = false;
+  const SCRUB_MAX = 1000;
+  function syncScrubFromScroll() {
+    if (scrubbing) return; // user is dragging — don't fight them
+    const max = content.scrollHeight - content.clientHeight;
+    scrubInput.value = max > 0 ? Math.round((content.scrollTop / max) * SCRUB_MAX) : 0;
+  }
+  scrubInput.addEventListener("input", e => {
+    scrubbing = true;
+    const max = content.scrollHeight - content.clientHeight;
+    if (max > 0) {
+      const pct = parseFloat(e.target.value) / SCRUB_MAX;
+      content.scrollTop = max * pct;
+      virtualScroll = content.scrollTop;
+    }
+  });
+  scrubInput.addEventListener("change", () => { scrubbing = false; });
+  content.addEventListener("scroll", syncScrubFromScroll);
+
   // Chord-shape overlay — toggle, then update on scroll to show the chord nearest the top of the visible area
   let shapesOn = false;
   const shapesBtn = overlay.querySelector("#play-shapes");
@@ -3259,16 +3322,9 @@ function openPlayMode(song) {
     if (shapeDiag.dataset.last === sig) return;
     shapeDiag.dataset.last = sig;
 
-    // Pick a size class that fits — fewer chords + taller/wider panel = larger shapes.
-    // (svgGuitar/svgPianoFromPcs accept "sm" | "md" | "lg".)
-    const n = lineChords.length;
-    let size;
-    if (n >= 5)      size = "sm";
-    else if (n >= 3) size = panelH > 260 ? "md" : "sm";
-    else             size = panelH > 280 ? "lg" : panelH > 180 ? "md" : "sm";
-    // If the panel is very narrow, downsize one step to avoid overflow.
-    if (panelW / Math.max(n, 1) < 240 && size === "lg") size = "md";
-    if (panelW / Math.max(n, 1) < 180 && size === "md") size = "sm";
+    // Always render at the largest intrinsic size — CSS scales it down to fit each cell,
+    // so wider panels / fewer chords = bigger shapes (no wasted whitespace below).
+    const size = "lg";
 
     const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
     const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
@@ -3293,7 +3349,7 @@ function openPlayMode(song) {
           cellInner += svgPiano(name, undefined, size);
         }
       }
-      html += `<div class="shape-cell"><div class="shape-cell-name">${escapeHtml(name)}</div>${cellInner || `<div class="muted small">no shape</div>`}</div>`;
+      html += `<div class="shape-cell"><div class="shape-cell-name">${escapeHtml(name)}</div><div class="shape-svgs">${cellInner || `<div class="muted small">no shape</div>`}</div></div>`;
     }
     shapeDiag.innerHTML = html;
   }
@@ -3603,16 +3659,15 @@ function showScopeChoice(opts) {
     ? `Rename ${escapeHtml(oldName)} → ${escapeHtml(newName)}?`
     : `Change voicing of ${escapeHtml(oldName)}?`;
   const sub = `${count === 1 ? "There is 1 instance" : `There are ${count} instances`} of <b>[${escapeHtml(oldName)}]</b> in this song's lyrics.`;
-  // Rename (if any) is always applied globally — the modal only governs voicing scope.
   const justBtn = canApplyToOne ? `
     <button id="rc-just" style="padding:11px 14px; text-align:left; line-height:1.4;">
-      <b>Just this ${escapeHtml(newName)} chord</b><br>
+      <b>Just this ${escapeHtml(oldName)} chord</b><br>
       <span class="muted small">${renamed
-        ? `Use this voicing only at this spot. The chord renames everywhere in the lyrics, but other instances keep their previous voicing.`
+        ? `Rename only this one [${escapeHtml(oldName)}] in the lyrics to [${escapeHtml(newName)}] and use this voicing here. Other ${escapeHtml(oldName)} chords stay as they are.`
         : `Use this voicing only at this spot. Other ${escapeHtml(oldName)} chords keep their previous voicing.`}</span>
     </button>` : "";
   const allCopy = renamed
-    ? `Use this voicing for every ${escapeHtml(newName)} (the chord is renamed everywhere in the lyrics).`
+    ? `Rename every [${escapeHtml(oldName)}] in the lyrics to [${escapeHtml(newName)}] and use this voicing for all of them.`
     : `Apply this voicing to every [${escapeHtml(oldName)}] in this song.`;
   bg.innerHTML = `
     <div class="modal" style="max-width:480px;">
@@ -3835,34 +3890,39 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
     const occRe = new RegExp("\\[" + escName + "\\]", "g");
     const totalOccs = ((song.lyrics || "").match(occRe) || []).length;
 
-    // Finalize the save under a chosen scope: "this" (only this occurrence) or "all" (every instance).
-    // RENAME is always global — if the chord-name changed, every [oldName] in the lyrics becomes [newName].
-    // Scope only governs voicing application (per-position override vs global).
+    // Finalize the save under a chosen scope. "this" → rename ONLY this Nth instance + per-position voicing.
+    // "all" (or no occ context) → rename every [oldName] globally + global voicing.
     const doSave = (scope) => {
       pushUndo(song);
       song.positionVoicings = song.positionVoicings || {};
+      const isThisScope = scope === "this" && knowOcc;
 
-      // Always-on rename in lyrics + migrate per-occurrence keys to the new name.
+      // RENAME — scope-aware
       if (renamed && totalOccs > 0) {
-        song.lyrics = (song.lyrics || "").replace(occRe, "[" + targetName + "]");
-        for (const k of Object.keys(song.positionVoicings)) {
-          if (k.startsWith(chordName + "@")) {
-            const suffix = k.slice(chordName.length); // "@N"
-            song.positionVoicings[targetName + suffix] = song.positionVoicings[k];
-            delete song.positionVoicings[k];
+        if (isThisScope) {
+          // Only this single occurrence in the lyrics
+          song.lyrics = replaceNthChord(song.lyrics, chordName, occ, targetName);
+        } else {
+          // Every [oldName] in the lyrics
+          song.lyrics = (song.lyrics || "").replace(occRe, "[" + targetName + "]");
+          // Migrate per-occurrence override keys from OLD name to NEW name (positions unchanged)
+          for (const k of Object.keys(song.positionVoicings)) {
+            if (k.startsWith(chordName + "@")) {
+              const suffix = k.slice(chordName.length);
+              song.positionVoicings[targetName + suffix] = song.positionVoicings[k];
+              delete song.positionVoicings[k];
+            }
           }
+          // Drop the edited user voicing from the OLD name (it moves under targetName via saveVoicing below)
+          if (isEdit) deleteVoicing(song, chordName, editIndex);
         }
-        // Drop the edited voicing from the OLD name (it's moving under targetName below).
-        if (isEdit) deleteVoicing(song, chordName, editIndex);
       }
 
-      // Apply the new voicing per scope.
-      if (scope === "this" && knowOcc) {
+      // VOICING SCOPE
+      if (isThisScope) {
         song.positionVoicings[targetName + "@" + occ] = voicing;
       } else {
-        // Global voicing for every chord by this name in this song.
         saveVoicing(song, targetName, voicing, isEdit && !renamed ? editIndex : undefined);
-        // Clear any leftover per-occurrence override at this position so the new global wins.
         if (knowOcc) {
           delete song.positionVoicings[targetName + "@" + occ];
         }
