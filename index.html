@@ -925,12 +925,25 @@
   .play-mode .play-shape-panel .play-shape-diagram {
     display: flex;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 22px;
     flex: 1 1 auto;
     overflow: auto;
+    align-content: flex-start;
   }
-  .play-mode .play-shape-panel .play-shape-diagram > * + * {
-    margin-left: 0;
+  .play-mode .play-shape-panel .play-shape-diagram .shape-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+  .play-mode .play-shape-panel .play-shape-diagram .shape-cell .shape-cell-name {
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: -.005em;
   }
   /* Drag handle for resizing the shape panel */
   .play-mode .play-shape-panel .panel-resize {
@@ -1098,7 +1111,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.2";
+const APP_VERSION = "1.5.3";
 
 //=============================================================
 // STORAGE
@@ -3119,6 +3132,7 @@ function openPlayMode(song) {
         <span class="speed-label" id="speed-label">25 px/s</span>
       </div>
       <button id="play-shapes" title="Show chord shapes as the song plays">⌗ Shapes</button>
+      <button id="play-rewind" title="Rewind to top (R)">⏮</button>
       <button id="play-toggle" class="primary" title="Play/Pause (Space)">▶ Play</button>
       <button id="play-close" title="Close (Esc)">Close ✕</button>
     </div>
@@ -3186,6 +3200,15 @@ function openPlayMode(song) {
   toggleBtn.addEventListener("click", () => isPlaying ? pause() : play());
   speedInput.addEventListener("input", e => setSpeed(e.target.value));
 
+  // Rewind: jump back to the top, reset the virtual scroll accumulator, keep play state as-is.
+  function rewind() {
+    pause();
+    content.scrollTop = 0;
+    virtualScroll = 0;
+    toggleBtn.textContent = "▶ Play";
+  }
+  overlay.querySelector("#play-rewind").addEventListener("click", rewind);
+
   // Chord-shape overlay — toggle, then update on scroll to show the chord nearest the top of the visible area
   let shapesOn = false;
   const shapesBtn = overlay.querySelector("#play-shapes");
@@ -3202,41 +3225,84 @@ function openPlayMode(song) {
     }
     const contentRect = content.getBoundingClientRect();
     const focusY = contentRect.top + 60; // a bit below the top of the scroll area
-    let nearest = null;
+    // Find the chord nearest the focus line
+    let focused = null;
     let nearestDist = Infinity;
     for (const el of allChordEls) {
       const r = el.getBoundingClientRect();
       if (r.bottom < contentRect.top || r.top > contentRect.bottom) continue;
       const dist = Math.abs(r.top - focusY);
-      if (dist < nearestDist) { nearestDist = dist; nearest = el; }
+      if (dist < nearestDist) { nearestDist = dist; focused = el; }
     }
-    if (!nearest) {
+    if (!focused) {
       shapeName.textContent = "—";
       shapeDiag.innerHTML = "";
       return;
     }
-    const chord = nearest.dataset.chord;
-    if (shapeName.dataset.last === chord) return; // no change
-    shapeName.dataset.last = chord;
-    shapeName.textContent = chord;
+    // Find every chord pill on the SAME LINE as the focused one (by similar top coordinate)
+    // — then dedupe by name preserving order, so a line "D A#maj7 Cadd9 D" yields three shapes.
+    const focusedTop = focused.getBoundingClientRect().top;
+    const sameLine = allChordEls.filter(el => {
+      const t = el.getBoundingClientRect().top;
+      return Math.abs(t - focusedTop) < 10;
+    });
+    const seen = new Set();
+    const lineChords = [];
+    for (const el of sameLine) {
+      const ch = el.dataset.chord;
+      if (seen.has(ch)) continue;
+      seen.add(ch);
+      const occRaw = el.dataset.occ;
+      lineChords.push({ name: ch, occ: occRaw !== undefined ? parseInt(occRaw, 10) : null });
+    }
+    // Dedup signature includes name + count + panel height — re-render when any of those change so
+    // resizing the panel actually re-picks the shape size.
+    const panelH = shapePanel.clientHeight;
+    const panelW = shapePanel.clientWidth;
+    const sig = lineChords.map(c => c.name).join("|") + "@" + panelH + "x" + panelW;
+    if (shapeName.dataset.last === sig) return;
+    shapeName.dataset.last = sig;
+
+    // Pick a size class that fits — fewer chords + taller/wider panel = larger shapes.
+    // (svgGuitar/svgPianoFromPcs accept "sm" | "md" | "lg".)
+    const n = lineChords.length;
+    let size;
+    if (n >= 5)      size = "sm";
+    else if (n >= 3) size = panelH > 260 ? "md" : "sm";
+    else             size = panelH > 280 ? "lg" : panelH > 180 ? "md" : "sm";
+    // If the panel is very narrow, downsize one step to avoid overflow.
+    if (panelW / Math.max(n, 1) < 240 && size === "lg") size = "md";
+    if (panelW / Math.max(n, 1) < 180 && size === "md") size = "sm";
+
     const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
     const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
-    const voicings = getVoicings(song, chord);
-    const v = voicings[0] || null;
+
     let html = "";
-    if (wantGuitar && v?.frets) html += svgGuitar(chord, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "lg");
-    else if (wantGuitar && !isSimpleMajorOrMinor(chord)) {
-      const builtIn = lookupShape(chord);
-      if (builtIn) html += svgGuitar(chord, { frets: builtIn.frets, fingers: builtIn.fingers, barre: builtIn.barre }, "lg");
-    }
-    if (wantPiano) {
-      if (v?.pianoNotes && v.pianoNotes.length) {
-        html += svgPianoFromPcs(v.pianoNotes, splitChord(chord)?.root, undefined, "lg");
-      } else {
-        html += svgPiano(chord, undefined, "lg");
+    for (const { name, occ } of lineChords) {
+      const voicings = getVoicings(song, name, occ);
+      const v = voicings[0] || null;
+      let cellInner = "";
+      if (wantGuitar) {
+        if (v?.frets) {
+          cellInner += svgGuitar(name, { frets: v.frets, fingers: v.fingers, barre: v.barre }, size);
+        } else if (!isSimpleMajorOrMinor(name)) {
+          const builtIn = lookupShape(name);
+          if (builtIn) cellInner += svgGuitar(name, { frets: builtIn.frets, fingers: builtIn.fingers, barre: builtIn.barre }, size);
+        }
       }
+      if (wantPiano) {
+        if (v?.pianoNotes && v.pianoNotes.length) {
+          cellInner += svgPianoFromPcs(v.pianoNotes, splitChord(name)?.root, undefined, size);
+        } else {
+          cellInner += svgPiano(name, undefined, size);
+        }
+      }
+      html += `<div class="shape-cell"><div class="shape-cell-name">${escapeHtml(name)}</div>${cellInner || `<div class="muted small">no shape</div>`}</div>`;
     }
-    shapeDiag.innerHTML = html || `<div class="muted small" style="text-align:center;color:#888;">no shape</div>`;
+    // The big chord name on the left now shows the line's first chord (still the focused one) —
+    // helps anchor the eye when the line wraps off-screen.
+    shapeName.textContent = lineChords[0]?.name || "—";
+    shapeDiag.innerHTML = html;
   }
   shapesBtn.addEventListener("click", () => {
     shapesOn = !shapesOn;
@@ -3262,6 +3328,11 @@ function openPlayMode(song) {
     if (!dragging) return;
     const newH = Math.max(100, Math.min(window.innerHeight * 0.7, dragStartH + (e.clientY - dragStartY)));
     shapePanel.style.height = newH + "px";
+    // Re-pick the size class so shapes scale up/down with the panel height.
+    if (shapesOn) {
+      delete shapeName.dataset.last; // bypass the "no change" early return
+      renderCurrentShape();
+    }
   });
   document.addEventListener("mouseup", () => {
     if (!dragging) return;
@@ -3288,6 +3359,8 @@ function openPlayMode(song) {
     else if (e.key === " " || e.code === "Space") {
       e.preventDefault();
       isPlaying ? pause() : play();
+    } else if (e.key === "r" || e.key === "R") {
+      rewind();
     } else if (e.key === "ArrowUp") {
       speedInput.value = Math.min(40, parseFloat(speedInput.value) + 2);
       setSpeed(speedInput.value);
@@ -3806,12 +3879,13 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
       if (state.selectedId === song.id) renderDetail();
     };
 
-    // When to ask which scope to apply:
-    //   - rename + at least one [chordName] in lyrics
-    //   - same name + 2+ instances and we know which one the user clicked on
-    const askOnRename = renamed && totalOccs > 0;
-    const askOnPhrasing = !renamed && knowOcc && totalOccs > 1;
-    if (askOnRename || askOnPhrasing) {
+    // Only ASK when there's a real choice — i.e. the user came from a specific chord pill
+    // AND the chord has multiple instances. Otherwise just apply globally:
+    //   - rename + no occ context → always rename in lyrics + save voicing under new name
+    //   - rename + only 1 instance → no real choice, do "all" (which renames that single instance)
+    //   - phrasing change without occ context or single instance → just save globally
+    const askForScope = knowOcc && totalOccs > 1;
+    if (askForScope) {
       showScopeChoice({
         oldName: chordName,
         newName: targetName,
@@ -3822,7 +3896,6 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
       });
       return;
     }
-    // No ambiguity (single instance, no rename, or chord doesn't appear in lyrics) — just save globally.
     doSave("all");
   });
   if (isEdit) {
