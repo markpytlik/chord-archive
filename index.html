@@ -322,11 +322,57 @@
     opacity: 1;
     background: rgba(177, 74, 44, .15);
   }
-  .detail-head h1 .key-inline .key-sep { opacity: .35; margin: 0 2px; font-size: 14px; }
-  .detail-head h1 .key-inline .accidental-btn {
-    font-size: 12px; font-weight: 600; padding: 2px 8px;
-    text-transform: uppercase; letter-spacing: .04em;
-    opacity: .75;
+  /* Accidental pill — same shape as the key pill, different (cool blue) palette so it reads as a separate control. */
+  .detail-head h1 .acc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    vertical-align: middle;
+    margin-left: 8px;
+    margin-bottom: 6px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    background: #e8eef9;
+    color: #2c5fbf;
+    border: 1px solid #cbd6ec;
+    padding: 3px 4px 3px 10px;
+    border-radius: 999px;
+  }
+  .detail-head h1 .acc-pill .acc-toggle,
+  .detail-head h1 .acc-pill .acc-reset {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: opacity .12s, background .12s;
+    border-radius: 999px;
+  }
+  .detail-head h1 .acc-pill .acc-toggle:hover { opacity: .75; }
+  .detail-head h1 .acc-pill .acc-toggle .acc-glyph {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    margin-left: 4px;
+    text-transform: none;
+  }
+  .detail-head h1 .acc-pill .acc-reset {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 0 5px;
+    margin-left: 4px;
+    opacity: .55;
+    text-transform: none;
+  }
+  .detail-head h1 .acc-pill .acc-reset:hover {
+    opacity: 1;
+    background: rgba(44, 95, 191, .15);
   }
   .detail-head .title-block { min-width: 0; }
   .detail-head h1 .source-corner {
@@ -1029,7 +1075,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.9";
+const APP_VERSION = "1.5.0";
 
 //=============================================================
 // STORAGE
@@ -1463,6 +1509,10 @@ function convertChordAccidental(chordName, useFlat) {
 // Mutate the song so every chord, key, and voicing key uses the requested accidental style.
 function rewriteAccidentals(song, useFlat) {
   pushUndo(song);
+  // Lock in the original accidental style the first time we toggle (so the ↺ reset has somewhere to go).
+  if (typeof song.originalPreferFlat !== "boolean") {
+    song.originalPreferFlat = !!song.preferFlat;
+  }
   if (song.lyrics) {
     song.lyrics = song.lyrics.replace(/\[([^\]]+)\]/g, (m, ch) => "[" + convertChordAccidental(ch, useFlat) + "]");
   }
@@ -2570,9 +2620,13 @@ function renderDetail() {
           ${song.originalKey && song.originalKey !== song.key
             ? `<button class="transpose-btn" data-reset="1" title="Reset to original key (${escapeHtml(song.originalKey)})" aria-label="Reset to original key">↺</button>`
             : ""}
-          <span class="key-sep" aria-hidden="true">·</span>
-          <button class="transpose-btn accidental-btn" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click for sharps (C♯, F♯m, etc.)" : "Currently sharps — click for flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "use ♯" : "use ♭"}</button>
-        </span></h1>
+        </span>${(() => {
+          const accChanged = (typeof song.originalPreferFlat === "boolean") && (song.originalPreferFlat !== !!song.preferFlat);
+          return `<span class="acc-pill">
+            <button class="acc-toggle" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click to switch to sharps (C♯, F♯m, etc.)" : "Currently sharps — click to switch to flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "Flats" : "Sharps"}<span class="acc-glyph">${song.preferFlat ? "♭" : "♯"}</span></button>
+            ${accChanged ? `<button class="acc-reset" data-accidental-reset="1" title="Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})" aria-label="Reset accidentals">↺</button>` : ""}
+          </span>`;
+        })()}</h1>
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
@@ -2625,11 +2679,22 @@ function renderDetail() {
     });
   });
   // Toggle accidental style for the whole song (♯ ↔ ♭)
-  el.querySelectorAll(".transpose-btn[data-accidental]").forEach(btn => {
+  el.querySelectorAll("[data-accidental]").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       const useFlat = e.currentTarget.dataset.accidental === "flat";
       rewriteAccidentals(song, useFlat);
+      saveState({ songs: state.songs });
+      renderDetail();
+    });
+  });
+  // ↺ reset accidentals to the song's original style
+  el.querySelectorAll("[data-accidental-reset]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (typeof song.originalPreferFlat !== "boolean") return;
+      if (!!song.preferFlat === !!song.originalPreferFlat) return;
+      rewriteAccidentals(song, !!song.originalPreferFlat);
       saveState({ songs: state.songs });
       renderDetail();
     });
