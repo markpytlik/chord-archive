@@ -1283,7 +1283,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "3.1.0";
 
 //=============================================================
 // STORAGE
@@ -1457,30 +1457,45 @@ function openAuthModal() {
     alert("Auth isn't loaded — check your network connection and refresh.");
     return;
   }
-  let mode = "signin"; // or "signup"
+  // mode: "signin" (magic-link primary) | "signup" (email + password) | "password" (sign in with password)
+  let mode = "signin";
   const bg = document.createElement("div");
   bg.className = "modal-bg auth-modal";
   function render() {
+    const isSignup = mode === "signup";
+    const isPassword = mode === "password";
+    const showPassword = isSignup || isPassword;
     bg.innerHTML = `
       <div class="modal" style="max-width:420px;">
-        <h3>${mode === "signin" ? "Sign in" : "Create your account"}</h3>
-        <div class="modal-sub">${mode === "signin" ? "Sign in to sync your songs to the cloud." : "Free account — your songs stay private to you."}</div>
+        <h3>${isSignup ? "Create your account" : isPassword ? "Sign in with password" : "Sign in"}</h3>
+        <div class="modal-sub">${isSignup
+          ? "Free account — your songs stay private to you."
+          : isPassword
+            ? "Use the password you set when you first signed up."
+            : "We'll email you a one-click sign-in link — no password needed."}</div>
         <div class="tabs">
-          <button data-tab="signin" class="${mode === "signin" ? "active" : ""}">Sign in</button>
-          <button data-tab="signup" class="${mode === "signup" ? "active" : ""}">Sign up</button>
+          <button data-tab="signin" class="${mode !== "signup" ? "active" : ""}">Sign in</button>
+          <button data-tab="signup" class="${isSignup ? "active" : ""}">Sign up</button>
         </div>
         <label for="auth-email">Email</label>
         <input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" />
-        <label for="auth-password">Password</label>
-        <input id="auth-password" type="password" autocomplete="${mode === "signin" ? "current-password" : "new-password"}" placeholder="${mode === "signup" ? "At least 6 characters" : ""}" />
+        ${showPassword ? `
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" autocomplete="${isPassword ? "current-password" : "new-password"}" placeholder="${isSignup ? "At least 6 characters" : ""}" />
+        ` : ""}
         <div id="auth-msg" class="auth-msg"></div>
         <div class="actions">
-          <button id="auth-go" class="primary">${mode === "signin" ? "Sign in" : "Create account"}</button>
+          <button id="auth-go" class="primary">${
+            isSignup ? "Create account"
+            : isPassword ? "Sign in"
+            : "Email me a sign-in link"
+          }</button>
         </div>
-        <div style="margin-top: 12px; text-align: center; font-size: 12px; color: var(--muted);">
-          ${mode === "signin"
-            ? `<button class="small-link" id="auth-magic">Email me a sign-in link instead</button>`
-            : `By signing up you agree this is a personal project with no warranty of any kind.`}
+        <div style="margin-top: 14px; text-align: center; font-size: 12px; color: var(--muted);">
+          ${isSignup ? `By signing up you agree this is a personal project with no warranty of any kind.`
+            : isPassword
+              ? `<button class="small-link" data-switch-to="signin">← Use a magic link instead</button> · <button class="small-link" id="auth-forgot">Forgot password?</button>`
+              : `Already have a password? <button class="small-link" data-switch-to="password">Sign in with password</button>`}
         </div>
         <div class="actions" style="margin-top: 8px;">
           <button id="auth-cancel" class="ghost">Cancel</button>
@@ -1490,13 +1505,17 @@ function openAuthModal() {
     bg.querySelectorAll("[data-tab]").forEach(b => {
       b.addEventListener("click", () => { mode = b.dataset.tab; render(); });
     });
+    bg.querySelectorAll("[data-switch-to]").forEach(b => {
+      b.addEventListener("click", () => { mode = b.dataset.switchTo; render(); });
+    });
     bg.querySelector("#auth-cancel").addEventListener("click", () => bg.remove());
     bg.querySelector("#auth-go").addEventListener("click", () => doAuth(mode, bg));
-    const magic = bg.querySelector("#auth-magic");
-    if (magic) magic.addEventListener("click", () => doMagic(bg));
-    bg.querySelector("#auth-password").addEventListener("keydown", e => {
-      if (e.key === "Enter") doAuth(mode, bg);
-    });
+    const forgot = bg.querySelector("#auth-forgot");
+    if (forgot) forgot.addEventListener("click", () => doForgotPassword(bg));
+    const submitOnEnter = e => { if (e.key === "Enter") doAuth(mode, bg); };
+    bg.querySelector("#auth-email").addEventListener("keydown", submitOnEnter);
+    const passInput = bg.querySelector("#auth-password");
+    if (passInput) passInput.addEventListener("keydown", submitOnEnter);
   }
   render();
   document.body.appendChild(bg);
@@ -1512,17 +1531,15 @@ function setAuthMsg(bg, kind, text) {
 
 async function doAuth(mode, bg) {
   const email = bg.querySelector("#auth-email").value.trim();
-  const password = bg.querySelector("#auth-password").value;
-  if (!email || !password) { setAuthMsg(bg, "err", "Email and password are both required."); return; }
-  setAuthMsg(bg, "busy", mode === "signin" ? "Signing in…" : "Creating account…");
+  const passInput = bg.querySelector("#auth-password");
+  const password = passInput ? passInput.value : "";
+  if (!email) { setAuthMsg(bg, "err", "Type your email first."); return; }
+
   try {
-    if (mode === "signin") {
-      const { error } = await auth.client.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      setAuthMsg(bg, "ok", "Signed in. Loading your library…");
-      setTimeout(() => bg.remove(), 600);
-    } else {
-      const { data, error } = await auth.client.auth.signUp({ email, password });
+    if (mode === "signup") {
+      if (!password) { setAuthMsg(bg, "err", "Pick a password (at least 6 characters)."); return; }
+      setAuthMsg(bg, "busy", "Creating account…");
+      const { data, error } = await auth.client.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
       if (error) throw error;
       if (data.user && !data.session) {
         setAuthMsg(bg, "ok", "Check your inbox — we sent a confirmation link to verify your email.");
@@ -1530,22 +1547,35 @@ async function doAuth(mode, bg) {
         setAuthMsg(bg, "ok", "Account created. Loading your library…");
         setTimeout(() => bg.remove(), 600);
       }
+    } else if (mode === "password") {
+      if (!password) { setAuthMsg(bg, "err", "Enter your password."); return; }
+      setAuthMsg(bg, "busy", "Signing in…");
+      const { error } = await auth.client.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      setAuthMsg(bg, "ok", "Signed in. Loading your library…");
+      setTimeout(() => bg.remove(), 600);
+    } else {
+      // mode === "signin" — magic link is the default path
+      setAuthMsg(bg, "busy", "Sending sign-in link…");
+      const { error } = await auth.client.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
+      if (error) throw error;
+      setAuthMsg(bg, "ok", `Sent a sign-in link to ${email}. Click the link in your inbox to sign in.`);
     }
   } catch (e) {
     setAuthMsg(bg, "err", e.message || "Something went wrong.");
   }
 }
 
-async function doMagic(bg) {
+async function doForgotPassword(bg) {
   const email = bg.querySelector("#auth-email").value.trim();
   if (!email) { setAuthMsg(bg, "err", "Type your email first."); return; }
-  setAuthMsg(bg, "busy", "Sending sign-in link…");
+  setAuthMsg(bg, "busy", "Sending password reset email…");
   try {
-    const { error } = await auth.client.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
+    const { error } = await auth.client.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
     if (error) throw error;
-    setAuthMsg(bg, "ok", `Sent a sign-in link to ${email}. Check your inbox and click the link.`);
+    setAuthMsg(bg, "ok", `Sent a password reset link to ${email}.`);
   } catch (e) {
-    setAuthMsg(bg, "err", e.message || "Couldn't send the link.");
+    setAuthMsg(bg, "err", e.message || "Couldn't send the reset email.");
   }
 }
 async function fetchSeed() {
@@ -2693,15 +2723,25 @@ async function lookupLyrics(title, artist) {
   return data.lyrics.replace(/\r\n/g, "\n").trim();
 }
 
-// ----- Best-effort scraper for chord-site URLs -----
-const CORS_PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-];
+// ----- URL fetch proxy -----
+// Primary: a Supabase Edge Function (`fetch-page`) we control. Far more reliable than the
+// random public CORS proxies that used to be the only option.
+//
+// Caveats baked into reality:
+//   - Cloudflare-protected sites (Ultimate Guitar, E-Chords, Songsterr) return a CF challenge
+//     page even from the Edge Function, because CF blocks server-side fetches. Those still
+//     need the browser extension or bookmarklet.
+//   - Smaller chord/lyric sites without aggressive bot protection work fine.
+//
+// We keep one public-proxy fallback for the rare case the Edge Function itself is down.
+const FETCH_PROXY_PRIMARY = url =>
+  `https://mjgctqprbecwkdinpcbp.supabase.co/functions/v1/fetch-page?url=${encodeURIComponent(url)}`;
+const FETCH_PROXY_FALLBACK = url =>
+  `https://corsproxy.io/?${encodeURIComponent(url)}`;
+
 async function fetchViaProxy(url) {
   let lastErr = null;
-  for (const proxify of CORS_PROXIES) {
+  for (const proxify of [FETCH_PROXY_PRIMARY, FETCH_PROXY_FALLBACK]) {
     try {
       const res = await fetch(proxify(url), { cache: "no-cache" });
       if (res.ok) {
@@ -2709,7 +2749,7 @@ async function fetchViaProxy(url) {
         if (txt && txt.length > 200) return txt;
         lastErr = new Error("Empty body");
       } else {
-        lastErr = new Error("Proxy " + res.status);
+        lastErr = new Error("Proxy returned " + res.status);
       }
     } catch (e) { lastErr = e; }
   }
