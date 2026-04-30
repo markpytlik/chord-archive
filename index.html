@@ -322,6 +322,12 @@
     opacity: 1;
     background: rgba(177, 74, 44, .15);
   }
+  .detail-head h1 .key-inline .key-sep { opacity: .35; margin: 0 2px; font-size: 14px; }
+  .detail-head h1 .key-inline .accidental-btn {
+    font-size: 12px; font-weight: 600; padding: 2px 8px;
+    text-transform: uppercase; letter-spacing: .04em;
+    opacity: .75;
+  }
   .detail-head .title-block { min-width: 0; }
   .detail-head h1 .source-corner {
     display: inline-block;
@@ -482,6 +488,13 @@
     text-align: center;
     letter-spacing: -.01em;
     margin-bottom: 10px;
+  }
+  .chord-popover .pop-header-sub {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 2px;
   }
   .chord-popover .pop-row {
     display: flex; gap: 14px; align-items: flex-start; justify-content: center;
@@ -1016,7 +1029,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.4.8";
+const APP_VERSION = "1.4.9";
 
 //=============================================================
 // STORAGE
@@ -2557,7 +2570,8 @@ function renderDetail() {
           ${song.originalKey && song.originalKey !== song.key
             ? `<button class="transpose-btn" data-reset="1" title="Reset to original key (${escapeHtml(song.originalKey)})" aria-label="Reset to original key">↺</button>`
             : ""}
-          <button class="transpose-btn" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Switch to sharps (e.g. C♯, F♯m)" : "Switch to flats (e.g. D♭, G♭m)"}" aria-label="Toggle accidentals">${song.preferFlat ? "♯" : "♭"}</button>
+          <span class="key-sep" aria-hidden="true">·</span>
+          <button class="transpose-btn accidental-btn" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click for sharps (C♯, F♯m, etc.)" : "Currently sharps — click for flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "use ♯" : "use ♭"}</button>
         </span></h1>
       </div>
       <div class="detail-actions">
@@ -3231,6 +3245,21 @@ function ensurePopover() {
   return popoverEl;
 }
 
+// Build the parenthetical voicing-name suffix for a chord title (e.g. "D" → "D (inverted)").
+// Standard/built-in voicings get nothing in parens — they're the default, no qualifier needed.
+// Strips a redundant leading copy of the chord name from the voicing name so we don't get "D (d inverted)".
+function voicingTitleSuffix(chordName, v) {
+  if (!v || v.builtIn) return "";
+  let label = voicingLabel(v);
+  if (!label || label === "Standard") return "";
+  // Tidy: lowercase first letter and drop redundant chord-name prefix.
+  let lower = label.toLowerCase();
+  const cn = chordName.toLowerCase();
+  if (lower.startsWith(cn + " ")) lower = lower.slice(cn.length + 1);
+  else if (lower === cn) return "";
+  return ` (${lower})`;
+}
+
 function renderPopover(target) {
   const pop = ensurePopover();
   if (!popoverState) return;
@@ -3240,11 +3269,9 @@ function renderPopover(target) {
   const voicings = (wantGuitar || wantPiano) ? getVoicings(song, chordName, occ) : [];
   const current = voicings[index] || null;
   const total = voicings.length;
-  const labelTail = current ? ` · ${escapeHtml(voicingLabel(current))}` : "";
   // Guitar diagram — bigger in popover (md size) so it's easy to read at a glance
   const guitarHtml = wantGuitar
     ? `<div class="diag-mini">
-        <div class="label">Guitar${labelTail}</div>
         ${current && current.frets
           ? svgGuitar(chordName, { frets: current.frets, fingers: current.fingers, barre: current.barre }, "lg")
           : (current ? "" : `<div class="muted small" style="padding:18px 6px; text-align:center; min-width:130px;">No saved voicing<br><span class="micro">click <b>+ Add</b> below</span></div>`)
@@ -3253,7 +3280,6 @@ function renderPopover(target) {
     : "";
   const pianoHtml = wantPiano
     ? `<div class="diag-mini">
-        <div class="label">Piano${labelTail}</div>
         ${current && current.pianoNotes && current.pianoNotes.length
           ? svgPianoFromPcs(current.pianoNotes, splitChord(chordName)?.root, 2, "lg")
           : svgPiano(chordName, 2, "lg")}
@@ -3276,8 +3302,9 @@ function renderPopover(target) {
       ` : current && current.builtIn ? `<button data-action="edit-from-builtin" title="Customize this chord">Customize</button>` : ""}
     </div>`;
 
+  const titleSuffix = voicingTitleSuffix(chordName, current);
   pop.innerHTML = `
-    <div class="pop-header">${escapeHtml(chordName)}</div>
+    <div class="pop-header">${escapeHtml(chordName)}${titleSuffix ? `<span class="pop-header-sub">${escapeHtml(titleSuffix)}</span>` : ""}</div>
     <div class="pop-row ${both ? "" : "single"}">
       ${guitarHtml}${pianoHtml}
     </div>
@@ -3693,8 +3720,10 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
 //=============================================================
 function openChordModal(chordName, song) {
   hidePopover();
-  // Always show + Add and the voicings list — instrument settings only affect WHICH fields appear in the editor.
-  const voicings = getVoicings(song, chordName);
+  // Chord modal manages YOUR saved voicings only — auto/built-in suggestions only appear in the hover popover
+  // (where they're labeled "Standard"). Showing them here was confusing because there's nothing to delete.
+  const userVoicings = (song.voicings && song.voicings[chordName]) || [];
+  const voicings = userVoicings.map(v => Object.assign({ builtIn: false }, v));
 
   const bg = document.createElement("div");
   bg.className = "modal-bg chord-modal";
@@ -3731,7 +3760,7 @@ function openChordModal(chordName, song) {
             const showPiano = hasPiano && (sel.includes("piano")  || !hasFrets);
             return `
             <div class="diag-card" data-vidx="${i}" data-builtin="${v.builtIn}">
-              <h4>${v.builtIn ? "Built-in" : (v.name ? escapeHtml(v.name) : "Voicing " + i)}</h4>
+              <h4>${v.name ? escapeHtml(v.name) : "Voicing " + (i + 1)}</h4>
               <div class="canvas">
                 ${showFrets ? svgGuitar(chordName, { frets: v.frets, fingers: v.fingers, barre: v.barre }, "md") : ""}
                 ${showPiano ? `<div style="margin-top:6px;">${svgPianoFromPcs(v.pianoNotes, splitChord(chordName)?.root, undefined, "md")}</div>` : ""}
