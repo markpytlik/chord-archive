@@ -318,9 +318,12 @@
     opacity: .55;
     transition: opacity .12s, background .12s;
   }
-  .detail-head h1 .key-inline .transpose-btn:hover {
+  .detail-head h1 .key-inline .transpose-btn:hover:not(:disabled) {
     opacity: 1;
     background: rgba(177, 74, 44, .15);
+  }
+  .detail-head h1 .key-inline .transpose-btn:disabled {
+    opacity: .25; cursor: default;
   }
   /* Accidental pill — same shape as the key pill, different (cool blue) palette so it reads as a separate control. */
   .detail-head h1 .acc-pill {
@@ -370,9 +373,12 @@
     opacity: .55;
     text-transform: none;
   }
-  .detail-head h1 .acc-pill .acc-reset:hover {
+  .detail-head h1 .acc-pill .acc-reset:hover:not(:disabled) {
     opacity: 1;
     background: rgba(44, 95, 191, .15);
+  }
+  .detail-head h1 .acc-pill .acc-reset:disabled {
+    opacity: .25; cursor: default;
   }
   .detail-head .title-block { min-width: 0; }
   .detail-head h1 .source-corner {
@@ -1075,7 +1081,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.5.1";
 
 //=============================================================
 // STORAGE
@@ -2617,14 +2623,17 @@ function renderDetail() {
           }
           <button class="transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
           <button class="transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
-          ${song.originalKey && song.originalKey !== song.key
-            ? `<button class="transpose-btn" data-reset="1" title="Reset to original key (${escapeHtml(song.originalKey)})" aria-label="Reset to original key">↺</button>`
-            : ""}
+          ${(() => {
+            const keyChanged = !!(song.originalKey && song.originalKey !== song.key);
+            const title = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
+            return `<button class="transpose-btn" data-reset="1" title="${title}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>`;
+          })()}
         </span>${(() => {
           const accChanged = (typeof song.originalPreferFlat === "boolean") && (song.originalPreferFlat !== !!song.preferFlat);
+          const resetTitle = accChanged ? `Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})` : "Already at original accidentals";
           return `<span class="acc-pill">
             <button class="acc-toggle" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click to switch to sharps (C♯, F♯m, etc.)" : "Currently sharps — click to switch to flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "Flats" : "Sharps"}<span class="acc-glyph">${song.preferFlat ? "♭" : "♯"}</span></button>
-            ${accChanged ? `<button class="acc-reset" data-accidental-reset="1" title="Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})" aria-label="Reset accidentals">↺</button>` : ""}
+            <button class="acc-reset" data-accidental-reset="1" title="${resetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
           </span>`;
         })()}</h1>
       </div>
