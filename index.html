@@ -283,130 +283,127 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  /* === Song-controls toolbar (key, accidentals, Roman numerals).
-     Lives below the title in its own row. Fixed-height pills with consistent
-     internal layout — controls are always present (disabled when N/A) so state
-     changes don't shift adjacent pills. Each pill has a small uppercase "cap"
-     label for discoverability. === */
+  /* === Song-controls toolbar (key, accidentals, chord analysis).
+     Quiet typographic design — labels in small caps, value as a serif numeral, controls as
+     unadorned ghost buttons. Hover reveals a subtle highlight. No chunky pill borders.
+     Sections separated by a thin vertical rule. === */
   .song-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
     align-items: center;
-  }
-  .sc-pill, .sc-toggle-pill {
-    display: inline-flex;
-    align-items: stretch;
-    height: 32px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    overflow: hidden;
-    background: var(--panel);
+    gap: 0;
+    margin-top: 14px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
     font-family: var(--sans);
     font-size: 13px;
     line-height: 1;
+    color: var(--ink);
   }
-  .sc-cap {
-    display: inline-flex; align-items: center;
-    padding: 0 12px;
-    text-transform: uppercase;
+  .sc-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 16px;
+    border-right: 1px solid var(--line);
+    height: 28px;
+  }
+  .sc-section:last-child { border-right: 0; }
+  .sc-section .sc-cap {
     font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: .09em;
+    letter-spacing: .12em;
+    text-transform: uppercase;
     color: var(--muted);
-    background: var(--panel-2);
-    border-right: 1px solid var(--line);
   }
-  .sc-pill .sc-value {
-    display: inline-flex; align-items: center; justify-content: center;
-    padding: 0 14px;
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--ink);
-    border-right: 1px solid var(--line);
-    min-width: 56px;
-  }
-  .sc-pill .sc-btn {
-    background: transparent;
-    border: 0;
-    border-right: 1px solid var(--line);
-    width: 36px;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    color: var(--ink-soft);
-    font-family: var(--sans);
-    transition: background .12s, color .12s;
-  }
-  .sc-pill .sc-btn:last-child { border-right: 0; }
-  .sc-pill .sc-btn:hover:not(:disabled) {
-    background: var(--accent-soft);
-    color: var(--accent-deep);
-  }
-  .sc-pill .sc-btn:disabled { opacity: .3; cursor: default; }
-  .sc-pill .sc-btn.sc-reset { font-size: 14px; }
-
-  /* Key pill: rust accent on the value to anchor it visually */
-  .sc-pill.sc-key .sc-value {
-    color: var(--accent-deep);
-    background: var(--accent-soft);
-  }
-  /* Accidentals pill: segmented ♯ / ♭ control */
-  .sc-pill.sc-acc .sc-segmented {
-    display: inline-flex;
-    align-items: stretch;
-    border-right: 1px solid var(--line);
-  }
-  .sc-pill.sc-acc .sc-segmented .sc-seg {
-    background: transparent;
-    border: 0;
-    border-right: 1px solid var(--line);
-    padding: 0;
-    width: 36px;
-    display: inline-flex; align-items: center; justify-content: center;
+  .sc-section .sc-value {
     font-family: var(--serif);
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 500;
+    letter-spacing: -.005em;
+    color: var(--ink);
+    min-width: 36px;
+    text-align: center;
+  }
+  .sc-section .sc-btn {
+    background: transparent;
+    border: 0;
+    width: 26px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
     color: var(--ink-soft);
+    border-radius: 4px;
     transition: background .12s, color .12s;
-    line-height: 1;
+    font-family: var(--sans);
   }
-  .sc-pill.sc-acc .sc-segmented .sc-seg:last-child { border-right: 0; }
-  .sc-pill.sc-acc .sc-segmented .sc-seg:hover:not([aria-pressed="true"]) {
-    background: #e8eef9;
-    color: #2c5fbf;
+  .sc-section .sc-btn:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
   }
-  .sc-pill.sc-acc .sc-segmented .sc-seg[aria-pressed="true"] {
-    background: #2c5fbf;
-    color: #fff;
+  .sc-section .sc-btn:disabled { opacity: .25; cursor: default; }
+  .sc-section .sc-btn.sc-reset { font-size: 14px; }
+  /* Sharp / flat segmented control — typographic, with a subtle underline marking the active one. */
+  .sc-section .sc-seg-row {
+    display: inline-flex; align-items: center; gap: 10px;
   }
-  /* Roman-numerals toggle pill */
-  .sc-toggle-pill.rn-pill {
+  .sc-section .sc-seg {
+    background: transparent;
+    border: 0;
+    padding: 0 6px;
+    height: 24px;
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 500;
     cursor: pointer;
-    padding: 0;
-    border: 1px solid var(--line);
-    color: inherit;
-    font: inherit;
-  }
-  .sc-toggle-pill.rn-pill .sc-on-off {
-    display: inline-flex; align-items: center;
-    padding: 0 16px;
-    font-weight: 700;
-    font-size: 13px;
-    color: var(--muted);
+    color: var(--ink-soft);
+    border-radius: 4px;
+    line-height: 1;
+    position: relative;
     transition: color .12s, background .12s;
   }
-  .sc-toggle-pill.rn-pill[aria-pressed="true"] {
-    border-color: #c8dec8;
-    background: #eaf2ec;
+  .sc-section .sc-seg:hover:not([aria-pressed="true"]) {
+    color: var(--ink);
+    background: var(--panel-2);
   }
-  .sc-toggle-pill.rn-pill[aria-pressed="true"] .sc-on-off { color: #2d6a3d; }
-  .sc-toggle-pill.rn-pill[aria-pressed="true"] .sc-cap   { color: #2d6a3d; background: #d8e8dc; border-right-color: #c8dec8; }
-  .sc-toggle-pill.rn-pill:hover .sc-on-off { color: var(--accent-deep); }
-  .sc-toggle-pill.rn-pill:hover[aria-pressed="false"] .sc-cap { background: var(--accent-soft); color: var(--accent-deep); border-right-color: #ecccc0; }
+  .sc-section .sc-seg[aria-pressed="true"] {
+    color: var(--accent-deep);
+    background: var(--accent-soft);
+  }
+  /* Analysis toggle — text-link feel. Active state has a small dot to indicate "on". */
+  .sc-section.sc-analysis {
+    cursor: pointer;
+    color: var(--ink-soft);
+    transition: color .12s;
+  }
+  .sc-section.sc-analysis:hover { color: var(--ink); }
+  .sc-section.sc-analysis .sc-toggle-label {
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: .01em;
+    color: inherit;
+    user-select: none;
+  }
+  .sc-section.sc-analysis .sc-toggle-state {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .sc-section.sc-analysis .sc-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--line);
+    transition: background .12s;
+  }
+  .sc-section.sc-analysis[aria-pressed="true"] .sc-dot { background: #2d6a3d; }
+  .sc-section.sc-analysis[aria-pressed="true"] .sc-toggle-state { color: #2d6a3d; }
   /* (Old .rn-pill inside-h1 styles removed — Roman toggle now lives in .song-controls.) */
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
@@ -503,6 +500,18 @@
   }
   .lyrics .chord, .lyrics .chord-pill-inline { cursor: grab; }
   .lyrics .chord:active, .lyrics .chord-pill-inline:active { cursor: grabbing; }
+  /* Vertical drop indicator that tracks the cursor during chord drag */
+  .chord-drop-indicator {
+    position: absolute;
+    width: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    pointer-events: none;
+    display: none;
+    z-index: 5;
+    box-shadow: 0 0 0 1px rgba(177, 74, 44, .25);
+  }
+  .lyrics { position: relative; }
   .lyrics .section-label {
     color: var(--accent);
     font-weight: 700;
@@ -1177,6 +1186,22 @@
     0%, 100% { opacity: 1; transform: translateY(-2px) scale(1); }
     50%      { opacity: .65; transform: translateY(-2px) scale(.85); }
   }
+  /* Next-line preview in play mode — the line after the active one is highlighted softer so
+     the musician sees what chords are coming up. */
+  .play-mode .lyrics-large .lyric-line.active-next {
+    opacity: 1;
+    background: rgba(177, 74, 44, 0.045);
+    border-radius: 6px;
+  }
+  .play-mode .lyrics-large .lyric-line.active-next .chord,
+  .play-mode .lyrics-large .lyric-line.active-next .chord-pill-inline {
+    background: #f5e3da;
+    color: #8a3819;
+  }
+  .play-mode .lyrics-large .lyric-line.active {
+    background: rgba(177, 74, 44, 0.10);
+    border-radius: 6px;
+  }
   /* Shape panel — its OWN row above the scrolling lyrics, so it never visually covers lyrics text.
      Height is user-resizable via the bottom drag handle (defaults set in JS at 220px). */
   .play-mode .play-shape-panel {
@@ -1620,7 +1645,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.3.1";
+const APP_VERSION = "4.4.0";
 
 //=============================================================
 // STORAGE
@@ -1666,6 +1691,15 @@ function initAuth() {
   auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true },
   });
+  // Safety net: if Supabase never fires INITIAL_SESSION (rare SDK hiccup), don't
+  // leave the loader spinning forever. After 3s, mark initialized and continue.
+  setTimeout(() => {
+    if (!auth.initialized) {
+      auth.initialized = true;
+      renderAuthArea();
+      renderDetail();
+    }
+  }, 3000);
   // Auth events Supabase emits — handled differently to avoid sign-in/sign-out flapping:
   //   INITIAL_SESSION  — once on listener attach. Real source of truth on page load.
   //   SIGNED_IN        — explicit sign-in (new session).
@@ -1812,7 +1846,13 @@ async function cloudSyncOut(songs) {
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(async () => {
     try {
-      const rows = songs.map(song => ({
+      // Defensive: only push songs with a valid id. Songs without ids will fail
+      // upsert with a cryptic message — drop them and log so we know.
+      const validSongs = songs.filter(s => s && s.id);
+      if (validSongs.length !== songs.length) {
+        console.warn("[cloudSyncOut] skipping", songs.length - validSongs.length, "songs without an id");
+      }
+      const rows = validSongs.map(song => ({
         id: song.id,
         user_id: auth.user.id,
         data: song,
@@ -1820,14 +1860,22 @@ async function cloudSyncOut(songs) {
       }));
       if (rows.length) {
         const { error } = await auth.client.from("songs").upsert(rows);
-        if (error) throw error;
+        if (error) {
+          // Surface what came back from PostgREST so we can see the real cause
+          // (RLS denial, schema mismatch, etc.) instead of a generic "save failed".
+          console.error("[cloudSyncOut] upsert error", error);
+          throw error;
+        }
       }
       // Detect deletions: any ID that was previously in cloud but isn't in current state
-      const currentIds = new Set(songs.map(s => s.id));
+      const currentIds = new Set(validSongs.map(s => s.id));
       const removed = [...auth.knownIds].filter(id => !currentIds.has(id));
       if (removed.length) {
         const { error } = await auth.client.from("songs").delete().in("id", removed);
-        if (error) throw error;
+        if (error) {
+          console.error("[cloudSyncOut] delete error", error);
+          throw error;
+        }
       }
       auth.knownIds = currentIds;
       setSyncStatus("synced");
@@ -1835,7 +1883,9 @@ async function cloudSyncOut(songs) {
       setTimeout(() => { if (auth.syncStatus === "synced") setSyncStatus("idle"); }, 2400);
     } catch (e) {
       console.warn("Cloud sync failed:", e);
-      setSyncStatus("error", e.message || String(e));
+      // Pull a useful message from PostgREST errors (which have message/details/hint).
+      const detail = e?.message || e?.error_description || e?.hint || String(e);
+      setSyncStatus("error", detail);
     }
   }, 600);
 }
@@ -2897,10 +2947,17 @@ function stackChordFromRoot(pcs, rootPc) {
   for (const { pc } of sorted) {
     let pos = fePosOfPc(pc);
     while (pos <= prev) pos += 12;
-    // If the next note would push past the 24-key range, allow wrap (cap at 23)
     if (pos > 23) pos = 23;
     positions.push(pos);
     prev = pos;
+  }
+  // Visual centering: if the lowest note (the root) lives in the bottom half of the
+  // F-to-E layout (positions 0–4: F, F♯, G, G♯, A) the chord renders flush-left, which
+  // looks lopsided. Bump the whole chord up an octave when (a) all notes still fit and
+  // (b) the highest note isn't already crowding the right edge.
+  if (positions.length && positions[0] <= 4) {
+    const shifted = positions.map(p => p + 12);
+    if (shifted[shifted.length - 1] <= 23) return shifted;
   }
   return positions;
 }
@@ -3784,15 +3841,14 @@ function wireLandingPage() {
 
 function renderDetail() {
   const el = document.getElementById("detail");
-  if (state.editing) { renderEditor(el); return; }
-  const song = state.songs.find(s => s.id === state.selectedId);
-  // === Loading gates (in priority order) — show preloaders instead of half-rendered states ===
+  // === Loading gates first — show preloaders instead of half-rendered states ===
   const hash = window.location.hash || "";
   const search = window.location.search || "";
   const inAuthCallback = /access_token=|refresh_token=|type=(magiclink|recovery|signup|invite)/.test(hash)
                       || /[?&]code=/.test(search);
   // Until Supabase resolves the initial session, show a clean loading shell rather
-  // than flashing the marketing landing page (which then snaps to the songbook).
+  // than flashing the marketing landing page or the editor (which would briefly show
+  // a "Sign in" button instead of the user chip while the session restores).
   const stillResolvingAuth = !auth.initialized && !!auth.client;
   if (inAuthCallback && !auth.user) {
     document.body.classList.remove("landing-active");
@@ -3804,6 +3860,10 @@ function renderDetail() {
     el.innerHTML = renderInitialLoader();
     return;
   }
+  // Editor (incl. extension/bookmarklet imports) only opens after auth has resolved
+  // so the auth chip and cloud sync are wired up before the user starts typing.
+  if (state.editing) { renderEditor(el); return; }
+  const song = state.songs.find(s => s.id === state.selectedId);
   // Landing page: no signed-in user, no song picked, hasn't dismissed → marketing view.
   const landingDismissed = localStorage.getItem("chordpad_landing_dismissed") === "1";
   const showLanding = !auth.user && !song && !landingDismissed;
@@ -3834,26 +3894,26 @@ function renderDetail() {
           const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
           return `
           <div class="song-controls" role="toolbar" aria-label="Song display controls">
-            <div class="sc-pill sc-key" title="Song key — use −/+ to transpose">
+            <div class="sc-section sc-key" title="Song key — use − / + to transpose">
               <span class="sc-cap">Key</span>
               <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
               <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
               <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
               <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
             </div>
-            <div class="sc-pill sc-acc" title="Display chord names with sharps or flats">
+            <div class="sc-section sc-acc" title="Display chord names with sharps or flats">
               <span class="sc-cap">Accidentals</span>
-              <div class="sc-segmented" role="radiogroup" aria-label="Accidentals">
+              <div class="sc-seg-row" role="radiogroup" aria-label="Accidentals">
                 <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
                 <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
               </div>
               <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
             </div>
             ${song.key ? `
-            <button class="sc-toggle-pill rn-pill" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" title="${song.showRoman ? "Hide Roman numerals" : `Show Roman numeral analysis (key of ${escapeHtml(song.key)})`}">
-              <span class="sc-cap">Roman numerals</span>
-              <span class="sc-on-off">${song.showRoman ? "On" : "Off"}</span>
-            </button>` : ""}
+            <div class="sc-section sc-analysis" data-rn-toggle role="button" tabindex="0" aria-pressed="${song.showRoman ? "true" : "false"}" title="${song.showRoman ? "Hide chord analysis (i, IV, V…)" : `Show how each chord relates to the key of ${escapeHtml(song.key)} (i, ii, IV, V…)`}">
+              <span class="sc-cap">Show analysis</span>
+              <span class="sc-toggle-state"><span class="sc-dot"></span>${song.showRoman ? "On" : "Off"}</span>
+            </div>` : ""}
           </div>`;
         })()}
       </div>
@@ -3917,13 +3977,17 @@ function renderDetail() {
       renderDetail();
     });
   });
-  // Roman numeral analysis toggle
+  // Show-analysis toggle (formerly "Roman numerals")
   el.querySelectorAll("[data-rn-toggle]").forEach(btn => {
-    btn.addEventListener("click", e => {
+    const toggle = e => {
       e.stopPropagation();
       song.showRoman = !song.showRoman;
       saveState({ songs: state.songs });
       renderDetail();
+    };
+    btn.addEventListener("click", toggle);
+    btn.addEventListener("keydown", e => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(e); }
     });
   });
   // ↺ reset accidentals to the song's original style
@@ -4005,6 +4069,26 @@ function attachLyricsDragDrop(detailEl, song) {
     if (lastHover) lastHover.classList.remove("drop-target");
     lastHover = null;
   }
+  // Visual drop indicator — a thin vertical line that follows the caret position
+  // during dragover so the user sees exactly where the chord will land.
+  let dropIndicator = null;
+  function showDropIndicator(x, lineEl) {
+    if (!dropIndicator) {
+      dropIndicator = document.createElement("div");
+      dropIndicator.className = "chord-drop-indicator";
+      lyricsEl.appendChild(dropIndicator);
+    }
+    const lineRect = lineEl.getBoundingClientRect();
+    const lyricsRect = lyricsEl.getBoundingClientRect();
+    dropIndicator.style.left = (x - lyricsRect.left) + "px";
+    dropIndicator.style.top  = (lineRect.top - lyricsRect.top + 4) + "px";
+    dropIndicator.style.height = (lineRect.height - 8) + "px";
+    dropIndicator.style.display = "block";
+  }
+  function hideDropIndicator() {
+    if (dropIndicator) dropIndicator.style.display = "none";
+  }
+
   lyricsEl.addEventListener("dragover", e => {
     if (![...e.dataTransfer.types].includes("application/x-chordpad-chord")) return;
     e.preventDefault();
@@ -4014,13 +4098,18 @@ function attachLyricsDragDrop(detailEl, song) {
       clearHover();
       if (targetLine) { targetLine.classList.add("drop-target"); lastHover = targetLine; }
     }
+    if (targetLine) showDropIndicator(e.clientX, targetLine);
+    else hideDropIndicator();
   });
   lyricsEl.addEventListener("dragleave", e => {
-    // Only clear when the cursor actually exits the lyrics block
-    if (!e.relatedTarget || !lyricsEl.contains(e.relatedTarget)) clearHover();
+    if (!e.relatedTarget || !lyricsEl.contains(e.relatedTarget)) {
+      clearHover();
+      hideDropIndicator();
+    }
   });
   lyricsEl.addEventListener("drop", e => {
     clearHover();
+    hideDropIndicator();
     const raw = e.dataTransfer.getData("application/x-chordpad-chord");
     if (!raw) return;
     e.preventDefault();
@@ -4030,45 +4119,11 @@ function attachLyricsDragDrop(detailEl, song) {
     if (!targetLineEl) return;
     const targetLineIdx = parseInt(targetLineEl.dataset.lineIdx, 10);
     if (isNaN(targetLineIdx)) return;
-    // Decide insertion slot — before-a-chord-pill (geometric L/R half) or text-offset.
-    const slot = computeDropSlot(targetLineEl, e.clientX, e.clientY);
-    moveChordInLyrics(song, payload, targetLineIdx, slot);
+    // Pure caret-position-based drop. No "swap with neighbor" heuristic — the chord
+    // lands exactly at the character closest to where the user dropped it.
+    const targetCharIdx = textOffsetInLineFromPoint(targetLineEl, e.clientX, e.clientY);
+    moveChordInLyrics(song, payload, targetLineIdx, { textOffset: targetCharIdx });
   });
-
-  // Compute insertion slot. Two flavors:
-  //   { beforeChordPillIdx: N }   — insert immediately before the N-th chord token in the line
-  //   { textOffset: N }            — split a text token at character N
-  function computeDropSlot(lineEl, x, y) {
-    // Did we drop on (or very near) an existing chord pill? If so, decide left/right.
-    const allPills = [...lineEl.querySelectorAll(".chord, .chord-pill-inline")];
-    let nearest = null, nearestDist = Infinity, nearestSide = "right";
-    for (const pill of allPills) {
-      const r = pill.getBoundingClientRect();
-      // vertical proximity gate (covers absolute-positioned chord pills above lyric text)
-      const vClose = (y >= r.top - 6 && y <= r.bottom + 14);
-      if (!vClose) continue;
-      let dx = 0;
-      if (x < r.left)      dx = r.left - x;
-      else if (x > r.right) dx = x - r.right;
-      else                  dx = 0;
-      if (dx < nearestDist) {
-        nearestDist = dx;
-        nearest = pill;
-        const mid = (r.left + r.right) / 2;
-        nearestSide = (x < mid) ? "left" : "right";
-      }
-    }
-    if (nearest && nearestDist < 24) {
-      const pillIdx = parseInt(nearest.dataset.pillIdx, 10);
-      if (nearestSide === "left") {
-        return { beforeChordPillIdx: pillIdx };
-      }
-      // Right side of pill = AFTER this pill's chord. That's equivalent to
-      // "before the (pillIdx + 1)-th chord OR end of line" — handled by textOffset
-      // approach since text-offset 0 within the pill's seg means "right after this chord".
-    }
-    return { textOffset: textOffsetInLineFromPoint(lineEl, x, y) };
-  }
 
   function lineFromPoint(x, y) {
     const el = document.elementFromPoint(x, y);
@@ -4714,12 +4769,28 @@ function openPlayMode(song) {
       if (dist < nearestDist) { nearestDist = dist; focused = el; }
     }
     // Mark the focused chord's line as active so CSS can show the dot ONLY there.
-    // Done BEFORE the early return so the dot still shows even when shapes panel is closed.
+    // Also mark the NEXT line with chords as `.active-next` so the player can preview
+    // what's coming. "Next" = the next .lyric-line.has-chord after the active one.
     const newActive = focused ? focused.closest(".lyric-line") : null;
     const prevActive = content.querySelector(".lyric-line.active");
     if (prevActive !== newActive) {
       if (prevActive) prevActive.classList.remove("active");
       if (newActive) newActive.classList.add("active");
+    }
+    const prevNext = content.querySelector(".lyric-line.active-next");
+    let newNext = null;
+    if (newActive) {
+      let n = newActive.nextElementSibling;
+      while (n) {
+        if (n.classList && n.classList.contains("lyric-line") && n.classList.contains("has-chord")) {
+          newNext = n; break;
+        }
+        n = n.nextElementSibling;
+      }
+    }
+    if (prevNext !== newNext) {
+      if (prevNext) prevNext.classList.remove("active-next");
+      if (newNext) newNext.classList.add("active-next");
     }
     if (!focused) {
       shapeDiag.innerHTML = "";
