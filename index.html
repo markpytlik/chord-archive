@@ -1671,7 +1671,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.0";
+const APP_VERSION = "4.5.1";
 
 //=============================================================
 // STORAGE
@@ -2008,9 +2008,20 @@ function renderAuthArea() {
       area.classList.remove("open");
       openSettingsModal();
     });
-    document.getElementById("btn-signout").addEventListener("click", async () => {
+    document.getElementById("btn-signout").addEventListener("click", () => {
       area.classList.remove("open");
-      await auth.client.auth.signOut();
+      // Optimistic sign-out: flip the UI to guest state immediately, then fire the
+      // network call in the background. The earlier `await auth.client.auth.signOut()`
+      // froze the UI for 3–4 seconds (network round-trip + event-handler chain) and
+      // there's no useful info to wait for — if the server call fails, the user is
+      // still logged out locally, which is what they wanted.
+      if (auth.user) {
+        auth.user = null;
+        onSignOut();
+        renderAuthArea();
+        renderDetail();
+      }
+      auth.client.auth.signOut().catch(e => console.warn("[auth] signOut background error", e));
     });
     // Click anywhere else closes the menu
     document.addEventListener("click", () => area.classList.remove("open"), { once: true });
