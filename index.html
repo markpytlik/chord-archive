@@ -740,6 +740,46 @@
     flex-shrink: 0; padding-right: 6px;
   }
 
+  /* ====================== Branded loader (auth init / magic link callback) ====================== */
+  .cp-loader {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 60vh;
+    gap: 18px;
+    color: var(--ink);
+    text-align: center;
+  }
+  .cp-loader .cp-loader-mark {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+  }
+  .cp-loader .cp-loader-mark .cp-glyph,
+  .cp-loader .cp-loader-mark .cp-accent {
+    color: var(--accent);
+  }
+  .cp-loader .cp-loader-mark .cp-accent {
+    font-style: italic;
+  }
+  .cp-loader .cp-spinner {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2.5px solid var(--accent-soft);
+    border-top-color: var(--accent);
+    animation: cp-spin .8s linear infinite;
+  }
+  @keyframes cp-spin { to { transform: rotate(360deg); } }
+  .cp-loader .cp-loader-msg {
+    font-size: 15px;
+    font-family: var(--sans);
+    color: var(--ink-soft);
+    letter-spacing: .01em;
+  }
+  .cp-loader .cp-loader-hint {
+    font-size: 12.5px; color: var(--muted); margin-top: -8px;
+  }
+
   /* ====================== Practice mode overlay ====================== */
   .practice-overlay {
     position: fixed; inset: 0; z-index: 50;
@@ -1580,7 +1620,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.3.0";
+const APP_VERSION = "4.3.1";
 
 //=============================================================
 // STORAGE
@@ -3648,6 +3688,27 @@ function selectSong(id) {
 // LANDING PAGE — what an unauthenticated visitor sees on first arrival.
 // Two CTAs: sign up free (opens auth modal in signup mode) or browse demo songs (dismisses landing,
 // drops them into the seed library). Dismissal is sticky via localStorage so refreshes don't pester them.
+// Branded loading shells — used on initial auth resolution and during magic-link callbacks.
+function renderInitialLoader() {
+  return `
+    <div class="cp-loader">
+      <div class="cp-loader-mark"><span class="cp-glyph">♪</span> Chord<span class="cp-accent">pad</span></div>
+      <div class="cp-spinner" aria-hidden="true"></div>
+      <div class="cp-loader-msg">Loading your songbook…</div>
+    </div>
+  `;
+}
+function renderAuthCallbackLoader() {
+  return `
+    <div class="cp-loader">
+      <div class="cp-loader-mark"><span class="cp-glyph">♪</span> Chord<span class="cp-accent">pad</span></div>
+      <div class="cp-spinner" aria-hidden="true"></div>
+      <div class="cp-loader-msg">Signing you in…</div>
+      <div class="cp-loader-hint">Finishing up — this should only take a moment.</div>
+    </div>
+  `;
+}
+
 function renderLandingPage() {
   // Three demo chord pills with sample voicings — visual anchor for "what is this thing"
   const demoChords = [
@@ -3725,16 +3786,22 @@ function renderDetail() {
   const el = document.getElementById("detail");
   if (state.editing) { renderEditor(el); return; }
   const song = state.songs.find(s => s.id === state.selectedId);
-  // Mid-magic-link callback: hash carries access_token / refresh_token until Supabase parses it,
-  // or query has ?code=... for OAuth/PKCE. During that window auth.user is briefly null —
-  // show a spinner instead of the landing page so users don't see a marketing flash.
+  // === Loading gates (in priority order) — show preloaders instead of half-rendered states ===
   const hash = window.location.hash || "";
   const search = window.location.search || "";
   const inAuthCallback = /access_token=|refresh_token=|type=(magiclink|recovery|signup|invite)/.test(hash)
                       || /[?&]code=/.test(search);
+  // Until Supabase resolves the initial session, show a clean loading shell rather
+  // than flashing the marketing landing page (which then snaps to the songbook).
+  const stillResolvingAuth = !auth.initialized && !!auth.client;
   if (inAuthCallback && !auth.user) {
     document.body.classList.remove("landing-active");
-    el.innerHTML = `<div class="empty"><h2>Signing you in…</h2><p>One moment.</p></div>`;
+    el.innerHTML = renderAuthCallbackLoader();
+    return;
+  }
+  if (stillResolvingAuth) {
+    document.body.classList.remove("landing-active");
+    el.innerHTML = renderInitialLoader();
     return;
   }
   // Landing page: no signed-in user, no song picked, hasn't dismissed → marketing view.
