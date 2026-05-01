@@ -1672,7 +1672,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.2";
+const APP_VERSION = "4.5.3";
 
 //=============================================================
 // STORAGE
@@ -1731,12 +1731,17 @@ function initAuth() {
   // hangs and so does every subsequent query (including getSession). Race a quick
   // session probe against a 5s timeout — if it loses, force-sign-out so the user
   // can sign back in cleanly instead of staring at a frozen "Saving…" indicator.
+  // Diagnostic only — don't auto-purge on timeout. Earlier auto-purge was kicking
+  // out users whose getSession() simply took 5+ seconds to resolve (e.g. extension
+  // opens a new tab and the SDK takes its time). Surface a visible reconnect
+  // option via the sync indicator instead; never destroy a session preemptively.
   Promise.race([
     auth.client.auth.getSession(),
-    new Promise((_, rej) => setTimeout(() => rej(new Error("getSession hung")), 5000)),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("getSession >10s")), 10000)),
   ]).catch((e) => {
-    console.warn("[auth] session probe hung — purging session and reloading", e);
-    forceSessionPurgeAndReload();
+    if (auth.initialized) return; // it actually resolved later — false alarm
+    console.warn("[auth] session probe took longer than 10s; not auto-purging", e);
+    setSyncStatus("error", "Session is slow to load. Click to reconnect if it stays stuck.");
   });
   // Safety net: if Supabase never fires INITIAL_SESSION (rare SDK hiccup), don't
   // leave the loader spinning forever. After 3s, mark initialized and continue.
