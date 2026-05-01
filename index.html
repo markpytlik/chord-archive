@@ -1655,7 +1655,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.4.1";
+const APP_VERSION = "4.4.2";
 
 //=============================================================
 // STORAGE
@@ -1851,13 +1851,27 @@ function renderSyncIndicator() {
 }
 window.addEventListener("offline", () => { if (auth.user) setSyncStatus("offline"); });
 window.addEventListener("online",  () => { if (auth.user && auth.syncStatus === "offline") setSyncStatus("idle"); });
+// Race a promise against a wall-clock timeout. The timeout rejects with a
+// distinctive error so we can tell "request hung" from "request errored".
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function cloudSyncOut(songs) {
-  if (!auth.client || !auth.user) return;
+  if (!auth.client) { console.warn("[cloudSyncOut] no auth.client"); return; }
+  if (!auth.user)   { console.warn("[cloudSyncOut] no auth.user");   return; }
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     setSyncStatus("offline");
     return;
   }
   setSyncStatus("syncing");
+  console.log("[cloudSyncOut] queueing sync; songs=", songs.length, "userId=", auth.user.id);
   // Debounce — coalesce rapid mutations into a single round trip.
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(async () => {
@@ -1874,11 +1888,14 @@ async function cloudSyncOut(songs) {
         data: song,
         updated_at: new Date(song.updatedAt || Date.now()).toISOString(),
       }));
+      console.log("[cloudSyncOut] upserting", rows.length, "rows");
       if (rows.length) {
-        const { error } = await auth.client.from("songs").upsert(rows);
+        const { error } = await withTimeout(
+          auth.client.from("songs").upsert(rows),
+          15000,
+          "songs upsert"
+        );
         if (error) {
-          // Surface what came back from PostgREST so we can see the real cause
-          // (RLS denial, schema mismatch, etc.) instead of a generic "save failed".
           console.error("[cloudSyncOut] upsert error", error);
           throw error;
         }
@@ -1887,19 +1904,23 @@ async function cloudSyncOut(songs) {
       const currentIds = new Set(validSongs.map(s => s.id));
       const removed = [...auth.knownIds].filter(id => !currentIds.has(id));
       if (removed.length) {
-        const { error } = await auth.client.from("songs").delete().in("id", removed);
+        const { error } = await withTimeout(
+          auth.client.from("songs").delete().in("id", removed),
+          15000,
+          "songs delete"
+        );
         if (error) {
           console.error("[cloudSyncOut] delete error", error);
           throw error;
         }
       }
       auth.knownIds = currentIds;
+      console.log("[cloudSyncOut] sync complete");
       setSyncStatus("synced");
-      // Fade the indicator back to idle after a moment so it doesn't sit there forever.
       setTimeout(() => { if (auth.syncStatus === "synced") setSyncStatus("idle"); }, 2400);
     } catch (e) {
-      console.warn("Cloud sync failed:", e);
-      // Pull a useful message from PostgREST errors (which have message/details/hint).
+      // Surface as an explicit error in console so it's easy to see even at default log level.
+      console.error("[cloudSyncOut] FAILED", e);
       const detail = e?.message || e?.error_description || e?.hint || String(e);
       setSyncStatus("error", detail);
     }
