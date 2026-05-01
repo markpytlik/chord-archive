@@ -283,26 +283,53 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  .detail-head h1 .key-inline {
+  /* === Pill system: each pill is a colored capsule split into a "state" segment and
+     a "controls" segment. Same color group, but the state half has a slightly more
+     saturated tint and a thin divider separates it from the +/-/↺ controls. === */
+  .detail-head h1 .key-inline,
+  .detail-head h1 .acc-pill {
     display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    align-items: stretch;
     vertical-align: middle;
-    margin-left: 32px;
     margin-bottom: 6px;
     font-family: var(--sans);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: .04em;
     text-transform: uppercase;
-    background: var(--accent-soft);
+    border-radius: 999px;
+    overflow: hidden;
+    line-height: 1;
+  }
+  .detail-head h1 .key-inline .pill-state,
+  .detail-head h1 .acc-pill .pill-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 11px;
+  }
+  .detail-head h1 .key-inline .pill-ctrls,
+  .detail-head h1 .acc-pill .pill-ctrls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 4px;
+  }
+  /* === KEY pill (warm rust) === */
+  .detail-head h1 .key-inline {
+    margin-left: 32px;
+    background: #fbe1d4;
     color: var(--accent-deep);
     border: 1px solid #ecccc0;
-    padding: 3px 4px 3px 10px;
-    border-radius: 999px;
   }
-  .detail-head h1 .key-inline .key-pre { opacity: .7; }
-  .detail-head h1 .key-inline .key-name { font-weight: 500; }
+  .detail-head h1 .key-inline .pill-state {
+    background: #f5cdb9;
+  }
+  .detail-head h1 .key-inline .pill-ctrls {
+    background: #fbe9df;
+  }
+  .detail-head h1 .key-inline .key-pre { opacity: .8; }
+  .detail-head h1 .key-inline .key-name { font-weight: 700; letter-spacing: .04em; }
   .detail-head h1 .key-inline .key-name.transposed { font-style: normal; }
   .detail-head h1 .key-inline .transpose-btn {
     background: transparent;
@@ -311,38 +338,29 @@
     font-size: 16px;
     font-weight: 700;
     line-height: 1;
-    padding: 0 5px;
+    padding: 0 6px;
     cursor: pointer;
-    border-radius: 999px;
     font-family: var(--sans);
-    opacity: .55;
+    opacity: .65;
     transition: opacity .12s, background .12s;
   }
   .detail-head h1 .key-inline .transpose-btn:hover:not(:disabled) {
     opacity: 1;
-    background: rgba(177, 74, 44, .15);
+    background: rgba(177, 74, 44, .18);
   }
-  .detail-head h1 .key-inline .transpose-btn:disabled {
-    opacity: .25; cursor: default;
-  }
-  /* Accidental pill — same shape as the key pill, different (cool blue) palette so it reads as a separate control. */
+  .detail-head h1 .key-inline .transpose-btn:disabled { opacity: .3; cursor: default; }
+  /* === ACCIDENTAL pill (cool blue) === */
   .detail-head h1 .acc-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    vertical-align: middle;
     margin-left: 8px;
-    margin-bottom: 6px;
-    font-family: var(--sans);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    background: #e8eef9;
+    background: #dde6f4;
     color: #2c5fbf;
     border: 1px solid #cbd6ec;
-    padding: 3px 4px 3px 10px;
-    border-radius: 999px;
+  }
+  .detail-head h1 .acc-pill .pill-state {
+    background: #c9d6ee;
+  }
+  .detail-head h1 .acc-pill .pill-ctrls {
+    background: #e3eaf6;
   }
   .detail-head h1 .acc-pill .acc-toggle,
   .detail-head h1 .acc-pill .acc-reset {
@@ -356,30 +374,30 @@
     transition: opacity .12s, background .12s;
     border-radius: 999px;
   }
+  .detail-head h1 .acc-pill .acc-toggle {
+    display: inline-flex; align-items: center; gap: 4px;
+    letter-spacing: .04em;
+  }
   .detail-head h1 .acc-pill .acc-toggle:hover { opacity: .75; }
   .detail-head h1 .acc-pill .acc-toggle .acc-glyph {
     font-family: var(--serif);
     font-size: 16px;
     font-weight: 700;
     line-height: 1;
-    margin-left: 4px;
     text-transform: none;
   }
   .detail-head h1 .acc-pill .acc-reset {
     font-size: 16px;
     font-weight: 700;
-    padding: 0 5px;
-    margin-left: 4px;
-    opacity: .55;
+    padding: 0 6px;
+    opacity: .65;
     text-transform: none;
   }
   .detail-head h1 .acc-pill .acc-reset:hover:not(:disabled) {
     opacity: 1;
-    background: rgba(44, 95, 191, .15);
+    background: rgba(44, 95, 191, .18);
   }
-  .detail-head h1 .acc-pill .acc-reset:disabled {
-    opacity: .25; cursor: default;
-  }
+  .detail-head h1 .acc-pill .acc-reset:disabled { opacity: .3; cursor: default; }
   /* Roman-numeral toggle pill — green palette so it's distinct from key/accidental pills. */
   .detail-head h1 .rn-pill {
     display: inline-flex;
@@ -413,7 +431,12 @@
     letter-spacing: .02em;
     text-transform: none;
   }
-  .lyrics .seg .chord .rn-tag { position: absolute; left: 0; top: 100%; margin-top: 2px; }
+  .lyrics .seg .chord .rn-tag { position: absolute; left: 0; top: 100%; margin-top: 3px; }
+  /* When Roman numerals are showing, give chord pills more vertical breathing room
+     so the rn-tag below the pill doesn't crowd the lyric line. */
+  .lyrics.show-roman .seg { padding-top: 2.55em; }
+  .lyrics.show-roman .chord-only-row { line-height: 1.85; margin-bottom: .45em; }
+  .lyrics.show-roman .chord-pill-inline { margin-bottom: 6px; }
   .detail-head .title-block { min-width: 0; }
   .detail-head h1 .source-corner {
     display: inline-block;
@@ -478,6 +501,18 @@
     background: #dcdbd6; transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
   }
+  /* Drag-and-drop visuals */
+  .lyrics .chord.dragging,
+  .lyrics .chord-pill-inline.dragging {
+    opacity: .35;
+  }
+  .lyrics .lyric-line.drop-target {
+    background: rgba(177, 74, 44, .08);
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(177, 74, 44, .25);
+  }
+  .lyrics .chord, .lyrics .chord-pill-inline { cursor: grab; }
+  .lyrics .chord:active, .lyrics .chord-pill-inline:active { cursor: grabbing; }
   .lyrics .section-label {
     color: var(--accent);
     font-weight: 700;
@@ -1250,6 +1285,19 @@
   }
   header .auth-area .user-chip:hover { background: #ece8db; }
   header .auth-area .user-chip .user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  /* Cloud-save status indicator next to the user chip */
+  header .auth-area .sync-indicator {
+    font-family: var(--sans); font-size: 11.5px; font-weight: 500;
+    letter-spacing: .02em;
+    padding: 0 6px;
+    color: var(--muted);
+    transition: opacity .25s, color .25s;
+  }
+  header .auth-area .sync-indicator:empty { padding: 0; }
+  header .auth-area .sync-indicator.syncing { color: var(--accent); }
+  header .auth-area .sync-indicator.synced  { color: var(--good); }
+  header .auth-area .sync-indicator.error   { color: #b41a1a; font-weight: 600; }
+  header .auth-area .sync-indicator.offline { color: var(--muted); font-style: italic; }
   header .auth-area .user-menu {
     position: absolute; top: 100%; right: 0; margin-top: 6px;
     min-width: 220px; background: var(--panel); border: 1px solid var(--line);
@@ -1302,14 +1350,6 @@
   <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
   <button id="header-fetch" class="primary" title="Fetch & import this URL">Import URL</button>
   <button id="btn-new">+ New Song</button>
-  <div class="header-menu" tabindex="0">
-    <button id="btn-menu" class="ghost" title="More" aria-label="More options" aria-haspopup="true">⋯</button>
-    <div id="menu-pop" class="header-menu-pop">
-      <button id="btn-import">Import JSON backup…</button>
-      <button id="btn-export">Export all as JSON</button>
-      <button id="btn-bookmarklet-shortcut">Get bookmarklet…</button>
-    </div>
-  </div>
   <div id="auth-area" class="auth-area">
     <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>
   </div>
@@ -1423,7 +1463,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.0.0";
+const APP_VERSION = "4.1.0";
 
 //=============================================================
 // STORAGE
@@ -1469,10 +1509,19 @@ function initAuth() {
   auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true },
   });
-  // Listen for sign-in / sign-out events
+  // Listen for sign-in / sign-out / password-recovery events
   auth.client.auth.onAuthStateChange(async (event, session) => {
     if (session) {
       auth.user = { id: session.user.id, email: session.user.email };
+      // PASSWORD_RECOVERY fires when the user lands here from the reset-password email.
+      // Show a "set new password" form before letting them proceed.
+      if (event === "PASSWORD_RECOVERY") {
+        openPasswordRecoveryModal();
+        // Clear the recovery hash so it doesn't re-fire / look weird in the URL.
+        if (window.history.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+      }
       await onSignIn();
     } else {
       auth.user = null;
@@ -1536,8 +1585,38 @@ function onSignOut() {
 
 // Push the full song list to cloud — upserts new/changed, deletes anything that's been removed locally.
 let cloudSyncTimer = null;
+function setSyncStatus(state, detail) {
+  // state: "idle" | "syncing" | "synced" | "error" | "offline"
+  auth.syncStatus = state;
+  auth.syncDetail = detail || "";
+  renderSyncIndicator();
+}
+function renderSyncIndicator() {
+  const el = document.getElementById("sync-indicator");
+  if (!el) return;
+  if (!auth.user) { el.textContent = ""; el.className = "sync-indicator"; el.title = ""; return; }
+  const s = auth.syncStatus || "idle";
+  const map = {
+    idle:    { txt: "",                 cls: "sync-indicator",         tip: "" },
+    syncing: { txt: "↻ Saving…",        cls: "sync-indicator syncing", tip: "Saving to your cloud library" },
+    synced:  { txt: "✓ Saved to cloud", cls: "sync-indicator synced",  tip: "All changes saved to your cloud library" },
+    error:   { txt: "⚠ Save failed",    cls: "sync-indicator error",   tip: "Couldn't save to cloud: " + (auth.syncDetail || "unknown error") + " — your changes are still safe locally" },
+    offline: { txt: "Offline",          cls: "sync-indicator offline", tip: "No network — changes saved locally and will sync when you're back online" },
+  };
+  const m = map[s] || map.idle;
+  el.textContent = m.txt;
+  el.className = m.cls;
+  el.title = m.tip;
+}
+window.addEventListener("offline", () => { if (auth.user) setSyncStatus("offline"); });
+window.addEventListener("online",  () => { if (auth.user && auth.syncStatus === "offline") setSyncStatus("idle"); });
 async function cloudSyncOut(songs) {
   if (!auth.client || !auth.user) return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    setSyncStatus("offline");
+    return;
+  }
+  setSyncStatus("syncing");
   // Debounce — coalesce rapid mutations into a single round trip.
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(async () => {
@@ -1549,16 +1628,24 @@ async function cloudSyncOut(songs) {
         updated_at: new Date(song.updatedAt || Date.now()).toISOString(),
       }));
       if (rows.length) {
-        await auth.client.from("songs").upsert(rows);
+        const { error } = await auth.client.from("songs").upsert(rows);
+        if (error) throw error;
       }
       // Detect deletions: any ID that was previously in cloud but isn't in current state
       const currentIds = new Set(songs.map(s => s.id));
       const removed = [...auth.knownIds].filter(id => !currentIds.has(id));
       if (removed.length) {
-        await auth.client.from("songs").delete().in("id", removed);
+        const { error } = await auth.client.from("songs").delete().in("id", removed);
+        if (error) throw error;
       }
       auth.knownIds = currentIds;
-    } catch (e) { console.warn("Cloud sync failed:", e); }
+      setSyncStatus("synced");
+      // Fade the indicator back to idle after a moment so it doesn't sit there forever.
+      setTimeout(() => { if (auth.syncStatus === "synced") setSyncStatus("idle"); }, 2400);
+    } catch (e) {
+      console.warn("Cloud sync failed:", e);
+      setSyncStatus("error", e.message || String(e));
+    }
   }, 600);
 }
 
@@ -1568,17 +1655,24 @@ function renderAuthArea() {
   if (!area) return;
   if (auth.user) {
     area.innerHTML = `
+      <span id="sync-indicator" class="sync-indicator"></span>
       <button class="user-chip" id="user-chip" title="Signed in as ${escapeHtml(auth.user.email)}">
         <span class="user-dot"></span>${escapeHtml(auth.user.email)}
       </button>
       <div class="user-menu">
         <div class="user-email">${escapeHtml(auth.user.email)}</div>
+        <button id="btn-settings">Settings…</button>
         <button id="btn-signout">Sign out</button>
       </div>
     `;
+    renderSyncIndicator();
     document.getElementById("user-chip").addEventListener("click", e => {
       e.stopPropagation();
       area.classList.toggle("open");
+    });
+    document.getElementById("btn-settings").addEventListener("click", () => {
+      area.classList.remove("open");
+      openSettingsModal();
     });
     document.getElementById("btn-signout").addEventListener("click", async () => {
       area.classList.remove("open");
@@ -1587,7 +1681,10 @@ function renderAuthArea() {
     // Click anywhere else closes the menu
     document.addEventListener("click", () => area.classList.remove("open"), { once: true });
   } else {
-    area.innerHTML = `<button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>`;
+    area.innerHTML = `
+      <button id="btn-settings-guest" class="ghost" title="Import / Export / Bookmarklet" aria-label="Settings">⚙</button>
+      <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>`;
+    document.getElementById("btn-settings-guest").addEventListener("click", openSettingsModal);
     document.getElementById("btn-signin").addEventListener("click", openAuthModal);
   }
 }
@@ -1703,6 +1800,57 @@ async function doAuth(mode, bg) {
     }
   } catch (e) {
     setAuthMsg(bg, "err", e.message || "Something went wrong.");
+  }
+}
+
+// Modal shown when the user lands here via a password-reset email.
+// Lets them choose a new password, then drops them into the app signed in.
+function openPasswordRecoveryModal() {
+  if (!auth.client) return;
+  // If a recovery modal is already open (e.g. event re-fired), don't stack.
+  if (document.querySelector(".pw-recovery-modal")) return;
+  const bg = document.createElement("div");
+  bg.className = "modal-bg auth-modal pw-recovery-modal";
+  bg.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <h3>Set a new password</h3>
+      <div class="modal-sub">You're signed in. Pick a new password to use next time you sign in with one.</div>
+      <label for="pwr-password">New password</label>
+      <input id="pwr-password" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
+      <label for="pwr-password2">Confirm</label>
+      <input id="pwr-password2" type="password" autocomplete="new-password" placeholder="Type it again" />
+      <div id="auth-msg" class="auth-msg"></div>
+      <div class="actions">
+        <button id="pwr-save" class="primary">Save new password</button>
+      </div>
+      <div class="actions" style="margin-top: 8px;">
+        <button id="pwr-skip" class="ghost">Skip — I'll do this later</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+  setTimeout(() => bg.querySelector("#pwr-password").focus(), 50);
+  bg.querySelector("#pwr-skip").addEventListener("click", () => bg.remove());
+  bg.querySelector("#pwr-save").addEventListener("click", () => doSavePasswordRecovery(bg));
+  const submitOnEnter = e => { if (e.key === "Enter") doSavePasswordRecovery(bg); };
+  bg.querySelector("#pwr-password").addEventListener("keydown", submitOnEnter);
+  bg.querySelector("#pwr-password2").addEventListener("keydown", submitOnEnter);
+}
+
+async function doSavePasswordRecovery(bg) {
+  const p1 = bg.querySelector("#pwr-password").value;
+  const p2 = bg.querySelector("#pwr-password2").value;
+  if (!p1 || p1.length < 6) { setAuthMsg(bg, "err", "At least 6 characters."); return; }
+  if (p1 !== p2) { setAuthMsg(bg, "err", "Passwords don't match."); return; }
+  setAuthMsg(bg, "busy", "Saving new password…");
+  try {
+    const { error } = await auth.client.auth.updateUser({ password: p1 });
+    if (error) throw error;
+    setAuthMsg(bg, "ok", "Password updated. You're all set.");
+    setTimeout(() => bg.remove(), 900);
+  } catch (e) {
+    setAuthMsg(bg, "err", e.message || "Couldn't save the password.");
   }
 }
 
@@ -2581,11 +2729,13 @@ function normalizePianoNotes(notes, rootPc) {
 function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
   const positions = normalizePianoNotes(notesIn, rootPc);
   const positionSet = new Set(positions);
-  const dim = size === "sm" ? { whiteW: 18, whiteH: 80, blackW: 11, blackH: 50 } :
-              size === "lg" ? { whiteW: 26, whiteH: 110, blackW: 16, blackH: 70 } :
-                              { whiteW: 22, whiteH: 100, blackW: 13, blackH: 62 };
+  // Slimmer white keys; all "hit" keys share the same blue. Root marked with a small dot.
+  const dim = size === "sm" ? { whiteW: 14, whiteH: 76, blackW:  9, blackH: 46 } :
+              size === "lg" ? { whiteW: 22, whiteH: 110, blackW: 14, blackH: 70 } :
+                              { whiteW: 18, whiteH: 96, blackW: 11, blackH: 60 };
   const { whiteW, whiteH, blackW, blackH } = dim;
   const W = whiteW * FE_WHITE_POSITIONS.length, H = whiteH;
+  const HIT_BLUE = "#2c5fbf";
   // Explicit width/height so SVG has intrinsic pixel size when not constrained by container.
   // Combined with max-width:100% it stays responsive in narrow contexts.
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
@@ -2594,21 +2744,32 @@ function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
     const pos = FE_WHITE_POSITIONS[i];
     const pc = fePcOfPosition(pos);
     const isHit = positionSet.has(pos);
-    const isRoot = (rootPc !== undefined && rootPc !== null && pc === rootPc);
+    const isRoot = isHit && (rootPc !== undefined && rootPc !== null && pc === rootPc);
     const x = i * whiteW;
-    const fill = isHit && isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#fff");
+    const fill = isHit ? HIT_BLUE : "#fff";
     svg += `<rect x="${x}" y="0" width="${whiteW}" height="${whiteH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
     if (isHit) svg += `<text x="${x + whiteW/2}" y="${whiteH - 10}" text-anchor="middle" font-size="9" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(pc)}</text>`;
+    if (isRoot) {
+      // Small white dot near the top of the key marks the root
+      const cx = x + whiteW/2;
+      const cy = 12;
+      svg += `<circle cx="${cx}" cy="${cy}" r="2.6" fill="#fff"/>`;
+    }
   }
   // Black keys
   for (const bk of FE_BLACK_KEYS) {
     const pc = fePcOfPosition(bk.pos);
     const isHit = positionSet.has(bk.pos);
-    const isRoot = (rootPc !== undefined && rootPc !== null && pc === rootPc);
+    const isRoot = isHit && (rootPc !== undefined && rootPc !== null && pc === rootPc);
     const x = (bk.whiteIdx + 1) * whiteW - blackW/2;
-    const fill = isHit && isRoot ? "#14296b" : (isHit ? "#2c5fbf" : "#14161a");
+    const fill = isHit ? HIT_BLUE : "#14161a";
     svg += `<rect x="${x}" y="0" width="${blackW}" height="${blackH}" fill="${fill}" stroke="#14161a" stroke-width="1"/>`;
     if (isHit) svg += `<text x="${x + blackW/2}" y="${blackH - 8}" text-anchor="middle" font-size="8" fill="#fff" font-family="ui-sans-serif" font-weight="600">${pcToName(pc)}</text>`;
+    if (isRoot) {
+      const cx = x + blackW/2;
+      const cy = 9;
+      svg += `<circle cx="${cx}" cy="${cy}" r="2.2" fill="#fff"/>`;
+    }
   }
   svg += `</svg>`;
   return svg;
@@ -3024,10 +3185,24 @@ async function importFromUrl(url) {
   try {
     html = await fetchViaProxy(url);
   } catch (e) {
-    throw new Error("Proxy fetch failed: " + e.message + ". Use the bookmarklet for sites that block proxies (UG, etc.).");
+    throw new Error("Proxy fetch failed: " + e.message + ". Use the browser extension on sites that block proxies.");
   }
   if (isCloudflareChallenge(html)) {
-    throw new Error("This site (e.g. Ultimate Guitar) is behind Cloudflare bot-protection and can't be fetched by a CORS proxy. Use the bookmarklet — it runs in your browser session, where you're a real user.");
+    throw new Error("This site is behind Cloudflare bot-protection and can't be fetched server-side. Use the browser extension — it scrapes the page in your real browser session.");
+  }
+  // Detect "the proxy got through but the site redirected us to an artist landing or
+  // generic page" (common on e-chords / cifras sites when they suspect a bot).
+  // Heuristic: og:url's pathname has noticeably less depth than the requested URL.
+  const ogUrlMatch = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)/i);
+  if (ogUrlMatch) {
+    try {
+      const ogUrl = new URL(decodeHtmlEntities(ogUrlMatch[1]));
+      const reqDepth = new URL(url).pathname.replace(/\/$/, "").split("/").length;
+      const ogDepth  = ogUrl.pathname.replace(/\/$/, "").split("/").length;
+      if (ogDepth < reqDepth - 1) {
+        throw new Error("The site served us a different (probably artist or homepage) than the song URL — bot detection. Use the browser extension instead.");
+      }
+    } catch (e) { if (e.message?.startsWith("The site served")) throw e; /* URL parse failure: ignore */ }
   }
 
   let parsed = null;
@@ -3038,7 +3213,7 @@ async function importFromUrl(url) {
   }
   if (!parsed || !parsed.lyrics) parsed = parseGenericPre(html);
   if (!parsed || !parsed.lyrics) {
-    throw new Error("Couldn't find a chord chart on that page. Try paste-and-parse, or use the bookmarklet.");
+    throw new Error("Couldn't find a chord chart on that page. The site may have changed its layout, or it returned a non-song page. Try the browser extension or paste-and-parse.");
   }
   if (!parsed.title || !parsed.artist) {
     const meta = parseTitleArtistFromHtml(html);
@@ -3138,7 +3313,8 @@ function renderLyrics(text, song) {
   if (!text) return `<div class="muted">No lyrics yet — click <em>Edit</em> to add some.</div>`;
   const rawLines = text.replace(/\r\n/g, "\n").split("\n");
   // Pre-condense: if two chord-only lines have identical chord sets, merge them
-  // (skipping any blank lines in between).
+  // (skipping any blank lines in between). Each rendered line records its source raw line idx
+  // and how many raw lines it represents so drag-and-drop can map back to the lyrics string.
   const lines = [];
   for (let i = 0; i < rawLines.length; i++) {
     const ln = rawLines[i];
@@ -3153,10 +3329,10 @@ function renderLyrics(text, song) {
           count++; j++;
         } else break;
       }
-      lines.push({ kind: "chord-only", text: ln, count });
+      lines.push({ kind: "chord-only", text: ln, count, rawIdx: i, rawSpan: j - i });
       i = j - 1;
     } else {
-      lines.push(ln);
+      lines.push({ kind: "text", text: ln, rawIdx: i, rawSpan: 1 });
     }
   }
 
@@ -3173,32 +3349,35 @@ function renderLyrics(text, song) {
   // The dot marker sits inside each chord-bearing line but is only revealed via CSS on `.active`.
   const dot = `<span class="lyric-dot" aria-hidden="true">●</span>`;
   for (const line of lines) {
-    if (typeof line === "object" && line.kind === "chord-only") {
+    if (line.kind === "chord-only") {
       const re = /\[([^\]]+)\]/g;
-      let m, html = "";
+      let m, html = "", pillIdx = 0;
       while ((m = re.exec(line.text)) !== null) {
         const ch = m[1];
         const occ = nextOcc(ch);
         const rn = rnFor(ch);
-        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(ch)}" data-occ="${occ}">${escapeHtml(ch)}${rn ? `<span class="rn-tag">${escapeHtml(rn)}</span>` : ""}</span>`;
+        html += `<span class="chord-pill-inline" data-chord="${escapeHtml(ch)}" data-occ="${occ}" data-pill-idx="${pillIdx}">${escapeHtml(ch)}${rn ? `<span class="rn-tag">${escapeHtml(rn)}</span>` : ""}</span>`;
+        pillIdx++;
       }
       const repHtml = line.count > 1 ? `<span class="chord-rep">× ${line.count}</span>` : "";
-      out.push(`<div class="lyric-line chord-only-row has-chord">${dot}${html}${repHtml}</div>`);
+      out.push(`<div class="lyric-line chord-only-row has-chord" data-line-idx="${line.rawIdx}" data-line-span="${line.rawSpan}">${dot}${html}${repHtml}</div>`);
       continue;
     }
-    if (!line.trim()) { out.push(`<div class="lyric-line lyric-blank"></div>`); continue; }
-    const sec = line.match(/^\s*\{([^}]+)\}\s*$/);
+    const rawText = line.text;
+    if (!rawText.trim()) { out.push(`<div class="lyric-line lyric-blank" data-line-idx="${line.rawIdx}"></div>`); continue; }
+    const sec = rawText.match(/^\s*\{([^}]+)\}\s*$/);
     if (sec) {
-      out.push(`<div class="lyric-line section-row"><span class="section-label">${escapeHtml(sec[1])}</span></div>`);
+      out.push(`<div class="lyric-line section-row" data-line-idx="${line.rawIdx}"><span class="section-label">${escapeHtml(sec[1])}</span></div>`);
       continue;
     }
     // Mixed chord + lyric line — chord pills sit absolute-positioned above each lyric segment.
     // Each chord-bearing segment gets a min-width sized to its chord name so adjacent pills don't overlap.
     let html = "";
     let hasChord = false;
+    let pillIdx = 0;
     const re = /\[([^\]]+)\]([^\[]*)|([^\[]+)/g;
     let m;
-    while ((m = re.exec(line)) !== null) {
+    while ((m = re.exec(rawText)) !== null) {
       if (m[1] !== undefined) {
         hasChord = true;
         const chord = m[1];
@@ -3208,12 +3387,13 @@ function renderLyrics(text, song) {
         const rn = rnFor(chord);
         // Pill is ~0.7em per char + padding/border. Floor at 2.5em for short names.
         const minW = Math.max(2.5, chord.length * 0.72 + 0.5).toFixed(2);
-        html += `<span class="seg" style="min-width:${minW}em;"><span class="chord" data-chord="${escapeHtml(chord)}" data-occ="${occ}">${escapeHtml(chord)}${rn ? `<span class="rn-tag">${escapeHtml(rn)}</span>` : ""}</span>${safeText}</span>`;
+        html += `<span class="seg" style="min-width:${minW}em;"><span class="chord" data-chord="${escapeHtml(chord)}" data-occ="${occ}" data-pill-idx="${pillIdx}">${escapeHtml(chord)}${rn ? `<span class="rn-tag">${escapeHtml(rn)}</span>` : ""}</span>${safeText}</span>`;
+        pillIdx++;
       } else {
         html += `<span class="seg">${escapeHtml(m[3])}</span>`;
       }
     }
-    out.push(`<div class="lyric-line${hasChord ? " has-chord" : ""}">${hasChord ? dot : ""}${html}</div>`);
+    out.push(`<div class="lyric-line${hasChord ? " has-chord" : ""}" data-line-idx="${line.rawIdx}">${hasChord ? dot : ""}${html}</div>`);
   }
   return out.join("");
 }
@@ -3394,6 +3574,18 @@ function renderDetail() {
   const el = document.getElementById("detail");
   if (state.editing) { renderEditor(el); return; }
   const song = state.songs.find(s => s.id === state.selectedId);
+  // Mid-magic-link callback: hash carries access_token / refresh_token until Supabase parses it,
+  // or query has ?code=... for OAuth/PKCE. During that window auth.user is briefly null —
+  // show a spinner instead of the landing page so users don't see a marketing flash.
+  const hash = window.location.hash || "";
+  const search = window.location.search || "";
+  const inAuthCallback = /access_token=|refresh_token=|type=(magiclink|recovery|signup|invite)/.test(hash)
+                      || /[?&]code=/.test(search);
+  if (inAuthCallback && !auth.user) {
+    document.body.classList.remove("landing-active");
+    el.innerHTML = `<div class="empty"><h2>Signing you in…</h2><p>One moment.</p></div>`;
+    return;
+  }
   // Landing page: no signed-in user, no song picked, hasn't dismissed → marketing view.
   const landingDismissed = localStorage.getItem("chordpad_landing_dismissed") === "1";
   const showLanding = !auth.user && !song && !landingDismissed;
@@ -3416,25 +3608,17 @@ function renderDetail() {
     <div class="detail-head">
       <div class="title-block">
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
-        <h1>${escapeHtml(song.title || "Untitled")}${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}<span class="key-inline" title="${song.key ? "Key — click ± to transpose" : "Transpose chords"}">
-          ${song.key
+        <h1>${escapeHtml(song.title || "Untitled")}${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}<span class="key-inline" title="${song.key ? "Key — click ± to transpose" : "Transpose chords"}"><span class="pill-state">${song.key
             ? `<span class="key-pre">Key of </span><span class="key-name${song.originalKey && song.originalKey !== song.key ? " transposed" : ""}">${escapeHtml(song.key)}</span>`
             : `<span class="key-pre">Transpose</span>`
-          }
-          <button class="transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
-          <button class="transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
-          ${(() => {
+          }</span><span class="pill-ctrls"><button class="transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button><button class="transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>${(() => {
             const keyChanged = !!(song.originalKey && song.originalKey !== song.key);
             const title = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
             return `<button class="transpose-btn" data-reset="1" title="${title}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>`;
-          })()}
-        </span>${(() => {
+          })()}</span></span>${(() => {
           const accChanged = (typeof song.originalPreferFlat === "boolean") && (song.originalPreferFlat !== !!song.preferFlat);
           const resetTitle = accChanged ? `Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})` : "Already at original accidentals";
-          return `<span class="acc-pill">
-            <button class="acc-toggle" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click to switch to sharps (C♯, F♯m, etc.)" : "Currently sharps — click to switch to flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "Flats" : "Sharps"}<span class="acc-glyph">${song.preferFlat ? "♭" : "♯"}</span></button>
-            <button class="acc-reset" data-accidental-reset="1" title="${resetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
-          </span>`;
+          return `<span class="acc-pill"><span class="pill-state"><button class="acc-toggle" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click to switch to sharps (C♯, F♯m, etc.)" : "Currently sharps — click to switch to flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "Flats" : "Sharps"}<span class="acc-glyph">${song.preferFlat ? "♭" : "♯"}</span></button></span><span class="pill-ctrls"><button class="acc-reset" data-accidental-reset="1" title="${resetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button></span></span>`;
         })()}${song.key ? `<button class="rn-pill ${song.showRoman ? "active" : ""}" data-rn-toggle title="${song.showRoman ? "Hide Roman numerals" : "Show Roman numeral analysis (key of " + escapeHtml(song.key) + ")"}" aria-label="Toggle Roman numerals">vii°</button>` : ""}</h1>
       </div>
       <div class="detail-actions">
@@ -3458,7 +3642,7 @@ function renderDetail() {
       ${(song.instruments || []).map(i => `<span class="pill ${i}">${i}</span>`).join("")}
     </div>
 
-    <div class="lyrics" id="lyrics-view">${renderLyrics(song.lyrics || "", song)}</div>
+    <div class="lyrics${song.showRoman ? " show-roman" : ""}" id="lyrics-view">${renderLyrics(song.lyrics || "", song)}</div>
 
     ${song.notes ? `
       <div class="info-block">
@@ -3539,6 +3723,200 @@ function renderDetail() {
     });
   });
   attachHoverPopover(el, song);
+  attachLyricsDragDrop(el, song);
+}
+
+// === Drag-and-drop chord re-anchoring on the songsheet ===
+// User can drag any chord pill to a different position in the lyrics. The drop point's
+// caret position (text node + offset) is mapped back to a character index inside the
+// raw lyrics line, and the [Chord] marker is moved there.
+function attachLyricsDragDrop(detailEl, song) {
+  const lyricsEl = detailEl.querySelector("#lyrics-view");
+  if (!lyricsEl) return;
+  // Make every chord pill draggable
+  lyricsEl.querySelectorAll(".chord, .chord-pill-inline").forEach(pill => {
+    pill.draggable = true;
+    pill.addEventListener("dragstart", e => {
+      const lineEl = pill.closest(".lyric-line");
+      if (!lineEl) return;
+      const sourceLineIdx = parseInt(lineEl.dataset.lineIdx, 10);
+      const sourcePillIdx = parseInt(pill.dataset.pillIdx, 10);
+      e.dataTransfer.setData("application/x-chordpad-chord", JSON.stringify({
+        chord: pill.dataset.chord,
+        sourceLineIdx, sourcePillIdx,
+      }));
+      e.dataTransfer.effectAllowed = "move";
+      // Slight delay so the snapshot includes the pill before we hide it
+      setTimeout(() => pill.classList.add("dragging"), 0);
+    });
+    pill.addEventListener("dragend", () => pill.classList.remove("dragging"));
+    // Don't trigger the chord-edit modal when starting a drag (mouseup after drag is suppressed,
+    // but pointer events on the same pill could also fire click). Browsers usually handle this.
+  });
+  // Hover feedback + drop handling on the lyrics container
+  let lastHover = null;
+  function clearHover() {
+    if (lastHover) lastHover.classList.remove("drop-target");
+    lastHover = null;
+  }
+  lyricsEl.addEventListener("dragover", e => {
+    if (![...e.dataTransfer.types].includes("application/x-chordpad-chord")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const targetLine = lineFromPoint(e.clientX, e.clientY);
+    if (targetLine !== lastHover) {
+      clearHover();
+      if (targetLine) { targetLine.classList.add("drop-target"); lastHover = targetLine; }
+    }
+  });
+  lyricsEl.addEventListener("dragleave", e => {
+    // Only clear when the cursor actually exits the lyrics block
+    if (!e.relatedTarget || !lyricsEl.contains(e.relatedTarget)) clearHover();
+  });
+  lyricsEl.addEventListener("drop", e => {
+    clearHover();
+    const raw = e.dataTransfer.getData("application/x-chordpad-chord");
+    if (!raw) return;
+    e.preventDefault();
+    let payload;
+    try { payload = JSON.parse(raw); } catch (err) { return; }
+    const targetLineEl = lineFromPoint(e.clientX, e.clientY);
+    if (!targetLineEl) return;
+    const targetLineIdx = parseInt(targetLineEl.dataset.lineIdx, 10);
+    if (isNaN(targetLineIdx)) return;
+    // Compute target text-only character offset within the line.
+    const targetCharIdx = textOffsetInLineFromPoint(targetLineEl, e.clientX, e.clientY);
+    moveChordInLyrics(song, payload, targetLineIdx, targetCharIdx);
+  });
+
+  function lineFromPoint(x, y) {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    return el.closest(".lyric-line");
+  }
+  // Walk the line's text content (excluding chord pill text & rn-tags) to compute
+  // a char index that lines up with the raw lyrics line minus its chord markers.
+  function textOffsetInLineFromPoint(lineEl, x, y) {
+    let range = null;
+    if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(x, y);
+    else if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      if (p) { range = document.createRange(); range.setStart(p.offsetNode, p.offset); range.setEnd(p.offsetNode, p.offset); }
+    }
+    let dropNode = range ? range.startContainer : null;
+    let dropOffset = range ? range.startOffset : 0;
+    // If the drop landed on a chord pill, snap to its host seg's text start.
+    if (dropNode && dropNode.nodeType !== Node.TEXT_NODE) {
+      // try to find the next text node
+      const tn = firstTextNodeIn(dropNode);
+      if (tn) { dropNode = tn; dropOffset = 0; }
+    }
+    // Walk the line's text nodes in order, summing char counts of "lyric" text only
+    // (skipping chord pill labels and rn-tags). When we hit dropNode, add dropOffset.
+    let acc = 0;
+    let found = false;
+    function walk(node) {
+      if (found) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const inChord = !!node.parentElement?.closest(".chord, .chord-pill-inline, .rn-tag, .chord-rep, .lyric-dot, .section-label");
+        if (node === dropNode) {
+          if (!inChord) acc += dropOffset;
+          found = true; return;
+        }
+        if (!inChord) acc += node.nodeValue.length;
+      } else {
+        for (const c of node.childNodes) { walk(c); if (found) return; }
+      }
+    }
+    walk(lineEl);
+    return acc;
+  }
+  function firstTextNodeIn(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node;
+    for (const c of node.childNodes) {
+      const r = firstTextNodeIn(c);
+      if (r) return r;
+    }
+    return null;
+  }
+}
+
+// Mutate song.lyrics to move a chord marker. payload identifies the source
+// (line idx + which pill in that line); target is line + text-offset.
+function moveChordInLyrics(song, payload, targetLineIdx, targetTextOffset) {
+  const rawLines = (song.lyrics || "").replace(/\r\n/g, "\n").split("\n");
+  if (payload.sourceLineIdx < 0 || payload.sourceLineIdx >= rawLines.length) return;
+  if (targetLineIdx < 0 || targetLineIdx >= rawLines.length) return;
+
+  // Tokenize a line into chord and text pieces, in order.
+  function tokenize(line) {
+    const tokens = [];
+    const re = /\[([^\]]+)\]|([^\[]+)/g;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      if (m[1] !== undefined) tokens.push({ kind: "chord", name: m[1] });
+      else tokens.push({ kind: "text", str: m[2] });
+    }
+    return tokens;
+  }
+  function serialize(tokens) {
+    return tokens.map(t => t.kind === "chord" ? "[" + t.name + "]" : t.str).join("");
+  }
+
+  // ---- Remove source chord ----
+  const srcTokens = tokenize(rawLines[payload.sourceLineIdx]);
+  // Find the K-th chord token
+  let srcChordTokenIdx = -1, chordCounter = 0;
+  for (let i = 0; i < srcTokens.length; i++) {
+    if (srcTokens[i].kind === "chord") {
+      if (chordCounter === payload.sourcePillIdx) { srcChordTokenIdx = i; break; }
+      chordCounter++;
+    }
+  }
+  if (srcChordTokenIdx === -1) return;
+  const sourceIsTarget = payload.sourceLineIdx === targetLineIdx;
+  // Remove from source
+  srcTokens.splice(srcChordTokenIdx, 1);
+
+  // ---- Build target tokens ----
+  let tgtTokens = sourceIsTarget ? srcTokens : tokenize(rawLines[targetLineIdx]);
+  // Walk text tokens until we've consumed targetTextOffset characters
+  let remaining = targetTextOffset;
+  let inserted = false;
+  for (let i = 0; i < tgtTokens.length && !inserted; i++) {
+    const t = tgtTokens[i];
+    if (t.kind !== "text") continue;
+    if (remaining <= t.str.length) {
+      // Split this text token at `remaining` and insert chord between
+      const left = t.str.slice(0, remaining);
+      const right = t.str.slice(remaining);
+      const replacement = [];
+      if (left) replacement.push({ kind: "text", str: left });
+      replacement.push({ kind: "chord", name: payload.chord });
+      if (right) replacement.push({ kind: "text", str: right });
+      tgtTokens.splice(i, 1, ...replacement);
+      inserted = true;
+    } else {
+      remaining -= t.str.length;
+    }
+  }
+  if (!inserted) {
+    // Drop landed past the end of all text; append at the end
+    tgtTokens.push({ kind: "chord", name: payload.chord });
+  }
+
+  // ---- Write back ----
+  if (sourceIsTarget) {
+    rawLines[targetLineIdx] = serialize(tgtTokens);
+  } else {
+    rawLines[payload.sourceLineIdx] = serialize(srcTokens);
+    rawLines[targetLineIdx] = serialize(tgtTokens);
+  }
+  pushUndo(song);
+  song.lyrics = rawLines.join("\n");
+  song.updatedAt = Date.now();
+  saveState({ songs: state.songs });
+  renderDetail();
 }
 
 function renderEditor(el) {
@@ -4173,6 +4551,102 @@ function openPlayMode(song) {
   overlay.querySelector("#play-close").addEventListener("click", close);
   document.addEventListener("keydown", onKey);
   playState = { close };
+}
+
+//=============================================================
+// SETTINGS MODAL — formerly the "..." kebab menu's contents, now under the user name.
+//=============================================================
+function openSettingsModal() {
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  const signedIn = !!auth.user;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <h3>Settings</h3>
+      <div class="modal-sub">${signedIn ? `Signed in as ${escapeHtml(auth.user.email)}.` : "Browsing as a guest. Sign in to save songs to the cloud."}</div>
+
+      <div style="margin-top: 18px; display: grid; gap: 10px;">
+        <div style="border: 1px solid var(--line); border-radius: 8px; padding: 14px;">
+          <div style="font-weight: 600; margin-bottom: 4px;">Browser bookmarklet</div>
+          <div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; line-height: 1.5;">
+            One-click chord-chart capture from any chord page — bypasses Cloudflare and other bot blocks because it runs in your real browser session.
+          </div>
+          <button id="set-bookmarklet" class="primary" style="width:100%;">Get bookmarklet…</button>
+        </div>
+
+        <div style="border: 1px solid var(--line); border-radius: 8px; padding: 14px;">
+          <div style="font-weight: 600; margin-bottom: 4px;">Backup & restore</div>
+          <div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; line-height: 1.5;">
+            Export your full library as a JSON file, or import one to merge into your current library.
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button id="set-export" style="flex:1;">Export all as JSON</button>
+            <button id="set-import" style="flex:1;">Import JSON backup…</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top: 18px;">
+        <button id="set-cancel" class="ghost">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+  bg.querySelector("#set-cancel").addEventListener("click", () => bg.remove());
+  bg.querySelector("#set-bookmarklet").addEventListener("click", () => {
+    bg.remove();
+    state.editing = "new"; renderDetail();
+    setTimeout(() => openBookmarkletModal(), 50);
+  });
+  bg.querySelector("#set-export").addEventListener("click", () => { bg.remove(); exportJson(); });
+  bg.querySelector("#set-import").addEventListener("click", () => { bg.remove(); document.getElementById("import-file").click(); });
+}
+
+//=============================================================
+// IMPORT FAILED MODAL — shown when URL fetch / parse can't recover the chart.
+// Surfaces the durable alternatives (browser extension, bookmarklet, paste-and-parse)
+// instead of a jarring confirm() dialog.
+//=============================================================
+function openImportFailedModal(url, errorMsg) {
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  let host = "";
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch (e) {}
+  bg.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <h3>Couldn't import that URL</h3>
+      <div class="modal-sub" style="color:var(--ink-soft);">${escapeHtml(host || url)}</div>
+      <div style="margin: 14px 0; padding: 10px 12px; border-radius: 6px; background: #fceeed; color: #b41a1a; border: 1px solid #ebd2d2; font-size: 13px;">
+        ${escapeHtml(errorMsg || "Unknown error")}
+      </div>
+      <p style="font-size: 13.5px; line-height: 1.55; color: var(--ink); margin: 0 0 14px;">
+        Most chord sites detect server-side fetches and either block them or redirect to a generic page. Three reliable alternatives:
+      </p>
+      <ol style="font-size: 13.5px; line-height: 1.6; padding-left: 20px; margin: 0 0 18px;">
+        <li><b>Browser extension</b> — toolbar button that scrapes the page in your real browser session.</li>
+        <li><b>Bookmarklet</b> — a one-click bookmarks-bar button that does the same thing without installing anything.</li>
+        <li><b>Paste-and-parse</b> — copy the chord chart from the page, hit New Song, paste into the lyrics field, click <em>Parse pasted sheet</em>.</li>
+      </ol>
+      <div class="actions" style="display:flex; gap:8px;">
+        <button id="imp-bookmarklet" class="primary" style="flex:1;">Show bookmarklet</button>
+        <button id="imp-paste" class="ghost" style="flex:1;">Paste & parse</button>
+        <button id="imp-cancel" class="ghost">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+  bg.querySelector("#imp-cancel").addEventListener("click", () => bg.remove());
+  bg.querySelector("#imp-bookmarklet").addEventListener("click", () => {
+    bg.remove();
+    state.editing = "new"; renderDetail();
+    setTimeout(() => openBookmarkletModal(), 50);
+  });
+  bg.querySelector("#imp-paste").addEventListener("click", () => {
+    bg.remove();
+    state.editing = "new"; renderDetail();
+  });
 }
 
 //=============================================================
@@ -4974,11 +5448,7 @@ async function init() {
       document.getElementById("header-url").value = "";
       renderDetail();
     } catch (e) {
-      const useBookmarklet = confirm("Couldn't fetch that URL automatically (most likely Cloudflare bot protection):\n\n" + e.message + "\n\nWant to see the bookmarklet — a one-click button you put in your bookmarks bar that bypasses this?");
-      if (useBookmarklet) {
-        state.editing = "new"; renderDetail();
-        setTimeout(() => openBookmarkletModal(), 50);
-      }
+      openImportFailedModal(url, e.message);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
@@ -4988,24 +5458,8 @@ async function init() {
     if (e.key === "Enter") { e.preventDefault(); headerImportUrl(); }
   });
 
-  // Kebab menu
-  const menuBtn = document.getElementById("btn-menu");
-  const menuPop = document.getElementById("menu-pop");
-  menuBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    menuPop.classList.toggle("show");
-  });
-  document.addEventListener("click", e => {
-    if (!menuPop.contains(e.target) && e.target !== menuBtn) menuPop.classList.remove("show");
-  });
-  document.getElementById("btn-bookmarklet-shortcut").addEventListener("click", () => {
-    menuPop.classList.remove("show");
-    state.editing = "new"; renderDetail();
-    setTimeout(() => openBookmarkletModal(), 50);
-  });
-
-  document.getElementById("btn-export").addEventListener("click", () => { menuPop.classList.remove("show"); exportJson(); });
-  document.getElementById("btn-import").addEventListener("click", () => { menuPop.classList.remove("show"); document.getElementById("import-file").click(); });
+  // Kebab menu replaced by user-menu Settings (see openSettingsModal).
+  // We keep the hidden file input wired so Import-from-file still works.
   document.getElementById("import-file").addEventListener("change", e => {
     const f = e.target.files[0]; if (f) importJsonFile(f); e.target.value = "";
   });
