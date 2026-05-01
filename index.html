@@ -283,29 +283,34 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  /* === Song-controls toolbar v4 — compact, colored rounded pills with tight internal
-     sections. Each pill is a single capsule with an info segment (cap + value) on the
-     left and controls on the right, separated by a thin alpha-tinted divider. === */
+  /* === Song-controls toolbar v5 — STATE and CONTROLS as separate adjacent pills.
+     Each feature (Key, Accidentals, Analysis) is two pills with a small gap.
+     State pills have fixed widths so changing the value never shifts adjacent pills. === */
   .song-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 14px; /* gap BETWEEN feature groups */
     margin-top: 12px;
     font-family: var(--sans);
     line-height: 1;
   }
-  .sc-section {
+  .sc-group {
     display: inline-flex;
-    align-items: stretch;
+    align-items: center;
+    gap: 4px; /* gap WITHIN a feature group (state ↔ controls) */
+  }
+  .sc-pill {
+    display: inline-flex;
+    align-items: center;
     height: 26px;
     border-radius: 999px;
-    overflow: hidden;
     font-size: 12px;
     font-weight: 600;
     letter-spacing: .02em;
+    box-sizing: border-box;
   }
-  .sc-section .sc-cap {
+  .sc-pill .sc-cap {
     display: inline-flex; align-items: center;
     padding: 0 8px 0 11px;
     text-transform: uppercase;
@@ -314,20 +319,19 @@
     letter-spacing: .12em;
     opacity: .75;
   }
-  .sc-section .sc-value {
+  .sc-pill .sc-value {
     display: inline-flex; align-items: center; justify-content: center;
     padding: 0 11px 0 0;
     font-family: var(--serif);
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 0;
-    min-width: 38px;
   }
-  .sc-section .sc-btn {
+  .sc-pill .sc-btn {
     background: transparent;
     border: 0;
-    border-left: 1px solid currentColor;
-    width: 26px;
+    width: 28px;
+    height: 100%;
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 13px;
     font-weight: 700;
@@ -337,31 +341,45 @@
     transition: background .12s;
     line-height: 1;
   }
-  .sc-section .sc-btn:hover:not(:disabled) { background: rgba(255,255,255,.4); }
-  .sc-section .sc-btn:disabled { opacity: .3; cursor: default; }
-  /* === Key pill (warm rust) === */
-  .sc-section.sc-key {
+  .sc-pill .sc-btn:not(:last-child) { border-right: 1px solid currentColor; }
+  .sc-pill .sc-btn:hover:not(:disabled) { background: rgba(255,255,255,.4); }
+  .sc-pill .sc-btn:disabled { opacity: .3; cursor: default; }
+
+  /* === Key (warm rust) === */
+  .sc-pill.sc-key-state, .sc-pill.sc-key-ctrls {
     background: #f5e3da;
     color: var(--accent-deep);
     border: 1px solid #e8c8b8;
   }
-  .sc-section.sc-key .sc-btn { border-color: rgba(138, 56, 25, .18); }
-  .sc-section.sc-key .sc-btn:hover:not(:disabled) { background: rgba(177, 74, 44, .14); color: var(--accent-deep); }
-  /* === Accidentals pill (cool blue) === */
-  .sc-section.sc-acc {
+  .sc-pill.sc-key-state {
+    /* fixed-width value cell so transposing Em → A♭m7 doesn't shift the layout */
+    min-width: 124px;
+  }
+  .sc-pill.sc-key-state .sc-value { min-width: 0; }
+  .sc-pill.sc-key-ctrls .sc-btn { border-right-color: rgba(138, 56, 25, .18); }
+  .sc-pill.sc-key-ctrls .sc-btn:hover:not(:disabled) { background: rgba(177, 74, 44, .14); }
+
+  /* === Accidentals (cool blue) === */
+  .sc-pill.sc-acc-state, .sc-pill.sc-acc-ctrls {
     background: #e0e9f5;
     color: #1f4a99;
     border: 1px solid #c9d6ec;
   }
-  .sc-section.sc-acc .sc-seg-row {
-    display: inline-flex; align-items: stretch;
-    padding: 2px 4px;
+  .sc-pill.sc-acc-state {
+    min-width: 124px;
   }
-  .sc-section.sc-acc .sc-seg {
+  .sc-pill.sc-acc-state .sc-value {
+    font-family: var(--serif); font-size: 18px; font-weight: 700;
+  }
+  .sc-pill.sc-acc-ctrls .sc-seg-row {
+    display: inline-flex; align-items: stretch;
+    padding: 0 2px;
+  }
+  .sc-pill.sc-acc-ctrls .sc-seg {
     background: transparent;
     border: 0;
     padding: 0;
-    width: 22px;
+    width: 26px; height: 22px;
     display: inline-flex; align-items: center; justify-content: center;
     font-family: var(--serif);
     font-size: 16px;
@@ -370,50 +388,48 @@
     color: #1f4a99;
     border-radius: 999px;
     line-height: 1;
+    margin: 0 1px;
     transition: background .12s, color .12s;
   }
-  .sc-section.sc-acc .sc-seg:hover:not([aria-pressed="true"]) { background: rgba(31, 74, 153, .12); }
-  .sc-section.sc-acc .sc-seg[aria-pressed="true"] {
+  .sc-pill.sc-acc-ctrls .sc-seg:hover:not([aria-pressed="true"]) { background: rgba(31, 74, 153, .12); }
+  .sc-pill.sc-acc-ctrls .sc-seg[aria-pressed="true"] {
     background: #1f4a99;
     color: #fff;
   }
-  .sc-section.sc-acc .sc-cap { padding-right: 10px; }
-  .sc-section.sc-acc .sc-btn { border-color: rgba(31, 74, 153, .18); }
-  .sc-section.sc-acc .sc-btn:hover:not(:disabled) { background: rgba(31, 74, 153, .14); }
-  /* === Analysis toggle pill (green) === */
-  .sc-section.sc-analysis {
+  .sc-pill.sc-acc-ctrls .sc-btn { border-right-color: rgba(31, 74, 153, .18); }
+  .sc-pill.sc-acc-ctrls .sc-btn:hover:not(:disabled) { background: rgba(31, 74, 153, .14); }
+
+  /* === Analysis (green) === */
+  .sc-pill.sc-analysis-state, .sc-pill.sc-analysis-ctrls {
     background: #eef4ee;
     color: #2d6a3d;
     border: 1px solid #cee2d2;
-    cursor: pointer;
-    padding: 0 13px;
-    align-items: center;
-    gap: 8px;
-    transition: background .12s;
   }
-  .sc-section.sc-analysis:hover { background: #e2eee5; }
-  .sc-section.sc-analysis .sc-cap { padding: 0; opacity: .75; }
-  .sc-section.sc-analysis .sc-toggle-state {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-family: var(--sans);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .08em;
+  .sc-pill.sc-analysis-state {
+    min-width: 156px;
+    transition: background .12s, color .12s, border-color .12s;
   }
-  .sc-section.sc-analysis .sc-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: rgba(45, 106, 61, .25);
-    transition: background .12s;
-  }
-  .sc-section.sc-analysis[aria-pressed="true"] {
+  .sc-pill.sc-analysis-state[data-on="true"] {
     background: #2d6a3d;
     color: #fff;
     border-color: #2d6a3d;
   }
-  .sc-section.sc-analysis[aria-pressed="true"] .sc-dot { background: #fff; }
+  .sc-pill.sc-analysis-state .sc-value {
+    font-family: var(--sans); font-size: 11.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+  .sc-pill.sc-analysis-ctrls {
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .sc-pill.sc-analysis-ctrls:hover { background: #e2eee5; }
+  .sc-pill.sc-analysis-ctrls .sc-toggle-btn {
+    background: transparent; border: 0;
+    padding: 0 14px; height: 100%;
+    font: inherit; cursor: pointer; color: inherit;
+    font-size: 11.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
   /* (Old .rn-pill inside-h1 styles removed — Roman toggle now lives in .song-controls.) */
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
@@ -1655,7 +1671,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.4.3";
+const APP_VERSION = "4.5.0";
 
 //=============================================================
 // STORAGE
@@ -1699,7 +1715,16 @@ function initAuth() {
     return;
   }
   auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      // Disable Supabase's cross-tab navigator.locks coordination. With multiple
+      // chordpad.app tabs open (e.g., extension opens a new tab while the original
+      // is still alive), a stuck refresh in one tab would block ALL queries in the
+      // other. The trade-off is harmless here: two tabs may both attempt a refresh
+      // briefly. Without this override, "Saving…" hung forever for some users.
+      lock: async (_key, _acquireTimeout, fn) => fn(),
+    },
   });
   // Defensive: if the persisted refresh token is dead, Supabase's auto-refresh
   // hangs and so does every subsequent query (including getSession). Race a quick
@@ -1708,14 +1733,9 @@ function initAuth() {
   Promise.race([
     auth.client.auth.getSession(),
     new Promise((_, rej) => setTimeout(() => rej(new Error("getSession hung")), 5000)),
-  ]).catch(async (e) => {
-    console.warn("[auth] session probe hung — refresh token is likely dead, forcing sign-out", e);
-    try { await auth.client.auth.signOut(); } catch (_) {}
-    auth.initialized = true;
-    auth.user = null;
-    setSyncStatus("error", "Your session expired. Please sign in again.");
-    renderAuthArea();
-    renderDetail();
+  ]).catch((e) => {
+    console.warn("[auth] session probe hung — purging session and reloading", e);
+    forceSessionPurgeAndReload();
   });
   // Safety net: if Supabase never fires INITIAL_SESSION (rare SDK hiccup), don't
   // leave the loader spinning forever. After 3s, mark initialized and continue.
@@ -1938,16 +1958,29 @@ async function cloudSyncOut(songs) {
       // Surface as an explicit error in console so it's easy to see even at default log level.
       console.error("[cloudSyncOut] FAILED", e);
       const detail = e?.message || e?.error_description || e?.hint || String(e);
-      // If the timeout fires, the auth refresh is hung. Force a sign-out so the
-      // next save attempt doesn't queue behind the same dead refresh.
+      // If the timeout fires, the auth refresh / inter-tab lock is hung — signOut
+      // will hang too. Skip it; nuke the session directly and reload so the user
+      // can sign back in cleanly. Local songs are preserved (saveState already wrote them).
       if (/timed out/i.test(detail)) {
-        setSyncStatus("error", "Your session expired. Please sign in again.");
-        try { await auth.client.auth.signOut(); } catch (_) {}
+        setSyncStatus("error", "Session stuck — reloading to recover…");
+        forceSessionPurgeAndReload();
       } else {
         setSyncStatus("error", detail);
       }
     }
   }, 600);
+}
+
+// Bulletproof recovery for a wedged Supabase session: skip signOut() (which can
+// also hang), wipe its localStorage entries directly, and reload.
+function forceSessionPurgeAndReload() {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith("sb-") || k.startsWith("supabase."))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+  // Tiny delay so the user sees the error indicator update before the reload.
+  setTimeout(() => location.reload(), 300);
 }
 
 // --------- Auth UI ---------
@@ -1995,8 +2028,8 @@ function openAuthModal(opts) {
     alert("Auth isn't loaded — check your network connection and refresh.");
     return;
   }
-  // mode: "signin" (magic-link primary) | "signup" (email + password) | "password" (sign in with password)
-  let mode = (opts && opts.initialMode) ? opts.initialMode : "signin";
+  // mode: "password" (default, email + password) | "signup" (create) | "signin" (magic link)
+  let mode = (opts && opts.initialMode) ? opts.initialMode : "password";
   const bg = document.createElement("div");
   bg.className = "modal-bg auth-modal";
   function render() {
@@ -2041,7 +2074,11 @@ function openAuthModal(opts) {
       </div>
     `;
     bg.querySelectorAll("[data-tab]").forEach(b => {
-      b.addEventListener("click", () => { mode = b.dataset.tab; render(); });
+      b.addEventListener("click", () => {
+        // The "Sign in" tab now means password sign-in by default.
+        mode = b.dataset.tab === "signin" ? "password" : b.dataset.tab;
+        render();
+      });
     });
     bg.querySelectorAll("[data-switch-to]").forEach(b => {
       b.addEventListener("click", () => { mode = b.dataset.switchTo; render(); });
@@ -3954,25 +3991,39 @@ function renderDetail() {
           const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
           return `
           <div class="song-controls" role="toolbar" aria-label="Song display controls">
-            <div class="sc-section sc-key" title="Song key — use − / + to transpose">
-              <span class="sc-cap">Key</span>
-              <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
-              <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
-              <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
-              <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
-            </div>
-            <div class="sc-section sc-acc" title="Display chord names with sharps or flats">
-              <span class="sc-cap">Accidentals</span>
-              <div class="sc-seg-row" role="radiogroup" aria-label="Accidentals">
-                <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
-                <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
+            <div class="sc-group">
+              <div class="sc-pill sc-key-state" title="Current key">
+                <span class="sc-cap">Key</span>
+                <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
               </div>
-              <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
+              <div class="sc-pill sc-key-ctrls" title="Transpose this song">
+                <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
+                <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
+                <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
+              </div>
+            </div>
+            <div class="sc-group">
+              <div class="sc-pill sc-acc-state" title="Current accidental style">
+                <span class="sc-cap">Accidentals</span>
+                <span class="sc-value">${song.preferFlat ? "♭" : "♯"}</span>
+              </div>
+              <div class="sc-pill sc-acc-ctrls" title="Switch sharps / flats">
+                <div class="sc-seg-row" role="radiogroup" aria-label="Accidentals">
+                  <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
+                  <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
+                </div>
+                <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
+              </div>
             </div>
             ${song.key ? `
-            <div class="sc-section sc-analysis" data-rn-toggle role="button" tabindex="0" aria-pressed="${song.showRoman ? "true" : "false"}" title="${song.showRoman ? "Hide chord analysis (i, IV, V…)" : `Show how each chord relates to the key of ${escapeHtml(song.key)} (i, ii, IV, V…)`}">
-              <span class="sc-cap">Show analysis</span>
-              <span class="sc-toggle-state"><span class="sc-dot"></span>${song.showRoman ? "On" : "Off"}</span>
+            <div class="sc-group">
+              <div class="sc-pill sc-analysis-state" data-on="${song.showRoman ? "true" : "false"}" title="Whether chord analysis (i, IV, V…) is shown">
+                <span class="sc-cap">Show analysis</span>
+                <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
+              </div>
+              <div class="sc-pill sc-analysis-ctrls" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
+                <button class="sc-toggle-btn" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}">${song.showRoman ? "Turn off" : "Turn on"}</button>
+              </div>
             </div>` : ""}
           </div>`;
         })()}
