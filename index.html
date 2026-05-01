@@ -283,141 +283,131 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  /* === Pill system: each pill is a colored capsule split into a "state" segment and
-     a "controls" segment. Same color group, but the state half has a slightly more
-     saturated tint and a thin divider separates it from the +/-/↺ controls. === */
-  .detail-head h1 .key-inline,
-  .detail-head h1 .acc-pill {
+  /* === Song-controls toolbar (key, accidentals, Roman numerals).
+     Lives below the title in its own row. Fixed-height pills with consistent
+     internal layout — controls are always present (disabled when N/A) so state
+     changes don't shift adjacent pills. Each pill has a small uppercase "cap"
+     label for discoverability. === */
+  .song-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    align-items: center;
+  }
+  .sc-pill, .sc-toggle-pill {
     display: inline-flex;
     align-items: stretch;
-    vertical-align: middle;
-    margin-bottom: 6px;
-    font-family: var(--sans);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    height: 32px;
+    border: 1px solid var(--line);
     border-radius: 999px;
     overflow: hidden;
-    line-height: 1;
-  }
-  .detail-head h1 .key-inline .pill-state,
-  .detail-head h1 .acc-pill .pill-state {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 11px;
-  }
-  .detail-head h1 .key-inline .pill-ctrls,
-  .detail-head h1 .acc-pill .pill-ctrls {
-    display: inline-flex;
-    align-items: center;
-    gap: 0;
-    padding: 0 4px;
-  }
-  /* === KEY pill (warm rust) === */
-  .detail-head h1 .key-inline {
-    margin-left: 32px;
-    background: #fbe1d4;
-    color: var(--accent-deep);
-    border: 1px solid #ecccc0;
-  }
-  .detail-head h1 .key-inline .pill-state {
-    background: #f5cdb9;
-  }
-  .detail-head h1 .key-inline .pill-ctrls {
-    background: #fbe9df;
-  }
-  .detail-head h1 .key-inline .key-pre { opacity: .8; }
-  .detail-head h1 .key-inline .key-name { font-weight: 700; letter-spacing: .04em; }
-  .detail-head h1 .key-inline .key-name.transposed { font-style: normal; }
-  .detail-head h1 .key-inline .transpose-btn {
-    background: transparent;
-    border: 0;
-    color: var(--accent-deep);
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1;
-    padding: 0 6px;
-    cursor: pointer;
+    background: var(--panel);
     font-family: var(--sans);
-    opacity: .65;
-    transition: opacity .12s, background .12s;
+    font-size: 13px;
+    line-height: 1;
   }
-  .detail-head h1 .key-inline .transpose-btn:hover:not(:disabled) {
-    opacity: 1;
-    background: rgba(177, 74, 44, .18);
+  .sc-cap {
+    display: inline-flex; align-items: center;
+    padding: 0 12px;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    color: var(--muted);
+    background: var(--panel-2);
+    border-right: 1px solid var(--line);
   }
-  .detail-head h1 .key-inline .transpose-btn:disabled { opacity: .3; cursor: default; }
-  /* === ACCIDENTAL pill (cool blue) === */
-  .detail-head h1 .acc-pill {
-    margin-left: 8px;
-    background: #dde6f4;
-    color: #2c5fbf;
-    border: 1px solid #cbd6ec;
+  .sc-pill .sc-value {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 14px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+    border-right: 1px solid var(--line);
+    min-width: 56px;
   }
-  .detail-head h1 .acc-pill .pill-state {
-    background: #c9d6ee;
-  }
-  .detail-head h1 .acc-pill .pill-ctrls {
-    background: #e3eaf6;
-  }
-  .detail-head h1 .acc-pill .acc-toggle,
-  .detail-head h1 .acc-pill .acc-reset {
+  .sc-pill .sc-btn {
     background: transparent;
     border: 0;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    transition: opacity .12s, background .12s;
-    border-radius: 999px;
-  }
-  .detail-head h1 .acc-pill .acc-toggle {
-    display: inline-flex; align-items: center; gap: 4px;
-    letter-spacing: .04em;
-  }
-  .detail-head h1 .acc-pill .acc-toggle:hover { opacity: .75; }
-  .detail-head h1 .acc-pill .acc-toggle .acc-glyph {
-    font-family: var(--serif);
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1;
-    text-transform: none;
-  }
-  .detail-head h1 .acc-pill .acc-reset {
-    font-size: 16px;
-    font-weight: 700;
-    padding: 0 6px;
-    opacity: .65;
-    text-transform: none;
-  }
-  .detail-head h1 .acc-pill .acc-reset:hover:not(:disabled) {
-    opacity: 1;
-    background: rgba(44, 95, 191, .18);
-  }
-  .detail-head h1 .acc-pill .acc-reset:disabled { opacity: .3; cursor: default; }
-  /* Roman-numeral toggle pill — green palette so it's distinct from key/accidental pills. */
-  .detail-head h1 .rn-pill {
-    display: inline-flex;
-    align-items: center;
-    vertical-align: middle;
-    margin-left: 8px;
-    margin-bottom: 6px;
-    font-family: var(--serif);
-    font-size: 13px;
+    border-right: 1px solid var(--line);
+    width: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 15px;
     font-weight: 600;
-    background: #eaf2ec;
-    color: #2d6a3d;
-    border: 1px solid #c8dec8;
-    padding: 3px 12px;
-    border-radius: 999px;
     cursor: pointer;
+    color: var(--ink-soft);
+    font-family: var(--sans);
     transition: background .12s, color .12s;
   }
-  .detail-head h1 .rn-pill:hover { background: #d8e8dc; }
-  .detail-head h1 .rn-pill.active { background: #2d6a3d; color: #fff; border-color: #2d6a3d; }
+  .sc-pill .sc-btn:last-child { border-right: 0; }
+  .sc-pill .sc-btn:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+  }
+  .sc-pill .sc-btn:disabled { opacity: .3; cursor: default; }
+  .sc-pill .sc-btn.sc-reset { font-size: 14px; }
+
+  /* Key pill: rust accent on the value to anchor it visually */
+  .sc-pill.sc-key .sc-value {
+    color: var(--accent-deep);
+    background: var(--accent-soft);
+  }
+  /* Accidentals pill: segmented ♯ / ♭ control */
+  .sc-pill.sc-acc .sc-segmented {
+    display: inline-flex;
+    align-items: stretch;
+    border-right: 1px solid var(--line);
+  }
+  .sc-pill.sc-acc .sc-segmented .sc-seg {
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--line);
+    padding: 0;
+    width: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--ink-soft);
+    transition: background .12s, color .12s;
+    line-height: 1;
+  }
+  .sc-pill.sc-acc .sc-segmented .sc-seg:last-child { border-right: 0; }
+  .sc-pill.sc-acc .sc-segmented .sc-seg:hover:not([aria-pressed="true"]) {
+    background: #e8eef9;
+    color: #2c5fbf;
+  }
+  .sc-pill.sc-acc .sc-segmented .sc-seg[aria-pressed="true"] {
+    background: #2c5fbf;
+    color: #fff;
+  }
+  /* Roman-numerals toggle pill */
+  .sc-toggle-pill.rn-pill {
+    cursor: pointer;
+    padding: 0;
+    border: 1px solid var(--line);
+    color: inherit;
+    font: inherit;
+  }
+  .sc-toggle-pill.rn-pill .sc-on-off {
+    display: inline-flex; align-items: center;
+    padding: 0 16px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--muted);
+    transition: color .12s, background .12s;
+  }
+  .sc-toggle-pill.rn-pill[aria-pressed="true"] {
+    border-color: #c8dec8;
+    background: #eaf2ec;
+  }
+  .sc-toggle-pill.rn-pill[aria-pressed="true"] .sc-on-off { color: #2d6a3d; }
+  .sc-toggle-pill.rn-pill[aria-pressed="true"] .sc-cap   { color: #2d6a3d; background: #d8e8dc; border-right-color: #c8dec8; }
+  .sc-toggle-pill.rn-pill:hover .sc-on-off { color: var(--accent-deep); }
+  .sc-toggle-pill.rn-pill:hover[aria-pressed="false"] .sc-cap { background: var(--accent-soft); color: var(--accent-deep); border-right-color: #ecccc0; }
+  /* (Old .rn-pill inside-h1 styles removed — Roman toggle now lives in .song-controls.) */
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
   .lyrics .seg .chord .rn-tag {
@@ -1117,7 +1107,7 @@
     body { background: #fff !important; }
     aside, header, .detail-actions, .meta-row, .info-block, .chord-popover, .chord-modal, .modal-bg, .play-mode { display: none !important; }
     main, .detail { display: block !important; max-width: none !important; padding: 0 !important; }
-    .detail-head h1 .key-inline, .detail-head h1 .acc-pill { display: none !important; }
+    .song-controls { display: none !important; }
     .detail-head .source-corner { display: none !important; }
     .detail-head h1 { font-size: 24pt; }
     .detail-head .artist { font-size: 11pt; }
@@ -1590,7 +1580,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.2.0";
+const APP_VERSION = "4.3.0";
 
 //=============================================================
 // STORAGE
@@ -1636,35 +1626,69 @@ function initAuth() {
   auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true },
   });
-  // Listen for sign-in / sign-out / password-recovery events
+  // Auth events Supabase emits — handled differently to avoid sign-in/sign-out flapping:
+  //   INITIAL_SESSION  — once on listener attach. Real source of truth on page load.
+  //   SIGNED_IN        — explicit sign-in (new session).
+  //   SIGNED_OUT       — explicit sign-out.
+  //   TOKEN_REFRESHED  — token auto-refresh; session unchanged. NEVER re-fetch songs.
+  //   USER_UPDATED     — metadata change; treat like TOKEN_REFRESHED.
+  //   PASSWORD_RECOVERY — user lands from a reset email; open the recovery modal.
+  //
+  // Earlier impl re-fetched songs and re-rendered on EVERY event including
+  // TOKEN_REFRESHED, and treated any null session as a sign-out (wiping
+  // localStorage). That caused the visible flapping between signed-in / signed-out
+  // states whenever Supabase emitted a transient state change.
   auth.client.auth.onAuthStateChange(async (event, session) => {
-    if (session) {
+    // Quiet events — just keep auth.user fresh, do nothing else.
+    if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+      if (session) auth.user = { id: session.user.id, email: session.user.email };
+      return;
+    }
+
+    // Password recovery: open modal, clear hash, run sign-in once.
+    if (event === "PASSWORD_RECOVERY" && session) {
       auth.user = { id: session.user.id, email: session.user.email };
-      // PASSWORD_RECOVERY fires when the user lands here from the reset-password email.
-      // Show a "set new password" form before letting them proceed.
-      if (event === "PASSWORD_RECOVERY") {
-        openPasswordRecoveryModal();
-        // Clear the recovery hash so it doesn't re-fire / look weird in the URL.
-        if (window.history.replaceState) {
-          window.history.replaceState(null, "", window.location.pathname + window.location.search);
-        }
+      openPasswordRecoveryModal();
+      if (window.history.replaceState) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
-      await onSignIn();
-    } else {
-      auth.user = null;
-      onSignOut();
+      await runOnSignInOnce();
+      renderAuthArea();
+      return;
     }
-    renderAuthArea();
-  });
-  // Restore current session on page load
-  auth.client.auth.getSession().then(async ({ data: { session } }) => {
-    auth.initialized = true;
-    if (session) {
-      auth.user = { id: session.user.id, email: session.user.email };
-      await onSignIn();
+
+    // Initial / explicit sign-in.
+    if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+      auth.initialized = true;
+      if (session) {
+        const wasSignedIn = !!auth.user;
+        auth.user = { id: session.user.id, email: session.user.email };
+        if (!wasSignedIn) {
+          await runOnSignInOnce();
+        }
+      } else if (event === "INITIAL_SESSION") {
+        // Page loaded with no session — guest mode. Don't touch local state.
+        if (auth.user) { auth.user = null; onSignOut(); }
+      }
+      renderAuthArea();
+      return;
     }
-    renderAuthArea();
+
+    // Explicit sign-out only — never wipe local state on a transient null session.
+    if (event === "SIGNED_OUT") {
+      if (auth.user) { auth.user = null; onSignOut(); }
+      renderAuthArea();
+      return;
+    }
   });
+}
+
+// Prevent concurrent cloud fetches when both INITIAL_SESSION and SIGNED_IN fire close together.
+let _onSignInPromise = null;
+function runOnSignInOnce() {
+  if (_onSignInPromise) return _onSignInPromise;
+  _onSignInPromise = onSignIn().finally(() => { _onSignInPromise = null; });
+  return _onSignInPromise;
 }
 
 // On sign-in: fetch this user's cloud library and replace the local view.
@@ -3735,18 +3759,36 @@ function renderDetail() {
     <div class="detail-head">
       <div class="title-block">
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
-        <h1>${escapeHtml(song.title || "Untitled")}${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}<span class="key-inline" title="${song.key ? "Key — click ± to transpose" : "Transpose chords"}"><span class="pill-state">${song.key
-            ? `<span class="key-pre">Key of </span><span class="key-name${song.originalKey && song.originalKey !== song.key ? " transposed" : ""}">${escapeHtml(song.key)}</span>`
-            : `<span class="key-pre">Transpose</span>`
-          }</span><span class="pill-ctrls"><button class="transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button><button class="transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>${(() => {
-            const keyChanged = !!(song.originalKey && song.originalKey !== song.key);
-            const title = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
-            return `<button class="transpose-btn" data-reset="1" title="${title}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>`;
-          })()}</span></span>${(() => {
+        <h1>${escapeHtml(song.title || "Untitled")}${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}</h1>
+        ${(() => {
+          const keyChanged = !!(song.originalKey && song.originalKey !== song.key);
           const accChanged = (typeof song.originalPreferFlat === "boolean") && (song.originalPreferFlat !== !!song.preferFlat);
-          const resetTitle = accChanged ? `Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})` : "Already at original accidentals";
-          return `<span class="acc-pill"><span class="pill-state"><button class="acc-toggle" data-accidental="${song.preferFlat ? "sharp" : "flat"}" title="${song.preferFlat ? "Currently flats — click to switch to sharps (C♯, F♯m, etc.)" : "Currently sharps — click to switch to flats (D♭, G♭m, etc.)"}" aria-label="Toggle accidental style">${song.preferFlat ? "Flats" : "Sharps"}<span class="acc-glyph">${song.preferFlat ? "♭" : "♯"}</span></button></span><span class="pill-ctrls"><button class="acc-reset" data-accidental-reset="1" title="${resetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button></span></span>`;
-        })()}${song.key ? `<button class="rn-pill ${song.showRoman ? "active" : ""}" data-rn-toggle title="${song.showRoman ? "Hide Roman numerals" : "Show Roman numeral analysis (key of " + escapeHtml(song.key) + ")"}" aria-label="Toggle Roman numerals">vii°</button>` : ""}</h1>
+          const accResetTitle = accChanged ? `Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})` : "Already at original accidentals";
+          const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
+          return `
+          <div class="song-controls" role="toolbar" aria-label="Song display controls">
+            <div class="sc-pill sc-key" title="Song key — use −/+ to transpose">
+              <span class="sc-cap">Key</span>
+              <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
+              <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
+              <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
+              <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
+            </div>
+            <div class="sc-pill sc-acc" title="Display chord names with sharps or flats">
+              <span class="sc-cap">Accidentals</span>
+              <div class="sc-segmented" role="radiogroup" aria-label="Accidentals">
+                <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
+                <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
+              </div>
+              <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
+            </div>
+            ${song.key ? `
+            <button class="sc-toggle-pill rn-pill" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" title="${song.showRoman ? "Hide Roman numerals" : `Show Roman numeral analysis (key of ${escapeHtml(song.key)})`}">
+              <span class="sc-cap">Roman numerals</span>
+              <span class="sc-on-off">${song.showRoman ? "On" : "Off"}</span>
+            </button>` : ""}
+          </div>`;
+        })()}
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
@@ -3844,6 +3886,11 @@ function renderDetail() {
   document.getElementById("btn-delete").addEventListener("click", () => deleteSong(song));
   el.querySelectorAll("[data-chord]").forEach(c => {
     c.addEventListener("click", e => {
+      // A drag just finished — swallow the click so we don't pop the phrasing modal.
+      if (window._chordDragInProgress) {
+        e.preventDefault(); e.stopPropagation();
+        return;
+      }
       const t = e.currentTarget;
       const occ = t.dataset.occ !== undefined ? parseInt(t.dataset.occ, 10) : null;
       openChordModal(t.dataset.chord, song, isNaN(occ) ? null : occ);
@@ -3873,12 +3920,17 @@ function attachLyricsDragDrop(detailEl, song) {
         sourceLineIdx, sourcePillIdx,
       }));
       e.dataTransfer.effectAllowed = "move";
+      // Module-level flag tells the chord-click handler to swallow the next click
+      // (which fires on the source pill once drag completes in some browsers).
+      window._chordDragInProgress = true;
       // Slight delay so the snapshot includes the pill before we hide it
       setTimeout(() => pill.classList.add("dragging"), 0);
     });
-    pill.addEventListener("dragend", () => pill.classList.remove("dragging"));
-    // Don't trigger the chord-edit modal when starting a drag (mouseup after drag is suppressed,
-    // but pointer events on the same pill could also fire click). Browsers usually handle this.
+    pill.addEventListener("dragend", () => {
+      pill.classList.remove("dragging");
+      // Keep the flag set briefly so any straggler "click" event after dragend gets eaten.
+      setTimeout(() => { window._chordDragInProgress = false; }, 80);
+    });
   });
   // Hover feedback + drop handling on the lyrics container
   let lastHover = null;
@@ -3911,10 +3963,45 @@ function attachLyricsDragDrop(detailEl, song) {
     if (!targetLineEl) return;
     const targetLineIdx = parseInt(targetLineEl.dataset.lineIdx, 10);
     if (isNaN(targetLineIdx)) return;
-    // Compute target text-only character offset within the line.
-    const targetCharIdx = textOffsetInLineFromPoint(targetLineEl, e.clientX, e.clientY);
-    moveChordInLyrics(song, payload, targetLineIdx, targetCharIdx);
+    // Decide insertion slot — before-a-chord-pill (geometric L/R half) or text-offset.
+    const slot = computeDropSlot(targetLineEl, e.clientX, e.clientY);
+    moveChordInLyrics(song, payload, targetLineIdx, slot);
   });
+
+  // Compute insertion slot. Two flavors:
+  //   { beforeChordPillIdx: N }   — insert immediately before the N-th chord token in the line
+  //   { textOffset: N }            — split a text token at character N
+  function computeDropSlot(lineEl, x, y) {
+    // Did we drop on (or very near) an existing chord pill? If so, decide left/right.
+    const allPills = [...lineEl.querySelectorAll(".chord, .chord-pill-inline")];
+    let nearest = null, nearestDist = Infinity, nearestSide = "right";
+    for (const pill of allPills) {
+      const r = pill.getBoundingClientRect();
+      // vertical proximity gate (covers absolute-positioned chord pills above lyric text)
+      const vClose = (y >= r.top - 6 && y <= r.bottom + 14);
+      if (!vClose) continue;
+      let dx = 0;
+      if (x < r.left)      dx = r.left - x;
+      else if (x > r.right) dx = x - r.right;
+      else                  dx = 0;
+      if (dx < nearestDist) {
+        nearestDist = dx;
+        nearest = pill;
+        const mid = (r.left + r.right) / 2;
+        nearestSide = (x < mid) ? "left" : "right";
+      }
+    }
+    if (nearest && nearestDist < 24) {
+      const pillIdx = parseInt(nearest.dataset.pillIdx, 10);
+      if (nearestSide === "left") {
+        return { beforeChordPillIdx: pillIdx };
+      }
+      // Right side of pill = AFTER this pill's chord. That's equivalent to
+      // "before the (pillIdx + 1)-th chord OR end of line" — handled by textOffset
+      // approach since text-offset 0 within the pill's seg means "right after this chord".
+    }
+    return { textOffset: textOffsetInLineFromPoint(lineEl, x, y) };
+  }
 
   function lineFromPoint(x, y) {
     const el = document.elementFromPoint(x, y);
@@ -3969,8 +4056,14 @@ function attachLyricsDragDrop(detailEl, song) {
 }
 
 // Mutate song.lyrics to move a chord marker. payload identifies the source
-// (line idx + which pill in that line); target is line + text-offset.
-function moveChordInLyrics(song, payload, targetLineIdx, targetTextOffset) {
+// (line idx + which pill in that line); slot is one of:
+//   { textOffset: N }            — split a text token at character N
+//   { beforeChordPillIdx: K }    — insert immediately before the K-th chord pill in target line
+//                                  (used so dropping ON the LEFT half of an existing pill puts the
+//                                  new chord BEFORE that pill — fixes the "can only move right" bug)
+function moveChordInLyrics(song, payload, targetLineIdx, slot) {
+  // Back-compat: accept a bare number as textOffset.
+  if (typeof slot === "number") slot = { textOffset: slot };
   const rawLines = (song.lyrics || "").replace(/\r\n/g, "\n").split("\n");
   if (payload.sourceLineIdx < 0 || payload.sourceLineIdx >= rawLines.length) return;
   if (targetLineIdx < 0 || targetLineIdx >= rawLines.length) return;
@@ -3989,47 +4082,61 @@ function moveChordInLyrics(song, payload, targetLineIdx, targetTextOffset) {
   function serialize(tokens) {
     return tokens.map(t => t.kind === "chord" ? "[" + t.name + "]" : t.str).join("");
   }
+  function findKthChordTokenIdx(tokens, k) {
+    let chordCounter = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i].kind === "chord") {
+        if (chordCounter === k) return i;
+        chordCounter++;
+      }
+    }
+    return -1;
+  }
 
   // ---- Remove source chord ----
   const srcTokens = tokenize(rawLines[payload.sourceLineIdx]);
-  // Find the K-th chord token
-  let srcChordTokenIdx = -1, chordCounter = 0;
-  for (let i = 0; i < srcTokens.length; i++) {
-    if (srcTokens[i].kind === "chord") {
-      if (chordCounter === payload.sourcePillIdx) { srcChordTokenIdx = i; break; }
-      chordCounter++;
-    }
-  }
+  const srcChordTokenIdx = findKthChordTokenIdx(srcTokens, payload.sourcePillIdx);
   if (srcChordTokenIdx === -1) return;
   const sourceIsTarget = payload.sourceLineIdx === targetLineIdx;
-  // Remove from source
+  // For same-line moves, when slot is "before pill K" and source pill IS K, that's a no-op.
+  if (sourceIsTarget && slot.beforeChordPillIdx === payload.sourcePillIdx) return;
   srcTokens.splice(srcChordTokenIdx, 1);
 
   // ---- Build target tokens ----
   let tgtTokens = sourceIsTarget ? srcTokens : tokenize(rawLines[targetLineIdx]);
-  // Walk text tokens until we've consumed targetTextOffset characters
-  let remaining = targetTextOffset;
-  let inserted = false;
-  for (let i = 0; i < tgtTokens.length && !inserted; i++) {
-    const t = tgtTokens[i];
-    if (t.kind !== "text") continue;
-    if (remaining <= t.str.length) {
-      // Split this text token at `remaining` and insert chord between
-      const left = t.str.slice(0, remaining);
-      const right = t.str.slice(remaining);
-      const replacement = [];
-      if (left) replacement.push({ kind: "text", str: left });
-      replacement.push({ kind: "chord", name: payload.chord });
-      if (right) replacement.push({ kind: "text", str: right });
-      tgtTokens.splice(i, 1, ...replacement);
-      inserted = true;
-    } else {
-      remaining -= t.str.length;
+
+  if (slot.beforeChordPillIdx !== undefined) {
+    // For same-line moves: if the source pill (now removed) had a smaller idx than the
+    // target pill, the target pill's index has shifted down by 1.
+    let pillIdx = slot.beforeChordPillIdx;
+    if (sourceIsTarget && payload.sourcePillIdx < slot.beforeChordPillIdx) pillIdx -= 1;
+    let insertAt = findKthChordTokenIdx(tgtTokens, pillIdx);
+    if (insertAt === -1) {
+      // Couldn't find the pill (e.g. it was the only one and we just removed it) — fallback to start.
+      insertAt = 0;
     }
-  }
-  if (!inserted) {
-    // Drop landed past the end of all text; append at the end
-    tgtTokens.push({ kind: "chord", name: payload.chord });
+    tgtTokens.splice(insertAt, 0, { kind: "chord", name: payload.chord });
+  } else {
+    // textOffset path: walk text tokens until we've consumed `targetTextOffset` characters
+    let remaining = slot.textOffset || 0;
+    let inserted = false;
+    for (let i = 0; i < tgtTokens.length && !inserted; i++) {
+      const t = tgtTokens[i];
+      if (t.kind !== "text") continue;
+      if (remaining <= t.str.length) {
+        const left = t.str.slice(0, remaining);
+        const right = t.str.slice(remaining);
+        const replacement = [];
+        if (left) replacement.push({ kind: "text", str: left });
+        replacement.push({ kind: "chord", name: payload.chord });
+        if (right) replacement.push({ kind: "text", str: right });
+        tgtTokens.splice(i, 1, ...replacement);
+        inserted = true;
+      } else {
+        remaining -= t.str.length;
+      }
+    }
+    if (!inserted) tgtTokens.push({ kind: "chord", name: payload.chord });
   }
 
   // ---- Write back ----
