@@ -750,6 +750,132 @@
     flex-shrink: 0; padding-right: 6px;
   }
 
+  /* ====================== Practice mode overlay ====================== */
+  .practice-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: var(--bg);
+    display: flex; align-items: stretch; justify-content: center;
+    animation: fadein .15s ease;
+  }
+  .practice-shell {
+    width: 100%; max-width: 920px;
+    display: flex; flex-direction: column;
+    padding: 28px 32px;
+  }
+  .practice-head {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .practice-head .practice-title {
+    flex: 1; margin: 0;
+    font-family: var(--serif);
+    font-size: 22px; font-weight: 500;
+    letter-spacing: -.01em;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .practice-head .practice-back {
+    background: transparent; border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 14px;
+    font: inherit; cursor: pointer; color: var(--ink-soft);
+    font-size: 13px;
+  }
+  .practice-head .practice-back:hover { background: var(--panel-2); color: var(--ink); }
+  .practice-head .practice-count {
+    font-family: var(--mono); font-size: 13px;
+    color: var(--ink-soft); padding: 0 4px;
+    letter-spacing: .02em;
+  }
+  .practice-head .practice-close {
+    background: transparent; border: 0;
+    font-size: 22px; line-height: 1; cursor: pointer;
+    color: var(--ink-soft); padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .practice-head .practice-close:hover { background: var(--panel-2); color: var(--ink); }
+
+  .practice-body {
+    flex: 1;
+    padding: 32px 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px;
+  }
+  .practice-sub {
+    font-size: 13px; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+    align-self: flex-start; margin-bottom: -4px;
+  }
+  .practice-drills {
+    width: 100%;
+    display: grid; gap: 10px;
+  }
+  .practice-drill {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px 20px;
+    text-align: left; cursor: pointer;
+    font: inherit; color: var(--ink);
+    display: flex; align-items: center; justify-content: space-between;
+    transition: background .12s, border-color .12s, transform .12s;
+  }
+  .practice-drill:hover {
+    background: var(--accent-soft);
+    border-color: #ecccc0;
+    transform: translateY(-1px);
+  }
+  .practice-drill .pd-name {
+    font-family: var(--serif); font-size: 17px; font-weight: 500;
+    letter-spacing: -.005em;
+  }
+  .practice-drill .pd-arrow {
+    color: var(--accent); font-size: 18px; opacity: .6;
+  }
+  .practice-drill:hover .pd-arrow { opacity: 1; }
+
+  .practice-step .practice-prompt-big {
+    font-family: var(--serif); font-size: 44px; font-weight: 500;
+    letter-spacing: -.015em; color: var(--ink);
+    text-align: center; line-height: 1.15;
+  }
+  .practice-step .practice-detail {
+    font-family: var(--mono); font-size: 16px; color: var(--ink-soft);
+    text-align: center; letter-spacing: .04em;
+  }
+  .practice-step .practice-piano {
+    margin: 14px 0 8px;
+    /* Constrain width so it scales nicely */
+    max-width: 760px; width: 100%;
+    display: flex; justify-content: center;
+  }
+  .practice-step .practice-piano svg {
+    max-width: 100%; height: auto;
+  }
+  .practice-step .practice-nav {
+    display: flex; gap: 10px; margin-top: 10px;
+  }
+  .practice-step .practice-nav button {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: 9px 22px;
+    font: inherit; font-weight: 600; cursor: pointer; color: var(--ink);
+    transition: background .12s, border-color .12s;
+    min-width: 110px;
+  }
+  .practice-step .practice-nav button:hover:not(:disabled) {
+    background: var(--accent-soft); border-color: #ecccc0; color: var(--accent-deep);
+  }
+  .practice-step .practice-nav button:disabled { opacity: .35; cursor: default; }
+  .practice-step .practice-nav .practice-next:not(:disabled) {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .practice-step .practice-nav .practice-next:not(:disabled):hover {
+    background: var(--accent-deep); border-color: var(--accent-deep);
+  }
+  .practice-hint {
+    font-size: 12px; color: var(--muted);
+    letter-spacing: .02em;
+  }
+
   /* ====================== Modal ====================== */
   .modal-bg {
     position: fixed; inset: 0;
@@ -1349,6 +1475,7 @@
   <div class="grow"></div>
   <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
   <button id="header-fetch" class="primary" title="Fetch & import this URL">Import URL</button>
+  <button id="btn-practice" class="ghost" title="Piano practice drills (circle of fifths, scales, ii–V–I, etc.)">Practice</button>
   <button id="btn-new">+ New Song</button>
   <div id="auth-area" class="auth-area">
     <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>
@@ -1463,7 +1590,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.1.0";
+const APP_VERSION = "4.2.0";
 
 //=============================================================
 // STORAGE
@@ -4650,6 +4777,272 @@ function openImportFailedModal(url, errorMsg) {
 }
 
 //=============================================================
+// PRACTICE MODE — guided piano drills (circle of fifths, scales,
+// ii–V–I, diatonic triads, inversions). Full-screen overlay; same
+// piano render that powers chord voicings (root marked with white dot).
+//=============================================================
+const PC_NAMES_SHARP = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+const PC_NAMES_FLAT  = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+
+// Helper: name a pitch class with sharps OR flats based on context (key signature).
+function pcNameWithAccidentals(pc, preferFlat) {
+  return preferFlat ? PC_NAMES_FLAT[(pc % 12 + 12) % 12] : PC_NAMES_SHARP[(pc % 12 + 12) % 12];
+}
+
+// Major-key signature flats/sharps: which keys are flat-flavored.
+const FLAT_KEYS = new Set([5, 10, 3, 8, 1, 6]); // F, B♭, E♭, A♭, D♭, G♭
+
+function drillCircleOfFifths() {
+  const order = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+  return order.map(root => {
+    const flat = FLAT_KEYS.has(root);
+    const naming = pc => pcNameWithAccidentals(pc, flat);
+    const intervals = [0, 4, 7];
+    return {
+      label: naming(root) + " major",
+      detail: intervals.map(iv => naming((root + iv) % 12)).join(" – "),
+      notes: intervals.map(iv => (root + iv) % 12),
+      rootPc: root,
+    };
+  });
+}
+
+function drillMajorScales() {
+  const order = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+  const intervals = [0, 2, 4, 5, 7, 9, 11];
+  return order.map(root => {
+    const flat = FLAT_KEYS.has(root);
+    const naming = pc => pcNameWithAccidentals(pc, flat);
+    return {
+      label: naming(root) + " major scale",
+      detail: intervals.map(iv => naming((root + iv) % 12)).join(" – "),
+      notes: intervals.map(iv => (root + iv) % 12),
+      rootPc: root,
+    };
+  });
+}
+
+function drillNaturalMinorScales() {
+  // Order around the circle of fifths starting at A minor (relative to C major)
+  const order = [9, 4, 11, 6, 1, 8, 3, 10, 5, 0, 7, 2];
+  // Mirror flat-flavor for relative-minor keys: A,E,B,F♯,C♯ minor → sharp; the rest → flat
+  const sharpMinors = new Set([9, 4, 11, 6, 1]);
+  const intervals = [0, 2, 3, 5, 7, 8, 10];
+  return order.map(root => {
+    const flat = !sharpMinors.has(root);
+    const naming = pc => pcNameWithAccidentals(pc, flat);
+    return {
+      label: naming(root) + " minor (natural)",
+      detail: intervals.map(iv => naming((root + iv) % 12)).join(" – "),
+      notes: intervals.map(iv => (root + iv) % 12),
+      rootPc: root,
+    };
+  });
+}
+
+function drillIIVI() {
+  const keyOrder = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+  const out = [];
+  for (const tonic of keyOrder) {
+    const flat = FLAT_KEYS.has(tonic);
+    const naming = pc => pcNameWithAccidentals(pc, flat);
+    const ii  = (tonic + 2) % 12;
+    const V   = (tonic + 7) % 12;
+    const m7  = [0, 3, 7, 10];
+    const dom7 = [0, 4, 7, 10];
+    const maj7 = [0, 4, 7, 11];
+    out.push({
+      label: `ii in ${naming(tonic)}: ${naming(ii)}m7`,
+      detail: m7.map(iv => naming((ii + iv) % 12)).join(" – "),
+      notes: m7.map(iv => (ii + iv) % 12), rootPc: ii,
+    });
+    out.push({
+      label: `V in ${naming(tonic)}: ${naming(V)}7`,
+      detail: dom7.map(iv => naming((V + iv) % 12)).join(" – "),
+      notes: dom7.map(iv => (V + iv) % 12), rootPc: V,
+    });
+    out.push({
+      label: `I in ${naming(tonic)}: ${naming(tonic)}maj7`,
+      detail: maj7.map(iv => naming((tonic + iv) % 12)).join(" – "),
+      notes: maj7.map(iv => (tonic + iv) % 12), rootPc: tonic,
+    });
+  }
+  return out;
+}
+
+function drillTriadsOfCMajor() {
+  const tonic = 0;
+  const degrees = [
+    { name: "I — C major",         intervals: [0, 4, 7], offset: 0 },
+    { name: "ii — D minor",        intervals: [0, 3, 7], offset: 2 },
+    { name: "iii — E minor",       intervals: [0, 3, 7], offset: 4 },
+    { name: "IV — F major",        intervals: [0, 4, 7], offset: 5 },
+    { name: "V — G major",         intervals: [0, 4, 7], offset: 7 },
+    { name: "vi — A minor",        intervals: [0, 3, 7], offset: 9 },
+    { name: "vii° — B diminished", intervals: [0, 3, 6], offset: 11 },
+  ];
+  return degrees.map(d => {
+    const root = (tonic + d.offset) % 12;
+    return {
+      label: d.name,
+      detail: d.intervals.map(iv => PC_NAMES_SHARP[(root + iv) % 12]).join(" – "),
+      notes: d.intervals.map(iv => (root + iv) % 12),
+      rootPc: root,
+    };
+  });
+}
+
+// Build positional notes for a triad inversion that ascends visibly across the
+// F-to-E keyboard. Returns FE positions (0–23+).
+function inversionPositions(pcs, inversion) {
+  const reordered = [...pcs.slice(inversion), ...pcs.slice(0, inversion)];
+  const positions = [];
+  let prev = -1;
+  for (const pc of reordered) {
+    let pos = fePosOfPc(pc);
+    while (pos <= prev) pos += 12;
+    if (pos > 23) pos = 23;
+    positions.push(pos);
+    prev = pos;
+  }
+  return positions;
+}
+
+function drillInversions() {
+  // C major triad in 3 inversions, then F major and G major to give
+  // students some practice across roots.
+  const triads = [
+    { name: "C major",  pcs: [0, 4, 7]  },
+    { name: "F major",  pcs: [5, 9, 0]  },
+    { name: "G major",  pcs: [7, 11, 2] },
+  ];
+  const labels = ["root position", "1st inversion", "2nd inversion"];
+  const out = [];
+  for (const t of triads) {
+    for (let inv = 0; inv < 3; inv++) {
+      const positions = inversionPositions(t.pcs, inv);
+      const reordered = [...t.pcs.slice(inv), ...t.pcs.slice(0, inv)];
+      out.push({
+        label: t.name + " — " + labels[inv],
+        detail: reordered.map(pc => PC_NAMES_SHARP[pc]).join(" – "),
+        notes: positions, // explicit positions — bypass stacking
+        rootPc: t.pcs[0],
+      });
+    }
+  }
+  return out;
+}
+
+const PRACTICE_DRILLS = [
+  { id: "circle5",   name: "Circle of fifths — major chord roots",        build: drillCircleOfFifths },
+  { id: "majscales", name: "Major scales — all 12 keys",                  build: drillMajorScales },
+  { id: "minscales", name: "Natural minor scales — all 12 keys",          build: drillNaturalMinorScales },
+  { id: "iivi",      name: "ii–V–I in all 12 keys (36 chords)",           build: drillIIVI },
+  { id: "triadsC",   name: "Diatonic triads of C major (I–ii–iii–IV–V–vi–vii°)", build: drillTriadsOfCMajor },
+  { id: "inversions", name: "Triad inversions (root, 1st, 2nd)",          build: drillInversions },
+];
+
+let practiceState = null;
+function openPracticeMode() {
+  if (practiceState) return; // already open
+  let chosen = null, steps = [], cursor = 0;
+  const overlay = document.createElement("div");
+  overlay.className = "practice-overlay";
+  document.body.appendChild(overlay);
+
+  function close() {
+    document.removeEventListener("keydown", onKey);
+    overlay.remove();
+    practiceState = null;
+  }
+  function back() {
+    chosen = null; steps = []; cursor = 0;
+    render();
+  }
+  function next() {
+    if (cursor < steps.length - 1) { cursor++; render(); }
+  }
+  function prev() {
+    if (cursor > 0) { cursor--; render(); }
+  }
+  function pick(drillId) {
+    const d = PRACTICE_DRILLS.find(x => x.id === drillId);
+    if (!d) return;
+    chosen = d;
+    steps = d.build();
+    cursor = 0;
+    render();
+  }
+
+  function render() {
+    if (!chosen) {
+      overlay.innerHTML = `
+        <div class="practice-shell">
+          <div class="practice-head">
+            <h2 class="practice-title">Practice</h2>
+            <button class="practice-close" aria-label="Close practice mode">✕</button>
+          </div>
+          <div class="practice-body">
+            <div class="practice-sub">Pick a drill</div>
+            <div class="practice-drills">
+              ${PRACTICE_DRILLS.map(d => `
+                <button class="practice-drill" data-id="${d.id}">
+                  <span class="pd-name">${escapeHtml(d.name)}</span>
+                  <span class="pd-arrow">→</span>
+                </button>`).join("")}
+            </div>
+            <div class="practice-hint">Each drill cycles through every key. Use ← / → or Space to step through.</div>
+          </div>
+        </div>
+      `;
+      overlay.querySelector(".practice-close").addEventListener("click", close);
+      overlay.querySelectorAll(".practice-drill").forEach(b =>
+        b.addEventListener("click", () => pick(b.dataset.id)));
+    } else {
+      const step = steps[cursor];
+      overlay.innerHTML = `
+        <div class="practice-shell">
+          <div class="practice-head">
+            <button class="practice-back" aria-label="Back to drill picker">← Drills</button>
+            <h2 class="practice-title">${escapeHtml(chosen.name)}</h2>
+            <span class="practice-count">${cursor + 1} <span style="opacity:.5;">/ ${steps.length}</span></span>
+            <button class="practice-close" aria-label="Close practice mode">✕</button>
+          </div>
+          <div class="practice-body practice-step">
+            <div class="practice-prompt-big">${escapeHtml(step.label)}</div>
+            ${step.detail ? `<div class="practice-detail">${escapeHtml(step.detail)}</div>` : ""}
+            <div class="practice-piano">${svgPianoFromPcs(step.notes, step.rootPc, undefined, "lg")}</div>
+            <div class="practice-nav">
+              <button class="practice-prev" ${cursor === 0 ? "disabled" : ""}>◀ Prev</button>
+              <button class="practice-next" ${cursor === steps.length - 1 ? "disabled" : ""}>${cursor === steps.length - 1 ? "Done" : "Next ▶"}</button>
+            </div>
+            <div class="practice-hint">← / → keys, or Space, to navigate. Esc to back out.</div>
+          </div>
+        </div>
+      `;
+      overlay.querySelector(".practice-close").addEventListener("click", close);
+      overlay.querySelector(".practice-back").addEventListener("click", back);
+      overlay.querySelector(".practice-prev").addEventListener("click", prev);
+      overlay.querySelector(".practice-next").addEventListener("click", next);
+    }
+  }
+
+  function onKey(e) {
+    if (e.key === "Escape") {
+      if (chosen) back(); else close();
+      e.preventDefault();
+      return;
+    }
+    if (!chosen) return;
+    if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); next(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+  }
+  document.addEventListener("keydown", onKey);
+  practiceState = { close };
+  render();
+}
+
+//=============================================================
 // BOOKMARKLET MODAL
 //=============================================================
 function openBookmarkletModal() {
@@ -5423,6 +5816,7 @@ async function init() {
   document.getElementById("btn-new").addEventListener("click", () => {
     state.editing = "new"; renderDetail();
   });
+  document.getElementById("btn-practice").addEventListener("click", () => openPracticeMode());
 
   // Header URL import — fetch via proxy, fall back to bookmarklet on CF block
   async function headerImportUrl() {
