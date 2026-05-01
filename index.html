@@ -283,127 +283,137 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  /* === Song-controls toolbar (key, accidentals, chord analysis).
-     Quiet typographic design — labels in small caps, value as a serif numeral, controls as
-     unadorned ghost buttons. Hover reveals a subtle highlight. No chunky pill borders.
-     Sections separated by a thin vertical rule. === */
+  /* === Song-controls toolbar v4 — compact, colored rounded pills with tight internal
+     sections. Each pill is a single capsule with an info segment (cap + value) on the
+     left and controls on the right, separated by a thin alpha-tinted divider. === */
   .song-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0;
-    margin-top: 14px;
-    padding: 6px 0;
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
+    gap: 8px;
+    margin-top: 12px;
     font-family: var(--sans);
-    font-size: 13px;
     line-height: 1;
-    color: var(--ink);
   }
   .sc-section {
     display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 16px;
-    border-right: 1px solid var(--line);
-    height: 28px;
-  }
-  .sc-section:last-child { border-right: 0; }
-  .sc-section .sc-cap {
-    font-size: 10.5px;
+    align-items: stretch;
+    height: 26px;
+    border-radius: 999px;
+    overflow: hidden;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: .12em;
+    letter-spacing: .02em;
+  }
+  .sc-section .sc-cap {
+    display: inline-flex; align-items: center;
+    padding: 0 8px 0 11px;
     text-transform: uppercase;
-    color: var(--muted);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    opacity: .75;
   }
   .sc-section .sc-value {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 11px 0 0;
     font-family: var(--serif);
-    font-size: 17px;
-    font-weight: 500;
-    letter-spacing: -.005em;
-    color: var(--ink);
-    min-width: 36px;
-    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    min-width: 38px;
   }
   .sc-section .sc-btn {
     background: transparent;
     border: 0;
-    width: 26px; height: 24px;
+    border-left: 1px solid currentColor;
+    width: 26px;
     display: inline-flex; align-items: center; justify-content: center;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 700;
     cursor: pointer;
-    color: var(--ink-soft);
-    border-radius: 4px;
-    transition: background .12s, color .12s;
+    color: inherit;
     font-family: var(--sans);
+    transition: background .12s;
+    line-height: 1;
   }
-  .sc-section .sc-btn:hover:not(:disabled) {
-    background: var(--accent-soft);
+  .sc-section .sc-btn:hover:not(:disabled) { background: rgba(255,255,255,.4); }
+  .sc-section .sc-btn:disabled { opacity: .3; cursor: default; }
+  /* === Key pill (warm rust) === */
+  .sc-section.sc-key {
+    background: #f5e3da;
     color: var(--accent-deep);
+    border: 1px solid #e8c8b8;
   }
-  .sc-section .sc-btn:disabled { opacity: .25; cursor: default; }
-  .sc-section .sc-btn.sc-reset { font-size: 14px; }
-  /* Sharp / flat segmented control — typographic, with a subtle underline marking the active one. */
-  .sc-section .sc-seg-row {
-    display: inline-flex; align-items: center; gap: 10px;
+  .sc-section.sc-key .sc-btn { border-color: rgba(138, 56, 25, .18); }
+  .sc-section.sc-key .sc-btn:hover:not(:disabled) { background: rgba(177, 74, 44, .14); color: var(--accent-deep); }
+  /* === Accidentals pill (cool blue) === */
+  .sc-section.sc-acc {
+    background: #e0e9f5;
+    color: #1f4a99;
+    border: 1px solid #c9d6ec;
   }
-  .sc-section .sc-seg {
+  .sc-section.sc-acc .sc-seg-row {
+    display: inline-flex; align-items: stretch;
+    padding: 2px 4px;
+  }
+  .sc-section.sc-acc .sc-seg {
     background: transparent;
     border: 0;
-    padding: 0 6px;
-    height: 24px;
+    padding: 0;
+    width: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
     font-family: var(--serif);
-    font-size: 18px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 700;
     cursor: pointer;
-    color: var(--ink-soft);
-    border-radius: 4px;
+    color: #1f4a99;
+    border-radius: 999px;
     line-height: 1;
-    position: relative;
-    transition: color .12s, background .12s;
+    transition: background .12s, color .12s;
   }
-  .sc-section .sc-seg:hover:not([aria-pressed="true"]) {
-    color: var(--ink);
-    background: var(--panel-2);
+  .sc-section.sc-acc .sc-seg:hover:not([aria-pressed="true"]) { background: rgba(31, 74, 153, .12); }
+  .sc-section.sc-acc .sc-seg[aria-pressed="true"] {
+    background: #1f4a99;
+    color: #fff;
   }
-  .sc-section .sc-seg[aria-pressed="true"] {
-    color: var(--accent-deep);
-    background: var(--accent-soft);
-  }
-  /* Analysis toggle — text-link feel. Active state has a small dot to indicate "on". */
+  .sc-section.sc-acc .sc-cap { padding-right: 10px; }
+  .sc-section.sc-acc .sc-btn { border-color: rgba(31, 74, 153, .18); }
+  .sc-section.sc-acc .sc-btn:hover:not(:disabled) { background: rgba(31, 74, 153, .14); }
+  /* === Analysis toggle pill (green) === */
   .sc-section.sc-analysis {
+    background: #eef4ee;
+    color: #2d6a3d;
+    border: 1px solid #cee2d2;
     cursor: pointer;
-    color: var(--ink-soft);
-    transition: color .12s;
+    padding: 0 13px;
+    align-items: center;
+    gap: 8px;
+    transition: background .12s;
   }
-  .sc-section.sc-analysis:hover { color: var(--ink); }
-  .sc-section.sc-analysis .sc-toggle-label {
-    font-size: 12.5px;
-    font-weight: 500;
-    letter-spacing: .01em;
-    color: inherit;
-    user-select: none;
-  }
+  .sc-section.sc-analysis:hover { background: #e2eee5; }
+  .sc-section.sc-analysis .sc-cap { padding: 0; opacity: .75; }
   .sc-section.sc-analysis .sc-toggle-state {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-family: var(--mono);
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--sans);
     font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: .08em;
   }
   .sc-section.sc-analysis .sc-dot {
     display: inline-block;
     width: 7px; height: 7px;
     border-radius: 50%;
-    background: var(--line);
+    background: rgba(45, 106, 61, .25);
     transition: background .12s;
   }
-  .sc-section.sc-analysis[aria-pressed="true"] .sc-dot { background: #2d6a3d; }
-  .sc-section.sc-analysis[aria-pressed="true"] .sc-toggle-state { color: #2d6a3d; }
+  .sc-section.sc-analysis[aria-pressed="true"] {
+    background: #2d6a3d;
+    color: #fff;
+    border-color: #2d6a3d;
+  }
+  .sc-section.sc-analysis[aria-pressed="true"] .sc-dot { background: #fff; }
   /* (Old .rn-pill inside-h1 styles removed — Roman toggle now lives in .song-controls.) */
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
@@ -1645,7 +1655,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.4.0";
+const APP_VERSION = "4.4.1";
 
 //=============================================================
 // STORAGE
@@ -1737,14 +1747,19 @@ function initAuth() {
       if (session) {
         const wasSignedIn = !!auth.user;
         auth.user = { id: session.user.id, email: session.user.email };
+        // Update the chip & clear the loader IMMEDIATELY so the user sees the signed-in
+        // state during cloud fetch, not "Sign in" + loader for several seconds.
+        renderAuthArea();
+        renderDetail();
         if (!wasSignedIn) {
-          await runOnSignInOnce();
+          await runOnSignInOnce(); // refreshes list/detail when cloud songs arrive
         }
       } else if (event === "INITIAL_SESSION") {
-        // Page loaded with no session — guest mode. Don't touch local state.
+        // Guest mode (no session). Clear the loader by re-rendering the detail panel.
         if (auth.user) { auth.user = null; onSignOut(); }
+        renderAuthArea();
+        renderDetail();
       }
-      renderAuthArea();
       return;
     }
 
@@ -1752,6 +1767,7 @@ function initAuth() {
     if (event === "SIGNED_OUT") {
       if (auth.user) { auth.user = null; onSignOut(); }
       renderAuthArea();
+      renderDetail();
       return;
     }
   });
@@ -4239,8 +4255,33 @@ function moveChordInLyrics(song, payload, targetLineIdx, slot) {
     }
     tgtTokens.splice(insertAt, 0, { kind: "chord", name: payload.chord });
   } else {
-    // textOffset path: walk text tokens until we've consumed `targetTextOffset` characters
-    let remaining = slot.textOffset || 0;
+    // textOffset path: walk text tokens until we've consumed `targetTextOffset` characters.
+    // Snap the requested offset away from existing chord anchors so dragging left can't
+    // collide with another chord (which used to render as [A][B] looking like a swap).
+    let target = slot.textOffset || 0;
+    const occupied = new Set();
+    {
+      let acc = 0;
+      for (const t of tgtTokens) {
+        if (t.kind === "chord") occupied.add(acc);
+        else acc += t.str.length;
+      }
+      const totalLen = acc;
+      // If our target lands on an occupied anchor, push forward until it doesn't
+      // (or back, if we're at the end). Each snap moves by 1 character.
+      if (occupied.has(target)) {
+        let fwd = target;
+        while (fwd <= totalLen && occupied.has(fwd)) fwd++;
+        let back = target;
+        while (back >= 0 && occupied.has(back)) back--;
+        // Pick the closer of (fwd, back). Prefer forward (more natural for drag-left).
+        const dFwd = fwd - target;
+        const dBack = target - back;
+        target = (dBack < dFwd && back >= 0 && !occupied.has(back)) ? back : fwd;
+        if (target > totalLen) target = totalLen;
+      }
+    }
+    let remaining = target;
     let inserted = false;
     for (let i = 0; i < tgtTokens.length && !inserted; i++) {
       const t = tgtTokens[i];
@@ -5500,6 +5541,7 @@ function attachHoverPopover(rootEl, song) {
     const t = e.target.closest("[data-chord]");
     if (!t) return;
     if (popoverState && popoverState.pinned) return; // pinned popover stays put
+    if (window._chordDragInProgress) return; // never show shape popover during a drag
     const occ = t.dataset.occ !== undefined ? parseInt(t.dataset.occ, 10) : null;
     clearTimeout(popoverTimer);
     popoverTimer = setTimeout(() => showPopover(t, t.dataset.chord, song, occ), 220);
@@ -5510,6 +5552,12 @@ function attachHoverPopover(rootEl, song) {
     clearTimeout(popoverTimer);
     popoverTimer = setTimeout(hidePopover, 200);
   });
+  // Belt-and-braces: any dragstart on a chord pill should immediately hide an open popover.
+  rootEl.addEventListener("dragstart", e => {
+    if (!e.target.closest("[data-chord]")) return;
+    clearTimeout(popoverTimer);
+    hidePopover(true);
+  }, true);
 }
 
 //=============================================================
