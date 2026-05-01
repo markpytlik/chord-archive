@@ -1655,7 +1655,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.4.2";
+const APP_VERSION = "4.4.3";
 
 //=============================================================
 // STORAGE
@@ -1700,6 +1700,22 @@ function initAuth() {
   }
   auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true },
+  });
+  // Defensive: if the persisted refresh token is dead, Supabase's auto-refresh
+  // hangs and so does every subsequent query (including getSession). Race a quick
+  // session probe against a 5s timeout — if it loses, force-sign-out so the user
+  // can sign back in cleanly instead of staring at a frozen "Saving…" indicator.
+  Promise.race([
+    auth.client.auth.getSession(),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("getSession hung")), 5000)),
+  ]).catch(async (e) => {
+    console.warn("[auth] session probe hung — refresh token is likely dead, forcing sign-out", e);
+    try { await auth.client.auth.signOut(); } catch (_) {}
+    auth.initialized = true;
+    auth.user = null;
+    setSyncStatus("error", "Your session expired. Please sign in again.");
+    renderAuthArea();
+    renderDetail();
   });
   // Safety net: if Supabase never fires INITIAL_SESSION (rare SDK hiccup), don't
   // leave the loader spinning forever. After 3s, mark initialized and continue.
@@ -1922,7 +1938,14 @@ async function cloudSyncOut(songs) {
       // Surface as an explicit error in console so it's easy to see even at default log level.
       console.error("[cloudSyncOut] FAILED", e);
       const detail = e?.message || e?.error_description || e?.hint || String(e);
-      setSyncStatus("error", detail);
+      // If the timeout fires, the auth refresh is hung. Force a sign-out so the
+      // next save attempt doesn't queue behind the same dead refresh.
+      if (/timed out/i.test(detail)) {
+        setSyncStatus("error", "Your session expired. Please sign in again.");
+        try { await auth.client.auth.signOut(); } catch (_) {}
+      } else {
+        setSyncStatus("error", detail);
+      }
     }
   }, 600);
 }
