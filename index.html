@@ -1503,7 +1503,8 @@
   header .auth-area .sync-indicator:empty { padding: 0; }
   header .auth-area .sync-indicator.syncing { color: var(--accent); }
   header .auth-area .sync-indicator.synced  { color: var(--good); }
-  header .auth-area .sync-indicator.error   { color: #b41a1a; font-weight: 600; }
+  header .auth-area .sync-indicator.error   { color: #b41a1a; font-weight: 600; cursor: pointer; }
+  header .auth-area .sync-indicator.error:hover { text-decoration: underline; }
   header .auth-area .sync-indicator.offline { color: var(--muted); font-style: italic; }
   header .auth-area .user-menu {
     position: absolute; top: 100%; right: 0; margin-top: 6px;
@@ -1671,7 +1672,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.1";
+const APP_VERSION = "4.5.2";
 
 //=============================================================
 // STORAGE
@@ -1871,15 +1872,18 @@ function setSyncStatus(state, detail) {
 function renderSyncIndicator() {
   const el = document.getElementById("sync-indicator");
   if (!el) return;
-  if (!auth.user) { el.textContent = ""; el.className = "sync-indicator"; el.title = ""; return; }
+  if (!auth.user) { el.textContent = ""; el.className = "sync-indicator"; el.title = ""; el.onclick = null; return; }
   const s = auth.syncStatus || "idle";
   const map = {
     idle:    { txt: "",                 cls: "sync-indicator",         tip: "" },
     syncing: { txt: "↻ Saving…",        cls: "sync-indicator syncing", tip: "Saving to your cloud library" },
     synced:  { txt: "✓ Saved to cloud", cls: "sync-indicator synced",  tip: "All changes saved to your cloud library" },
-    error:   { txt: "⚠ Save failed",    cls: "sync-indicator error",   tip: "Couldn't save to cloud: " + (auth.syncDetail || "unknown error") + " — your changes are still safe locally" },
+    error:   { txt: "⚠ Save failed · Reconnect", cls: "sync-indicator error", tip: "Couldn't save to cloud: " + (auth.syncDetail || "unknown error") + ". Click to clear the session and sign back in. Your songs are safe locally." },
     offline: { txt: "Offline",          cls: "sync-indicator offline", tip: "No network — changes saved locally and will sync when you're back online" },
   };
+  el.onclick = (s === "error")
+    ? () => { if (confirm("Reconnect to the cloud? You'll be signed out and can sign back in. Your local songs won't be lost.")) forceSessionPurgeAndReload(); }
+    : null;
   const m = map[s] || map.idle;
   el.textContent = m.txt;
   el.className = m.cls;
@@ -1958,12 +1962,11 @@ async function cloudSyncOut(songs) {
       // Surface as an explicit error in console so it's easy to see even at default log level.
       console.error("[cloudSyncOut] FAILED", e);
       const detail = e?.message || e?.error_description || e?.hint || String(e);
-      // If the timeout fires, the auth refresh / inter-tab lock is hung — signOut
-      // will hang too. Skip it; nuke the session directly and reload so the user
-      // can sign back in cleanly. Local songs are preserved (saveState already wrote them).
+      // Don't auto-sign-out on timeouts — that surprised the user when a single
+      // hung save kicked them out mid-edit. Just surface the error; the indicator
+      // exposes a "Reconnect" link the user can click if it persists.
       if (/timed out/i.test(detail)) {
-        setSyncStatus("error", "Session stuck — reloading to recover…");
-        forceSessionPurgeAndReload();
+        setSyncStatus("error", "Save timed out. Click the indicator to reconnect.");
       } else {
         setSyncStatus("error", detail);
       }
