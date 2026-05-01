@@ -1,6 +1,6 @@
 // Cross-browser API: Firefox uses `browser`, Chrome uses `chrome`. The `chrome` namespace works in both.
 const api = (typeof browser !== "undefined") ? browser : chrome;
-const ARCHIVE_URL = "https://chordkeeper.markpytlik.com/";
+const ARCHIVE_URL = "https://chordpad.app/";
 
 const $ = (id) => document.getElementById(id);
 function setStatus(msg, kind = "") {
@@ -54,7 +54,7 @@ $("grab").addEventListener("click", async () => {
       btn.disabled = false;
       return;
     }
-    // Build payload, base64-encode, redirect to Chord Keeper's #new= URL.
+    // Build payload, base64-encode, redirect to Chordpad's #new= URL.
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
       title: cleanScrapedTitle(result.title || ""),
       artist: cleanScrapedTitle(result.artist || ""),
@@ -78,7 +78,7 @@ $("grab").addEventListener("click", async () => {
     }
 
     const charCount = result.lyrics.length;
-    setStatus("Got it — opening Chord Keeper with " + charCount + " chars pre-filled.", "ok");
+    setStatus("Got it — opening Chordpad with " + charCount + " chars pre-filled.", "ok");
     setTimeout(() => api.tabs.create({ url: targetUrl }), 200);
   } catch (e) {
     setStatus("Error: " + e.message, "err");

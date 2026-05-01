@@ -12,7 +12,7 @@
 <meta name="GPTBot" content="noindex, nofollow" />
 <meta name="ClaudeBot" content="noindex, nofollow" />
 <meta name="referrer" content="no-referrer" />
-<title>Chord Keeper</title>
+<title>Chordpad</title>
 <style>
   /* ====================== Reset & Tokens ====================== */
   :root {
@@ -1095,6 +1095,146 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #dcd6c5; border-radius: 5px; }
   ::-webkit-scrollbar-thumb:hover { background: #c5beac; }
+  /* LANDING PAGE — shown to logged-out first-time visitors. Hides sidebar so the marketing
+     content gets full width. Once dismissed, normal app shell returns. */
+  body.landing-active aside { display: none; }
+  body.landing-active main { grid-template-columns: 1fr; }
+  body.landing-active .filter-bar { display: none; }
+  body.landing-active #search,
+  body.landing-active #header-url,
+  body.landing-active #header-fetch,
+  body.landing-active #btn-new,
+  body.landing-active .header-menu { display: none !important; }
+  body.landing-active header { padding: 14px 32px; }
+  body.landing-active .grow { flex: 1; }
+
+  .lp-page {
+    max-width: 920px; margin: 0 auto; padding: 8vh 32px 6vh;
+    font-family: var(--sans);
+  }
+  .lp-hero { text-align: center; margin-bottom: 8vh; }
+  .lp-hero .lp-title {
+    font-family: var(--serif);
+    font-size: clamp(56px, 9vw, 96px);
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -.02em;
+    margin: 0 0 .15em 0;
+  }
+  .lp-hero .lp-title em { color: var(--accent); font-style: italic; font-size: 1.1em; }
+  .lp-hero .lp-tagline {
+    font-family: var(--serif);
+    font-size: clamp(20px, 2.4vw, 26px);
+    color: var(--ink);
+    margin: 0 0 18px 0;
+    font-weight: 400;
+  }
+  .lp-hero .lp-sub {
+    max-width: 600px; margin: 0 auto 32px;
+    font-size: 16px; line-height: 1.6;
+    color: var(--ink-soft);
+  }
+  .lp-cta-row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .lp-btn {
+    padding: 13px 26px;
+    border-radius: 8px;
+    font: inherit; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .lp-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .lp-btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+  .lp-btn.ghost { background: transparent; color: var(--ink-soft); border-color: var(--line); }
+  .lp-btn.ghost:hover { color: var(--ink); border-color: var(--ink-soft); background: var(--panel-2); }
+  .lp-btn-large { padding: 16px 32px; font-size: 17px; }
+
+  .lp-features {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 32px;
+    margin-bottom: 8vh;
+    padding: 32px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .lp-feature .lp-feature-icon {
+    font-size: 28px; margin-bottom: 10px;
+  }
+  .lp-feature h3 {
+    font-family: var(--serif);
+    font-size: 20px;
+    margin: 0 0 8px 0;
+    font-weight: 500;
+    letter-spacing: -.005em;
+    color: var(--ink);
+  }
+  .lp-feature p {
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .lp-demo {
+    text-align: center;
+    margin-bottom: 8vh;
+  }
+  .lp-demo-label {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+  .lp-demo-row {
+    display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
+  }
+  .lp-chord-tile {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 22px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .lp-chord-tile .lp-chord-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .lp-chord-tile .lp-chord-svg svg {
+    max-width: 220px !important; height: auto !important; width: auto !important;
+  }
+
+  .lp-cta-bottom {
+    text-align: center;
+    padding: 6vh 0;
+    background: var(--panel-2);
+    border-radius: 16px;
+    margin-bottom: 4vh;
+  }
+  .lp-cta-bottom h2 {
+    font-family: var(--serif);
+    font-size: 32px;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+    color: var(--ink);
+  }
+  .lp-cta-bottom p {
+    color: var(--ink-soft);
+    margin: 0 0 26px 0;
+    font-size: 15px;
+  }
+
+  .lp-footer {
+    display: flex; justify-content: space-between; padding: 24px 0;
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .lp-footer a { color: var(--muted); text-decoration: underline; }
+
   /* Auth area in header */
   header .auth-area {
     display: inline-flex; align-items: center; gap: 8px;
@@ -1156,7 +1296,7 @@
 <body>
 
 <header>
-  <div class="brand"><span class="glyph">♪</span> Chord <span class="accent">Keeper</span><span class="brand-version" id="brand-version" title="App version"></span></div>
+  <div class="brand"><span class="glyph">♪</span> Chord<span class="accent">pad</span><span class="brand-version" id="brand-version" title="App version"></span></div>
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
   <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
@@ -1283,7 +1423,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "4.0.0";
 
 //=============================================================
 // STORAGE
@@ -1452,13 +1592,13 @@ function renderAuthArea() {
   }
 }
 
-function openAuthModal() {
+function openAuthModal(opts) {
   if (!auth.client) {
     alert("Auth isn't loaded — check your network connection and refresh.");
     return;
   }
   // mode: "signin" (magic-link primary) | "signup" (email + password) | "password" (sign in with password)
-  let mode = "signin";
+  let mode = (opts && opts.initialMode) ? opts.initialMode : "signin";
   const bg = document.createElement("div");
   bg.className = "modal-bg auth-modal";
   function render() {
@@ -2913,7 +3053,7 @@ async function importFromUrl(url) {
 }
 
 // ----- Bookmarklet — runs in user's logged-in browser, bypasses CF + CORS -----
-// On click: scrape current page → open Chord Archive with a #new= hash that
+// On click: scrape current page → open Chordpad with a #new= hash that
 // auto-populates the new-song editor. No clipboard, no paste step.
 function bookmarkletSource() {
   const fn = function() {
@@ -2968,16 +3108,16 @@ function bookmarkletSource() {
       title = document.querySelector("h1")?.textContent?.trim()
             || document.title.replace(/\s*[\|@\-–—].*/, "").trim();
     }
-    if (!lyrics) { alert("Chord Archive: couldn't find a chord chart on this page."); return; }
+    if (!lyrics) { alert("Chordpad: couldn't find a chord chart on this page."); return; }
 
     const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
       title, artist, lyrics, sourceUrl: location.href
     }))));
-    const target = "https://chordkeeper.markpytlik.com/#new=" + payload;
+    const target = "https://chordpad.app/#new=" + payload;
     if (target.length > 500000) {
-      alert("Chord Keeper: chart is too large for direct import. Falling back to clipboard.");
+      alert("Chordpad: chart is too large for direct import. Falling back to clipboard.");
       navigator.clipboard.writeText(lyrics);
-      window.open("https://chordkeeper.markpytlik.com/", "_blank");
+      window.open("https://chordpad.app/", "_blank");
       return;
     }
     window.open(target, "_blank");
@@ -3174,15 +3314,100 @@ function selectSong(id) {
   renderDetail();
 }
 
+// LANDING PAGE — what an unauthenticated visitor sees on first arrival.
+// Two CTAs: sign up free (opens auth modal in signup mode) or browse demo songs (dismisses landing,
+// drops them into the seed library). Dismissal is sticky via localStorage so refreshes don't pester them.
+function renderLandingPage() {
+  // Three demo chord pills with sample voicings — visual anchor for "what is this thing"
+  const demoChords = [
+    { name: "Cmaj7",   pcs: [0,4,7,11] },
+    { name: "G/B",     pcs: [11,2,7] },
+    { name: "Am9",     pcs: [9,0,4,7,11] },
+  ];
+  const demoTiles = demoChords.map(c => `
+    <div class="lp-chord-tile">
+      <div class="lp-chord-name">${escapeHtml(c.name)}</div>
+      <div class="lp-chord-svg">${svgPianoFromPcs(c.pcs, c.pcs[0], undefined, "md")}</div>
+    </div>
+  `).join("");
+  return `
+    <div class="lp-page">
+      <section class="lp-hero">
+        <h1 class="lp-title">Chord<em>pad</em></h1>
+        <p class="lp-tagline">Your personal songbook for chords, lyrics, and voicings.</p>
+        <p class="lp-sub">Save chord charts from anywhere. Practice with auto-scrolling lyrics. Tailor voicings for your guitar or piano. Free forever for personal use.</p>
+        <div class="lp-cta-row">
+          <button class="lp-btn primary" id="lp-signup">Sign up free</button>
+          <button class="lp-btn ghost" id="lp-browse">Or browse the demo songs →</button>
+        </div>
+      </section>
+
+      <section class="lp-features">
+        <div class="lp-feature">
+          <div class="lp-feature-icon">📥</div>
+          <h3>Build your library</h3>
+          <p>Paste a chord-site URL, install the browser extension, or paste plain text from anywhere. Chordpad parses it into a clean editable chart in one click.</p>
+        </div>
+        <div class="lp-feature">
+          <div class="lp-feature-icon">▶︎</div>
+          <h3>Practice in real time</h3>
+          <p>Full-screen Play mode with auto-scrolling lyrics, a scrub slider, rewind, and live chord-shape diagrams that follow the line you're playing.</p>
+        </div>
+        <div class="lp-feature">
+          <div class="lp-feature-icon">🎚</div>
+          <h3>Make it yours</h3>
+          <p>Save custom voicings per song or per occurrence. Transpose. Toggle sharps/flats. Roman numeral analysis. Capo-aware diagrams. It's your songbook — make it match how you actually play.</p>
+        </div>
+      </section>
+
+      <section class="lp-demo">
+        <div class="lp-demo-label">A few of the diagrams Chordpad draws:</div>
+        <div class="lp-demo-row">${demoTiles}</div>
+      </section>
+
+      <section class="lp-cta-bottom">
+        <h2>Ready to start?</h2>
+        <p>Free Chordpad account. Your songbook syncs across every device you sign in on.</p>
+        <button class="lp-btn primary lp-btn-large" id="lp-signup-2">Create your free account</button>
+      </section>
+
+      <footer class="lp-footer">
+        <span>Chordpad · a personal practice tool</span>
+        <span><a href="https://github.com/markpytlik/chord-archive" target="_blank" rel="noopener">Source on GitHub</a></span>
+      </footer>
+    </div>
+  `;
+}
+
+function wireLandingPage() {
+  const browseBtn = document.getElementById("lp-browse");
+  if (browseBtn) browseBtn.addEventListener("click", () => {
+    localStorage.setItem("chordpad_landing_dismissed", "1");
+    document.body.classList.remove("landing-active");
+    renderDetail();
+  });
+  const signupBtns = [document.getElementById("lp-signup"), document.getElementById("lp-signup-2")].filter(Boolean);
+  signupBtns.forEach(b => b.addEventListener("click", () => openAuthModal({ initialMode: "signup" })));
+}
+
 function renderDetail() {
   const el = document.getElementById("detail");
   if (state.editing) { renderEditor(el); return; }
   const song = state.songs.find(s => s.id === state.selectedId);
+  // Landing page: no signed-in user, no song picked, hasn't dismissed → marketing view.
+  const landingDismissed = localStorage.getItem("chordpad_landing_dismissed") === "1";
+  const showLanding = !auth.user && !song && !landingDismissed;
+  document.body.classList.toggle("landing-active", showLanding);
+  if (showLanding) {
+    el.innerHTML = renderLandingPage();
+    wireLandingPage();
+    return;
+  }
   if (!song) {
     el.innerHTML = `
       <div class="empty">
-        <h2>Your archive of chords &amp; phrasings</h2>
-        <p>Pick a song from the left, or hit <strong>+ New Song</strong> to add one. You can paste a chord-site URL, autofill metadata or lyrics, or paste a chord sheet — then tailor everything to your taste.</p>
+        <h2>Your songbook</h2>
+        <p>${auth.user ? "Pick a song from the left, or hit <strong>+ New Song</strong> to add one." : "You're browsing as a guest. Sign in to save songs to a private cloud library that follows you across devices, or hit <strong>+ New Song</strong> to start adding songs locally."} You can paste a chord-site URL, autofill metadata or lyrics, or paste a chord sheet — then tailor everything to your taste.</p>
       </div>`;
     return;
   }
@@ -3959,7 +4184,7 @@ function openBookmarkletModal() {
   bg.className = "modal-bg";
   bg.innerHTML = `
     <div class="modal" style="max-width:560px;">
-      <h3>Chord Keeper Bookmarklet</h3>
+      <h3>Chordpad Bookmarklet</h3>
       <div class="modal-sub">Drag the button below to your bookmarks bar. Then while viewing any chord page (Ultimate Guitar, E-Chords, Chordie, etc.), click it — it copies the chord chart to your clipboard, ready to paste into a new song.</div>
 
       <div style="text-align:center; padding:24px; background:var(--panel-2); border-radius:var(--radius); margin:8px 0;">
@@ -3973,7 +4198,7 @@ function openBookmarkletModal() {
           <li>Drag the orange button up to your bookmarks bar.</li>
           <li>Visit a chord page (e.g. <code>tabs.ultimate-guitar.com/...</code>).</li>
           <li>Click the bookmark → "Chord chart copied to clipboard!" toast.</li>
-          <li>Click "Open Chord Keeper now" → paste into the lyrics field → "Parse pasted sheet".</li>
+          <li>Click "Open Chordpad now" → paste into the lyrics field → "Parse pasted sheet".</li>
         </ol>
         <p class="micro muted" style="margin:10px 0 0;">Why a bookmarklet? Sites like Ultimate Guitar use Cloudflare bot protection that blocks automated proxies. The bookmarklet runs in your already-logged-in browser, so it works.</p>
       </div>
