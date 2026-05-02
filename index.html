@@ -1783,7 +1783,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.7.1";
+const APP_VERSION = "4.7.2";
 
 //=============================================================
 // STORAGE
@@ -2563,7 +2563,12 @@ function qualityToIntervals(quality) {
   const isMaj7 = /maj7|M7|Δ/.test(orig);
   const hasAnyAdd = /add\d/.test(orig);
   const hasPlain7 = /(?<!ad)7/.test(orig);
+  // Diminished-seventh chord (dim7 / °7) needs the bb7 (9 semitones), not the
+  // b7 (10) that the generic "has 7" branch would add. Half-dim / m7b5 still
+  // wants b7 — that's handled by the isHalfDim branch below, unchanged.
+  const isDim7 = /^(dim|°)7/i.test(orig);
   if (isMaj7) ivs.add(11);
+  else if (isDim7) ivs.add(9);
   else if (hasPlain7 && !isMaj7) ivs.add(10);
   if (isHalfDim) ivs.add(10);
 
@@ -2896,9 +2901,11 @@ function romanNumeral(chordName, keyName) {
   let degree = positions[semitone];
   let prefix = "";
   if (!degree) {
-    // Chromatic — pick the nearest below and prefix with ♭ (or above + ♯ — preferred ♭ for jazz/pop common).
-    const below = Object.keys(positions).map(Number).filter(n => n < semitone).sort((a,b)=>b-a)[0];
-    if (below !== undefined) { degree = positions[below]; prefix = "♭"; }
+    // Chromatic — pick the nearest diatonic position ABOVE and prefix with ♭.
+    // Convention: Bb in C major = ♭VII (lower the VII), not ♭VI (raise the VI).
+    // Same for ♭II (semitone 1), ♭III (3), ♭V/♯IV (6), ♭VI (8), ♭VII (10) in major.
+    const above = Object.keys(positions).map(Number).filter(n => n > semitone).sort((a,b)=>a-b)[0];
+    if (above !== undefined) { degree = positions[above]; prefix = "♭"; }
     else return "";
   }
   // Case based on chord quality: uppercase major, lowercase minor, lowercase + ° dim
