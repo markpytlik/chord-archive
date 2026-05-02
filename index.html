@@ -1500,15 +1500,20 @@
   }
   header .auth-area .user-chip:hover { background: #ece8db; }
   header .auth-area .user-chip .user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
-  /* Cloud-save status indicator next to the user chip */
+  /* Cloud-save status indicator next to the user chip.
+     Fixed reserved width so the message changing (empty → "↻ Saving…" →
+     "✓ Saved to cloud" → empty) doesn't shift the rest of the header. */
   header .auth-area .sync-indicator {
     font-family: var(--sans); font-size: 11.5px; font-weight: 500;
     letter-spacing: .02em;
-    padding: 0 6px;
     color: var(--muted);
     transition: opacity .25s, color .25s;
+    width: 144px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  header .auth-area .sync-indicator:empty { padding: 0; }
   header .auth-area .sync-indicator.syncing { color: var(--accent); }
   header .auth-area .sync-indicator.synced  { color: var(--good); }
   header .auth-area .sync-indicator.error   { color: #b41a1a; font-weight: 600; cursor: pointer; }
@@ -1680,7 +1685,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.9";
+const APP_VERSION = "4.5.10";
 
 //=============================================================
 // STORAGE
