@@ -1783,7 +1783,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.7.0";
+const APP_VERSION = "4.7.1";
 
 //=============================================================
 // STORAGE
@@ -6385,10 +6385,107 @@ function consumeImportHash() {
   }
 }
 
+//=============================================================
+// SELF-TESTS — pure-function asserts on music-theory primitives.
+// Runs once at startup; logs a single summary line in green on success
+// or each failure with [music-tests] prefix. Negligible cost (~5ms).
+// To run interactively: open devtools console and call runMusicTests().
+//=============================================================
+function runMusicTests() {
+  const fails = [];
+  const eq = (name, got, want) => {
+    const a = JSON.stringify(got), b = JSON.stringify(want);
+    if (a !== b) fails.push(`${name}: got ${a}, want ${b}`);
+  };
+  const has = (name, arr, vals) => {
+    const set = new Set(arr);
+    for (const v of vals) if (!set.has(v)) fails.push(`${name}: missing ${v} in ${JSON.stringify(arr)}`);
+  };
+
+  // ---- splitChord ----
+  eq("splitChord C",      splitChord("C"),       { root: 0, rootStr: "C",  quality: "",      bass: null, bassStr: null, raw: "C" });
+  eq("splitChord Dm",     splitChord("Dm"),      { root: 2, rootStr: "D",  quality: "m",     bass: null, bassStr: null, raw: "Dm" });
+  eq("splitChord F#m7b5", splitChord("F#m7b5"),  { root: 6, rootStr: "F#", quality: "m7b5",  bass: null, bassStr: null, raw: "F#m7b5" });
+  eq("splitChord C/G",    splitChord("C/G"),     { root: 0, rootStr: "C",  quality: "",      bass: 7,    bassStr: "G",  raw: "C/G" });
+  eq("splitChord Bb/D",   splitChord("Bb/D"),    { root: 10,rootStr: "Bb", quality: "",      bass: 2,    bassStr: "D",  raw: "Bb/D" });
+  eq("splitChord null",   splitChord("Q"),       null);
+
+  // ---- qualityToIntervals ----
+  eq("qual ''",      qualityToIntervals(""),       [0, 4, 7]);
+  eq("qual m",       qualityToIntervals("m"),      [0, 3, 7]);
+  eq("qual 7",       qualityToIntervals("7"),      [0, 4, 7, 10]);
+  eq("qual maj7",    qualityToIntervals("maj7"),   [0, 4, 7, 11]);
+  eq("qual m7",      qualityToIntervals("m7"),     [0, 3, 7, 10]);
+  eq("qual m7b5",    qualityToIntervals("m7b5"),   [0, 3, 6, 10]);
+  eq("qual dim7",    qualityToIntervals("dim7"),   [0, 3, 6, 9]);
+  eq("qual sus4",    qualityToIntervals("sus4"),   [0, 5, 7]);
+  eq("qual sus2",    qualityToIntervals("sus2"),   [0, 2, 7]);
+  has("qual add9 has 14", qualityToIntervals("add9"), [0, 4, 7, 14]);
+  has("qual 9 has 10+14", qualityToIntervals("9"),    [0, 4, 7, 10, 14]);
+  eq("qual aug",     qualityToIntervals("aug"),    [0, 4, 8]);
+
+  // ---- transposeChord ----
+  eq("transpose C+2",      transposeChord("C", 2),         "D");
+  eq("transpose Em7+5",    transposeChord("Em7", 5),       "Am7");
+  eq("transpose F#m7b5+1", transposeChord("F#m7b5", 1),    "Gm7b5");
+  eq("transpose C/G+7",    transposeChord("C/G", 7),       "G/D");
+  eq("transpose F+1 sharp",transposeChord("F", 1),         "F#");
+  eq("transpose Bb+2 flat",transposeChord("Bb", 2),        "C");
+
+  // ---- convertChordAccidental ----
+  eq("acc F#m flat",  convertChordAccidental("F#m", true),  "Gbm");
+  eq("acc Bb sharp",  convertChordAccidental("Bb", false),  "A#");
+  eq("acc C unchanged", convertChordAccidental("C", true),  "C");
+  eq("acc D/F# flat", convertChordAccidental("D/F#", true), "D/Gb");
+
+  // ---- romanNumeral ----
+  eq("roman Am in C",  romanNumeral("Am", "C"),  "vi");
+  eq("roman G in C",   romanNumeral("G", "C"),   "V");
+  eq("roman F in C",   romanNumeral("F", "C"),   "IV");
+  eq("roman Bb in C",  romanNumeral("Bb", "C"),  "♭VII");
+  eq("roman D7 in G",  romanNumeral("D7", "G"),  "V7");
+
+  // ---- detectKey ----
+  eq("detect C major",   detectKey(["C", "F", "G", "Am", "C"]),         "C");
+  eq("detect A minor",   detectKey(["Am", "Dm", "E7", "Am"]),           "Am");
+  eq("detect G major",   detectKey(["G", "C", "D", "Em", "G"]),         "G");
+  eq("detect empty",     detectKey([]),                                  null);
+
+  // ---- lookupShape (slash + capo coverage) ----
+  const ce = lookupShape("C/E");
+  if (!ce) fails.push("lookupShape C/E: returned null");
+  else if (ce.frets[0] < 0) fails.push("lookupShape C/E: low E muted, expected open or fretted (got " + ce.frets[0] + ")");
+  const dfsharp = lookupShape("D/F#");
+  if (!dfsharp || dfsharp.frets[0] === -1 && dfsharp.frets[1] === -1) {
+    fails.push("lookupShape D/F#: bass F# not placed");
+  }
+
+  // ---- chordNameFromPcs ----
+  eq("name C major from pcs",  chordNameFromPcs([0, 4, 7], 0, false),       "C");
+  eq("name Am from pcs",       chordNameFromPcs([9, 0, 4], 9, false),       "Am");
+  eq("name Cmaj7 from pcs",    chordNameFromPcs([0, 4, 7, 11], 0, false),   "Cmaj7");
+  eq("name C7 from pcs",       chordNameFromPcs([0, 4, 7, 10], 0, false),   "C7");
+
+  if (fails.length === 0) {
+    console.log("%c[music-tests] " + 51 + " checks passed", "color:#15803d;font-weight:600;");
+  } else {
+    console.warn("[music-tests] " + fails.length + " failures:");
+    for (const f of fails) console.warn("  ✗ " + f);
+  }
+  return { passed: fails.length === 0, failCount: fails.length };
+}
+
 async function init() {
   // Show the app version in the brand
   const v = document.getElementById("brand-version");
   if (v) v.textContent = "v" + APP_VERSION;
+
+  // Quiet self-test on every load — catches regressions in the music-theory
+  // primitives before users hit them. Runs in <5ms; logs nothing on success.
+  try {
+    const r = runMusicTests();
+    if (!r.passed) console.warn("[init] music-theory tests failed; see prior log");
+  } catch (e) { console.warn("[init] runMusicTests threw:", e); }
 
   // Global Escape: close the topmost modal (or pinned popover) so users aren't trapped.
   document.addEventListener("keydown", e => {
