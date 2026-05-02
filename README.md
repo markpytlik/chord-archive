@@ -9,10 +9,9 @@ Static site — no server, no build step. Open `index.html` in any modern browse
 
 1. Double-click `index.html` to open it in your browser.
 2. Click **+ New Song** to add one.
-3. Three ways to get a starting chord chart:
-   - **Import URL** — paste a chord-site URL (Ultimate Guitar, E-Chords, etc.); the app fetches via a CORS proxy and parses the chart. Best-effort — falls back to paste-and-parse when sites change layouts.
-   - **Autofill metadata / Autofill lyrics** — type artist + title and pull from MusicBrainz / lyrics.ovh.
-   - **Parse pasted sheet** — paste any "chords on line above lyrics" sheet from anywhere; it converts it to the app's ChordPro format.
+3. Two ways to get a starting chord chart:
+   - **Browser extension** — install `chordpad-1.5.1.xpi` (Firefox) or load the `extension/` folder unpacked (Chrome). Click the extension's Grab button on any chord page and the song is sent into Chordpad. Reliable on sites that block server-side fetches (Ultimate Guitar, etc.).
+   - **Parse pasted sheet** — copy a "chords on line above lyrics" sheet from anywhere, paste into the lyrics field, click **Tidy & align**. Works for any source.
 4. **Hover** any chord above the lyrics to see a guitar diagram + piano keyboard inline (with your custom shape if saved).
 5. **Click** a chord to open the editor — save a custom guitar shape (e.g. `x32000` for Cmaj7) and a per-song voicing note.
 6. **Export** any time to download a `chord-archive.json` backup. **Import** restores from one.
@@ -47,15 +46,15 @@ Two layers of customization per song:
 
 These overrides live on the song itself and travel with it in your JSON exports.
 
-## URL import — what works, what doesn't
+## Importing chord charts
 
-The app tries CORS proxies (`corsproxy.io`, `allorigins.win`, `codetabs`) to fetch the page, then runs a parser based on the host:
+The browser extension is the only built-in import path. It runs in your real browser session, so it's not blocked by the bot-protection that breaks server-side fetches:
 
-- **Ultimate Guitar** — extracts the embedded `js-store` JSON, then converts `[ch]X[/ch]` markup to the app's `[X]` format.
+- **Ultimate Guitar** — reads the embedded `js-store` JSON and converts `[ch]X[/ch]` markup to the app's `[X]` format.
 - **E-Chords** — pulls the `<pre id="core">` content.
-- **Generic fallback** — finds the largest `<pre>` block and runs the chord-line-above-lyrics parser.
+- **Generic fallback** — finds the largest `<pre>` block on the page.
 
-Best-effort — sites change their HTML, proxies rate-limit, some pages block proxies. When fetch fails, copy the chord chart manually and use **Parse pasted sheet** instead.
+The extension hands the scraped song off to an already-open Chordpad tab when one exists; otherwise it opens a new tab. For everything else, copy the chord chart from the source page and paste it into the lyrics field — **Tidy & align** parses chord-line-above-lyrics format and re-aligns chords cleanly.
 
 ## Data model
 

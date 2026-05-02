@@ -156,18 +156,7 @@
     background: var(--panel-2); border-color: transparent;
   }
   header input.search:focus { background: var(--panel); border-color: var(--accent); }
-  header .header-url-input {
-    flex: 1 1 320px; max-width: 460px;
-    padding: 8px 14px;
-    background: var(--panel-2); border-color: transparent;
-  }
-  header .header-url-input:focus { background: var(--panel); border-color: var(--chord); }
   header .header-btn { white-space: nowrap; }
-  header .header-icon-btn {
-    width: 32px; padding: 0;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 18px; line-height: 1;
-  }
   header .header-menu { position: relative; display: inline-block; }
   header .header-menu-pop {
     position: absolute; right: 0; top: calc(100% + 4px);
@@ -1402,8 +1391,6 @@
   body.landing-active main { grid-template-columns: 1fr; }
   body.landing-active .filter-bar { display: none; }
   body.landing-active #search,
-  body.landing-active #header-url,
-  body.landing-active #header-fetch,
   body.landing-active #btn-new,
   body.landing-active .header-menu { display: none !important; }
   body.landing-active header { padding: 14px 32px; }
@@ -1619,10 +1606,8 @@
   <div class="brand"><span class="glyph">♪</span> Chord<span class="accent">pad</span><span class="brand-version" id="brand-version" title="App version"></span></div>
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
-  <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
-  <button id="header-fetch" class="header-btn" title="Fetch & import this URL">Import</button>
   <button id="btn-practice" class="ghost header-btn" title="Piano practice drills (circle of fifths, scales, ii–V–I, etc.)">Practice</button>
-  <button id="btn-new" class="header-btn header-icon-btn" title="Add a new song" aria-label="New song">+</button>
+  <button id="btn-new" class="header-btn" title="Add a new song">+ New Song</button>
   <div id="auth-area" class="auth-area">
     <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>
   </div>
@@ -1736,7 +1721,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.12";
+const APP_VERSION = "4.6.0";
 
 //=============================================================
 // STORAGE
@@ -3406,9 +3391,13 @@ function mergeChordsIntoLyric(chordLine, lyricLine) {
 function chordProToChordSheet(text) {
   if (!text) return "";
   const blocks = []; // { kind: 'section'|'pair'|'plain'|'chord-only', text }
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue; // drop input blanks; we add our own
-    const sec = line.match(/^\s*\{([^}]+)\}\s*$/);
+  for (const rawLine of text.split("\n")) {
+    // Strip leading whitespace on every input line. Lyric lines often arrive
+    // with stray indentation from copy-paste; chord-position alignment is
+    // recomputed below, so trimming has no negative effect on alignment.
+    const line = rawLine.replace(/^\s+/, "");
+    if (!line) continue; // drop blanks; we re-emit our own
+    const sec = line.match(/^\{([^}]+)\}\s*$/);
     if (sec) {
       blocks.push({ kind: "section", text: "[" + sec[1].trim() + "]" });
       continue;
@@ -3437,13 +3426,12 @@ function chordProToChordSheet(text) {
     else blocks.push({ kind: "pair", text: chordLine + "\n" + trimmedLyric });
   }
 
-  // Emit with blank lines between non-section blocks; section labels stay tight to following block
+  // Emit with a blank line between every consecutive block — including before
+  // AND after section labels, so verses/choruses/etc visually breathe.
   const out = [];
-  let prevWasSection = true; // treat start as if after a section, so first block gets no leading blank
-  for (const b of blocks) {
-    if (out.length > 0 && !prevWasSection) out.push("");
-    out.push(b.text);
-    prevWasSection = (b.kind === "section");
+  for (let i = 0; i < blocks.length; i++) {
+    if (i > 0) out.push("");
+    out.push(blocks[i].text);
   }
   return out.join("\n");
 }
@@ -3548,235 +3536,6 @@ function parseChordSheet(text) {
   // Catches the common UG case where [ch]F[/ch] → [F] shifts column alignment.
   const cleaned = snapChordsToWordBoundaries(out.join("\n")).trim();
   return { lyrics: cleaned, title, artist, key };
-}
-
-//=============================================================
-// REMOTE: MusicBrainz, lyrics.ovh, URL-based site scrape
-//=============================================================
-async function lookupMusicBrainz(title, artist) {
-  const q = `recording:"${title.replace(/"/g, "\\\"")}" AND artist:"${artist.replace(/"/g, "\\\"")}"`;
-  const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
-  const res = await fetch(url, { headers: { "Accept": "application/json" }});
-  if (!res.ok) throw new Error("MusicBrainz request failed: " + res.status);
-  const data = await res.json();
-  if (!data.recordings || !data.recordings.length) return null;
-  const r = data.recordings[0];
-  return {
-    title: r.title,
-    artist: r["artist-credit"]?.map(a => a.name).join(", ") || artist,
-    mbid: r.id,
-  };
-}
-async function lookupLyrics(title, artist) {
-  const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Lyrics request failed: " + res.status);
-  const data = await res.json();
-  if (!data || !data.lyrics) return null;
-  return data.lyrics.replace(/\r\n/g, "\n").trim();
-}
-
-// ----- URL fetch proxy -----
-// Primary: a Supabase Edge Function (`fetch-page`) we control. Far more reliable than the
-// random public CORS proxies that used to be the only option.
-//
-// Caveats baked into reality:
-//   - Cloudflare-protected sites (Ultimate Guitar, E-Chords, Songsterr) return a CF challenge
-//     page even from the Edge Function, because CF blocks server-side fetches. Those still
-//     need the browser extension or bookmarklet.
-//   - Smaller chord/lyric sites without aggressive bot protection work fine.
-//
-// We keep one public-proxy fallback for the rare case the Edge Function itself is down.
-const FETCH_PROXY_PRIMARY = url =>
-  `https://mjgctqprbecwkdinpcbp.supabase.co/functions/v1/fetch-page?url=${encodeURIComponent(url)}`;
-const FETCH_PROXY_FALLBACK = url =>
-  `https://corsproxy.io/?${encodeURIComponent(url)}`;
-
-async function fetchViaProxy(url) {
-  let lastErr = null;
-  for (const proxify of [FETCH_PROXY_PRIMARY, FETCH_PROXY_FALLBACK]) {
-    try {
-      const res = await fetch(proxify(url), { cache: "no-cache" });
-      if (res.ok) {
-        const txt = await res.text();
-        if (txt && txt.length > 200) return txt;
-        lastErr = new Error("Empty body");
-      } else {
-        lastErr = new Error("Proxy returned " + res.status);
-      }
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr || new Error("All proxies failed");
-}
-
-function decodeHtmlEntities(s) {
-  const ta = document.createElement("textarea");
-  ta.innerHTML = s;
-  return ta.value;
-}
-// Convert "[ch]Cmaj7[/ch]" → "[Cmaj7]"; "[tab]...[/tab]" → "..."
-function ugMarkupToChordPro(s) {
-  return s
-    .replace(/\[ch\]([^\[]+)\[\/ch\]/g, (_, c) => "[" + c.trim() + "]")
-    .replace(/\[\/?tab\]/g, "");
-}
-
-// Recursively search a parsed JSON for any key matching the regex; used as a robust fallback
-function deepFindKey(obj, keyPattern, depth = 0) {
-  if (depth > 8 || !obj || typeof obj !== "object") return null;
-  for (const k of Object.keys(obj)) {
-    if (keyPattern.test(k)) {
-      const v = obj[k];
-      if (typeof v === "string" && v.trim() && v.length < 200) return v.trim();
-    }
-  }
-  for (const k of Object.keys(obj)) {
-    const v = obj[k];
-    if (v && typeof v === "object") {
-      const found = deepFindKey(v, keyPattern, depth + 1);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function parseUltimateGuitar(html) {
-  let title = null, artist = null, lyrics = null;
-  // 1) og:title is the most reliable: "Sail To The Moon CHORDS by Radiohead @ Ultimate-Guitar.com"
-  //    Try several formats: with type word, with " - " separator, with " by " separator.
-  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i);
-  if (og) {
-    const t = decodeHtmlEntities(og[1]);
-    let m = t.match(/^(.+?)\s+(?:Chords?|Tabs?|Bass|Ukulele|Drum|Pro|Lyrics)\s+(?:by|–|—|-)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
-    if (!m) m = t.match(/^(.+?)\s+(?:by)\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/i);
-    if (!m) m = t.match(/^(.+?)\s+[-–—]\s+([^|@\-–—]+?)(?:\s*[\|@\-–—].*)?$/);
-    if (m) { title = m[1].trim(); artist = m[2].trim(); }
-  }
-  // 2) Pull lyrics + fill-in title/artist from the embedded JSON
-  let storeMatch = html.match(/<div[^>]+class="js-store"[^>]+data-content="([^"]+)"/);
-  if (storeMatch) {
-    try {
-      const json = JSON.parse(decodeHtmlEntities(storeMatch[1]));
-      const data = json?.store?.page?.data;
-      const tab = data?.tab_view?.wiki_tab?.content || data?.tab?.wiki_tab?.content;
-      if (tab) lyrics = ugMarkupToChordPro(tab);
-      if (!artist) artist = deepFindKey(json, /^(artist_name|artist|band|musician|performer|song_band|byArtist)$/i);
-      if (!title)  title  = deepFindKey(json, /^(song_name|song_title|title|name|track_name)$/i);
-    } catch (e) { console.warn("UG JSON parse failed", e); }
-  }
-  // 3) Older: a <pre> with [ch] markup
-  if (!lyrics) {
-    const m = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
-    if (m) {
-      const content = decodeHtmlEntities(m[1].replace(/<[^>]+>/g, ""));
-      if (/\[ch\]/.test(content)) lyrics = ugMarkupToChordPro(content);
-    }
-  }
-  if (!lyrics) return null;
-  return { lyrics, title, artist };
-}
-function parseEChords(html) {
-  // E-Chords also uses [ch]X[/ch] inside <pre id="core"> typically
-  let m = html.match(/<pre[^>]*id=["']core["'][^>]*>([\s\S]*?)<\/pre>/i);
-  if (!m) m = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
-  if (!m) return null;
-  const content = decodeHtmlEntities(m[1].replace(/<[^>]+>/g, ""));
-  if (/\[ch\]/.test(content)) {
-    return { lyrics: ugMarkupToChordPro(content), title: null, artist: null };
-  }
-  // Otherwise pass to generic parser
-  const parsed = parseChordSheet(content);
-  return parsed.lyrics ? { lyrics: parsed.lyrics, title: parsed.title, artist: parsed.artist } : null;
-}
-function parseGenericPre(html) {
-  // Find the longest <pre>...</pre>, treat as chord-line-above-lyric and run our parser
-  const matches = [...html.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/gi)];
-  if (!matches.length) return null;
-  matches.sort((a, b) => b[1].length - a[1].length);
-  const content = decodeHtmlEntities(matches[0][1].replace(/<[^>]+>/g, ""));
-  if (!content.trim()) return null;
-  const parsed = parseChordSheet(content);
-  return parsed.lyrics ? { lyrics: parsed.lyrics, title: parsed.title, artist: parsed.artist } : null;
-}
-function parseTitleArtistFromHtml(html) {
-  // Try OpenGraph / <title> for fallback metadata
-  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i);
-  if (og) {
-    const t = decodeHtmlEntities(og[1]);
-    const m = t.match(/^(.+?)\s+(?:Chords|Tab|Lyrics)?\s+(?:by|–|—|-)\s+(.+?)(?:\s*[\|@].*)?$/i);
-    if (m) return { title: m[1].trim(), artist: m[2].trim() };
-    return { title: t.trim(), artist: null };
-  }
-  const tt = html.match(/<title>([^<]+)<\/title>/i);
-  if (tt) {
-    const t = decodeHtmlEntities(tt[1]);
-    const m = t.match(/^(.+?)\s+(?:Chords|Tab|Lyrics)?\s+(?:by|–|—|-)\s+(.+?)(?:\s*[\|@].*)?$/i);
-    if (m) return { title: m[1].trim(), artist: m[2].trim() };
-  }
-  return { title: null, artist: null };
-}
-function isCloudflareChallenge(html) {
-  return /Just a moment\.\.\./.test(html) || /challenges\.cloudflare\.com/.test(html) || /cf-chl-bypass/.test(html);
-}
-
-// Fallback: extract artist from a UG URL path, e.g. /tab/radiohead/sail-to-the-moon-... → "Radiohead"
-function artistFromUgUrl(url) {
-  try {
-    const m = new URL(url).pathname.match(/^\/tab\/([^\/]+)\//i);
-    if (!m) return null;
-    return m[1].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  } catch (e) { return null; }
-}
-
-async function importFromUrl(url) {
-  if (!/^https?:\/\//i.test(url)) throw new Error("Please paste a full URL (https://…)");
-  const host = new URL(url).hostname.replace(/^www\./, "");
-  const isUG = /ultimate-guitar\.com/.test(host);
-
-  let html;
-  try {
-    html = await fetchViaProxy(url);
-  } catch (e) {
-    throw new Error("Proxy fetch failed: " + e.message + ". Use the browser extension on sites that block proxies.");
-  }
-  if (isCloudflareChallenge(html)) {
-    throw new Error("This site is behind Cloudflare bot-protection and can't be fetched server-side. Use the browser extension — it scrapes the page in your real browser session.");
-  }
-  // Detect "the proxy got through but the site redirected us to an artist landing or
-  // generic page" (common on e-chords / cifras sites when they suspect a bot).
-  // Heuristic: og:url's pathname has noticeably less depth than the requested URL.
-  const ogUrlMatch = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)/i);
-  if (ogUrlMatch) {
-    try {
-      const ogUrl = new URL(decodeHtmlEntities(ogUrlMatch[1]));
-      const reqDepth = new URL(url).pathname.replace(/\/$/, "").split("/").length;
-      const ogDepth  = ogUrl.pathname.replace(/\/$/, "").split("/").length;
-      if (ogDepth < reqDepth - 1) {
-        throw new Error("The site served us a different (probably artist or homepage) than the song URL — bot detection. Use the browser extension instead.");
-      }
-    } catch (e) { if (e.message?.startsWith("The site served")) throw e; /* URL parse failure: ignore */ }
-  }
-
-  let parsed = null;
-  if (isUG) {
-    parsed = parseUltimateGuitar(html);
-  } else if (/e-chords\.com$/.test(host)) {
-    parsed = parseEChords(html);
-  }
-  if (!parsed || !parsed.lyrics) parsed = parseGenericPre(html);
-  if (!parsed || !parsed.lyrics) {
-    throw new Error("Couldn't find a chord chart on that page. The site may have changed its layout, or it returned a non-song page. Try the browser extension or paste-and-parse.");
-  }
-  if (!parsed.title || !parsed.artist) {
-    const meta = parseTitleArtistFromHtml(html);
-    parsed.title = parsed.title || meta.title;
-    parsed.artist = parsed.artist || meta.artist;
-  }
-  // Last resort: pull artist from UG URL path
-  if (isUG && !parsed.artist) {
-    parsed.artist = artistFromUgUrl(url);
-  }
-  return parsed;
 }
 
 // ----- Bookmarklet — runs in user's logged-in browser, bypasses CF + CORS -----
@@ -4099,7 +3858,7 @@ function renderLandingPage() {
         <div class="lp-feature">
           <div class="lp-feature-icon">📥</div>
           <h3>Build your library</h3>
-          <p>Paste a chord-site URL, install the browser extension, or paste plain text from anywhere. Chordpad parses it into a clean editable chart in one click.</p>
+          <p>Install the browser extension, or paste plain text from anywhere. Chordpad parses it into a clean editable chart in one click.</p>
         </div>
         <div class="lp-feature">
           <div class="lp-feature-icon">▶︎</div>
@@ -4181,7 +3940,7 @@ function renderDetail() {
     el.innerHTML = `
       <div class="empty">
         <h2>Your songbook</h2>
-        <p>${auth.user ? "Pick a song from the left, or hit <strong>+ New Song</strong> to add one." : "You're browsing as a guest. Sign in to save songs to a private cloud library that follows you across devices, or hit <strong>+ New Song</strong> to start adding songs locally."} You can paste a chord-site URL, autofill metadata or lyrics, or paste a chord sheet — then tailor everything to your taste.</p>
+        <p>${auth.user ? "Pick a song from the left, or hit <strong>+ New Song</strong> to add one." : "You're browsing as a guest. Sign in to save songs to a private cloud library that follows you across devices, or hit <strong>+ New Song</strong> to start adding songs locally."} Use the browser extension to grab from any chord site, or paste a chord sheet directly — then tailor everything to your taste.</p>
       </div>`;
     return;
   }
@@ -4666,8 +4425,6 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
         <div class="editor-tools">
           <button id="t-tidy" type="button">Tidy &amp; align ↻</button>
           <button id="t-strip-tabs" type="button" class="prominent" title="Remove tablature lines (e|---0---0---|)">🗑 Remove tablature</button>
-          <button id="t-fill-meta" type="button">Autofill metadata</button>
-          <button id="t-fill-lyrics" type="button">Autofill lyrics</button>
         </div>
         <div class="helper-msg" id="helper"></div>
       </div>
@@ -4757,39 +4514,6 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
       setHelper("Detected key: " + k + " (best fit for " + chords.length + " chord" + (chords.length !== 1 ? "s" : "") + ")", "ok");
     } else {
       setHelper("Couldn't determine a clear key from this chord set.", "err");
-    }
-  });
-
-  document.getElementById("t-fill-meta").addEventListener("click", async () => {
-    const t = document.getElementById("f-title").value.trim();
-    const a = document.getElementById("f-artist").value.trim();
-    if (!t || !a) { setHelper("Type a title and artist first.", "err"); return; }
-    setHelper("Looking up on MusicBrainz…", "busy");
-    try {
-      const r = await lookupMusicBrainz(t, a);
-      if (!r) { setHelper("No match on MusicBrainz.", "err"); return; }
-      if (r.title) document.getElementById("f-title").value = r.title;
-      if (r.artist) document.getElementById("f-artist").value = r.artist;
-      setHelper(`Match: ${r.artist} — ${r.title}`, "ok");
-    } catch (e) {
-      setHelper("MusicBrainz error: " + e.message, "err");
-    }
-  });
-
-  document.getElementById("t-fill-lyrics").addEventListener("click", async () => {
-    const t = document.getElementById("f-title").value.trim();
-    const a = document.getElementById("f-artist").value.trim();
-    if (!t || !a) { setHelper("Type a title and artist first.", "err"); return; }
-    const ta = document.getElementById("f-lyrics");
-    if (ta.value.trim() && !confirm("Replace existing lyrics with autofilled lyrics?")) return;
-    setHelper("Looking up lyrics…", "busy");
-    try {
-      const lyrics = await lookupLyrics(t, a);
-      if (!lyrics) { setHelper("No lyrics found.", "err"); return; }
-      ta.value = lyrics;
-      setHelper("Lyrics loaded. They have no chords yet — paste chords above lyrics or add [Chord] markers, then hit Parse.", "ok");
-    } catch (e) {
-      setHelper("Lyrics fetch error: " + e.message, "err");
     }
   });
 
@@ -5316,52 +5040,6 @@ function openSettingsModal() {
   });
   bg.querySelector("#set-export").addEventListener("click", () => { bg.remove(); exportJson(); });
   bg.querySelector("#set-import").addEventListener("click", () => { bg.remove(); document.getElementById("import-file").click(); });
-}
-
-//=============================================================
-// IMPORT FAILED MODAL — shown when URL fetch / parse can't recover the chart.
-// Surfaces the durable alternatives (browser extension, bookmarklet, paste-and-parse)
-// instead of a jarring confirm() dialog.
-//=============================================================
-function openImportFailedModal(url, errorMsg) {
-  const bg = document.createElement("div");
-  bg.className = "modal-bg";
-  let host = "";
-  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch (e) {}
-  bg.innerHTML = `
-    <div class="modal" style="max-width:520px;">
-      <h3>Couldn't import that URL</h3>
-      <div class="modal-sub" style="color:var(--ink-soft);">${escapeHtml(host || url)}</div>
-      <div style="margin: 14px 0; padding: 10px 12px; border-radius: 6px; background: #fceeed; color: #b41a1a; border: 1px solid #ebd2d2; font-size: 13px;">
-        ${escapeHtml(errorMsg || "Unknown error")}
-      </div>
-      <p style="font-size: 13.5px; line-height: 1.55; color: var(--ink); margin: 0 0 14px;">
-        Most chord sites detect server-side fetches and either block them or redirect to a generic page. Three reliable alternatives:
-      </p>
-      <ol style="font-size: 13.5px; line-height: 1.6; padding-left: 20px; margin: 0 0 18px;">
-        <li><b>Browser extension</b> — toolbar button that scrapes the page in your real browser session.</li>
-        <li><b>Bookmarklet</b> — a one-click bookmarks-bar button that does the same thing without installing anything.</li>
-        <li><b>Paste-and-parse</b> — copy the chord chart from the page, hit New Song, paste into the lyrics field, click <em>Parse pasted sheet</em>.</li>
-      </ol>
-      <div class="actions" style="display:flex; gap:8px;">
-        <button id="imp-bookmarklet" class="primary" style="flex:1;">Show bookmarklet</button>
-        <button id="imp-paste" class="ghost" style="flex:1;">Paste & parse</button>
-        <button id="imp-cancel" class="ghost">Cancel</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(bg);
-  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
-  bg.querySelector("#imp-cancel").addEventListener("click", () => bg.remove());
-  bg.querySelector("#imp-bookmarklet").addEventListener("click", () => {
-    bg.remove();
-    state.editing = "new"; renderDetail();
-    setTimeout(() => openBookmarkletModal(), 50);
-  });
-  bg.querySelector("#imp-paste").addEventListener("click", () => {
-    bg.remove();
-    state.editing = "new"; renderDetail();
-  });
 }
 
 //=============================================================
@@ -6430,40 +6108,6 @@ async function init() {
     state.editing = "new"; renderDetail();
   });
   document.getElementById("btn-practice").addEventListener("click", () => openPracticeMode());
-
-  // Header URL import — fetch via proxy, fall back to bookmarklet on CF block
-  async function headerImportUrl() {
-    const url = document.getElementById("header-url").value.trim();
-    if (!url) return;
-    const btn = document.getElementById("header-fetch");
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = "Fetching…";
-    try {
-      const result = await importFromUrl(url);
-      // Build a draft song and open the editor
-      const parsed = parseChordSheet(result.lyrics || "");
-      const chords = extractChords(parsed.lyrics || "");
-      const detected = detectKey(chords);
-      const draft = Object.assign(blankSong(), {
-        title: cleanScrapedTitle(result.title || parsed.title || ""),
-        artist: cleanScrapedTitle(result.artist || parsed.artist || ""),
-        key: parsed.key || detected || "",
-        lyrics: parsed.lyrics || "",
-        sourceUrl: url,
-      });
-      state.editing = draft;
-      document.getElementById("header-url").value = "";
-      renderDetail();
-    } catch (e) {
-      openImportFailedModal(url, e.message);
-    } finally {
-      btn.disabled = false; btn.textContent = orig;
-    }
-  }
-  document.getElementById("header-fetch").addEventListener("click", headerImportUrl);
-  document.getElementById("header-url").addEventListener("keydown", e => {
-    if (e.key === "Enter") { e.preventDefault(); headerImportUrl(); }
-  });
 
   // Kebab menu replaced by user-menu Settings (see openSettingsModal).
   // We keep the hidden file input wired so Import-from-file still works.
