@@ -162,6 +162,12 @@
     background: var(--panel-2); border-color: transparent;
   }
   header .header-url-input:focus { background: var(--panel); border-color: var(--chord); }
+  header .header-btn { white-space: nowrap; }
+  header .header-icon-btn {
+    width: 32px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; line-height: 1;
+  }
   header .header-menu { position: relative; display: inline-block; }
   header .header-menu-pop {
     position: absolute; right: 0; top: calc(100% + 4px);
@@ -477,7 +483,55 @@
     background: var(--accent-soft);
     transform: translate(1px, -1px);
   }
-  .detail-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  /* Detail-actions row — uniform pill buttons, Play as the only filled primary,
+     Delete as a transparent icon-only that reveals red on hover. */
+  .detail-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+  .detail-actions button {
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .detail-actions button:hover:not(:disabled) {
+    background: var(--panel-2);
+    border-color: #d8d3c4;
+  }
+  .detail-actions button:disabled { opacity: .35; cursor: default; }
+  .detail-actions button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .detail-actions button.primary:hover:not(:disabled) {
+    background: var(--accent-deep);
+    border-color: var(--accent-deep);
+  }
+  .detail-actions button .da-icon {
+    font-size: 13px;
+    line-height: 1;
+    opacity: .8;
+  }
+  .detail-actions button.primary .da-icon { opacity: 1; }
+  .detail-actions .da-trash {
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted);
+    padding: 6px 8px;
+    margin-left: 2px;
+  }
+  .detail-actions .da-trash:hover:not(:disabled) {
+    background: #fceeee;
+    border-color: #ebd2d2;
+    color: #b41a1a;
+  }
 
   .meta-row {
     display: flex; flex-wrap: wrap; gap: 6px;
@@ -1569,9 +1623,9 @@
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
   <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
-  <button id="header-fetch" class="primary" title="Fetch & import this URL">Import URL</button>
-  <button id="btn-practice" class="ghost" title="Piano practice drills (circle of fifths, scales, ii–V–I, etc.)">Practice</button>
-  <button id="btn-new">+ New Song</button>
+  <button id="header-fetch" class="primary header-btn" title="Fetch & import this URL">Import</button>
+  <button id="btn-practice" class="ghost header-btn" title="Piano practice drills (circle of fifths, scales, ii–V–I, etc.)">Practice</button>
+  <button id="btn-new" class="header-btn header-icon-btn" title="Add a new song" aria-label="New song">+</button>
   <div id="auth-area" class="auth-area">
     <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>
   </div>
@@ -1685,7 +1739,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.10";
+const APP_VERSION = "4.5.11";
 
 //=============================================================
 // STORAGE
@@ -4185,11 +4239,11 @@ function renderDetail() {
         })()}
       </div>
       <div class="detail-actions">
-        <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll">▶ Play</button>
-        <button id="btn-edit">Edit</button>
-        <button id="btn-undo" class="ghost" title="Undo last change (transpose, voicing edit, etc.)" ${state.undoStack.find(e => e.songId === song.id) ? "" : "disabled"}>↶ Undo</button>
-        <button id="btn-duplicate" class="ghost">Duplicate</button>
-        <button id="btn-delete" class="danger" title="Delete song" aria-label="Delete song">
+        <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll"><span class="da-icon">▶</span>Play</button>
+        <button id="btn-edit" title="Edit this song"><span class="da-icon">✎</span>Edit</button>
+        <button id="btn-undo" title="Undo last change (transpose, voicing edit, etc.)" ${state.undoStack.find(e => e.songId === song.id) ? "" : "disabled"}><span class="da-icon">↶</span>Undo</button>
+        <button id="btn-duplicate" title="Duplicate this song"><span class="da-icon">⧉</span>Duplicate</button>
+        <button id="btn-delete" class="da-trash" title="Delete song" aria-label="Delete song">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
