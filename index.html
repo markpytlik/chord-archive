@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Content-Security-Policy: belt-and-braces against a compromised CDN (Supabase
+     SDK loads from jsdelivr). 'unsafe-inline' on style is required for the inline
+     <style> block; on script it's required for the inline <script> at the bottom.
+     connect-src whitelists the Supabase project + lyrics/MusicBrainz APIs. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data:;
+  font-src 'self' data:;
+  connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+  frame-ancestors 'none';
+  base-uri 'self';
+  form-action 'self';
+" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="favicon.svg" />
 <meta name="theme-color" content="#b14a2c" />
@@ -1721,7 +1736,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.6.1";
+const APP_VERSION = "4.6.2";
 
 //=============================================================
 // STORAGE
@@ -1939,8 +1954,19 @@ async function onSignIn() {
     const userAdded = state.songs.filter(s => !String(s.id || "").startsWith("seed-"));
     if (userAdded.length) {
       const rows = userAdded.map(song => ({ id: song.id, user_id: auth.user.id, data: song, updated_at: new Date(song.updatedAt || Date.now()).toISOString() }));
-      const { error: upErr } = await auth.client.from("songs").upsert(rows);
-      if (upErr) console.warn("Cloud seed-from-local failed:", upErr);
+      // Bound the seed upsert with the same watchdog timeout as cloudSyncOut —
+      // a wedged client here would otherwise hang onSignIn forever with no signal.
+      try {
+        const { error: upErr } = await withTimeout(
+          auth.client.from("songs").upsert(rows),
+          10000,
+          "songs seed upsert"
+        );
+        if (upErr) console.warn("Cloud seed-from-local failed:", upErr);
+      } catch (e) {
+        console.warn("[onSignIn] seed-from-local timed out:", e);
+        setSyncStatus("error", e?.message || "Couldn't seed cloud library — click to reconnect.");
+      }
       state.songs = userAdded;
       auth.knownIds = new Set(userAdded.map(s => s.id));
     } else {
@@ -1988,7 +2014,14 @@ function renderSyncIndicator() {
     offline: { txt: "Offline",          cls: "sync-indicator offline", tip: "No network — changes saved locally and will sync when you're back online" },
   };
   el.onclick = (s === "error")
-    ? () => { if (confirm("Reconnect to the cloud? You'll be signed out and can sign back in. Your local songs won't be lost.")) forceSessionPurgeAndReload(); }
+    ? async () => {
+        const ok = await modalConfirm({
+          title: "Reconnect to the cloud?",
+          message: "You'll be signed out and can sign back in. Your local songs won't be lost.",
+          confirmText: "Reconnect",
+        });
+        if (ok) forceSessionPurgeAndReload();
+      }
     : null;
   const m = map[s] || map.idle;
   el.textContent = m.txt;
@@ -2217,7 +2250,7 @@ function renderAuthArea() {
 
 function openAuthModal(opts) {
   if (!auth.client) {
-    alert("Auth isn't loaded — check your network connection and refresh.");
+    modalAlert({ title: "Auth isn't loaded", message: "Check your network connection and refresh." });
     return;
   }
   // mode: "password" (default, email + password) | "signup" (create) | "signin" (magic link)
@@ -3622,6 +3655,77 @@ function bookmarkletSource() {
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c]);
 }
+
+// ----- Native dialog replacements -----
+// modalConfirm + modalAlert use the existing .modal-bg / .modal pattern so
+// confirmations match the rest of the UI instead of breaking out into the
+// browser-chrome dialog (which doesn't focus-trap and looks alien on macOS).
+// Both return a Promise; modalConfirm resolves true on confirm, false on
+// cancel/dismiss; modalAlert resolves when dismissed.
+function modalConfirm({ title, message, confirmText = "OK", cancelText = "Cancel", danger = false } = {}) {
+  return new Promise(resolve => {
+    const bg = document.createElement("div");
+    bg.className = "modal-bg";
+    bg.innerHTML = `
+      <div class="modal" style="max-width:420px;">
+        <h3>${escapeHtml(title || "")}</h3>
+        ${message ? `<p style="font-size:13.5px; line-height:1.55; margin: 8px 0 18px;">${escapeHtml(message)}</p>` : ""}
+        <div class="actions" style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="ghost" data-act="cancel">${escapeHtml(cancelText)}</button>
+          <button class="${danger ? "danger" : "primary"}" data-act="ok">${escapeHtml(confirmText)}</button>
+        </div>
+      </div>
+    `;
+    function done(result) {
+      bg.remove();
+      document.removeEventListener("keydown", onKey);
+      resolve(result);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); done(false); }
+      else if (e.key === "Enter") { e.preventDefault(); done(true); }
+    }
+    bg.addEventListener("click", e => {
+      if (e.target === bg) return done(false);
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act === "ok") done(true);
+      else if (act === "cancel") done(false);
+    });
+    document.body.appendChild(bg);
+    document.addEventListener("keydown", onKey);
+    setTimeout(() => bg.querySelector('[data-act="ok"]')?.focus(), 50);
+  });
+}
+function modalAlert({ title, message, ok = "OK" } = {}) {
+  return new Promise(resolve => {
+    const bg = document.createElement("div");
+    bg.className = "modal-bg";
+    bg.innerHTML = `
+      <div class="modal" style="max-width:420px;">
+        <h3>${escapeHtml(title || "")}</h3>
+        ${message ? `<p style="font-size:13.5px; line-height:1.55; margin: 8px 0 18px;">${escapeHtml(message)}</p>` : ""}
+        <div class="actions" style="display:flex; justify-content:flex-end;">
+          <button class="primary" data-act="ok">${escapeHtml(ok)}</button>
+        </div>
+      </div>
+    `;
+    function done() {
+      bg.remove();
+      document.removeEventListener("keydown", onKey);
+      resolve();
+    }
+    function onKey(e) {
+      if (e.key === "Escape" || e.key === "Enter") { e.preventDefault(); done(); }
+    }
+    bg.addEventListener("click", e => {
+      if (e.target === bg || e.target.closest('[data-act="ok"]')) done();
+    });
+    document.body.appendChild(bg);
+    document.addEventListener("keydown", onKey);
+    setTimeout(() => bg.querySelector('[data-act="ok"]')?.focus(), 50);
+  });
+}
+
 function renderLyrics(text, song) {
   const showRoman = !!(song && song.showRoman && song.key);
   const rnFor = (ch) => showRoman ? romanNumeral(ch, song.key) : "";
@@ -4681,8 +4785,14 @@ function saveEdit(isNew, songSnapshot) {
   state.editing = false;
   renderList(); renderDetail();
 }
-function deleteSong(song) {
-  if (!confirm(`Delete "${song.title}"? This can't be undone.`)) return;
+async function deleteSong(song) {
+  const ok = await modalConfirm({
+    title: `Delete "${song.title}"?`,
+    message: "This can't be undone.",
+    confirmText: "Delete",
+    danger: true,
+  });
+  if (!ok) return;
   state.songs = state.songs.filter(s => s.id !== song.id);
   state.selectedId = null;
   saveState({ songs: state.songs });
@@ -4948,21 +5058,24 @@ function openPlayMode(song) {
     dragStartH = shapePanel.getBoundingClientRect().height;
     document.body.style.userSelect = "none";
   });
-  document.addEventListener("mousemove", e => {
+  // Named handlers so close() can detach them — anonymous listeners on document
+  // would leak and stack up across repeat play-mode opens.
+  function onResizeMove(e) {
     if (!dragging) return;
     const newH = Math.max(100, Math.min(window.innerHeight * 0.7, dragStartH + (e.clientY - dragStartY)));
     shapePanel.style.height = newH + "px";
-    // Re-pick the size class so shapes scale up/down with the panel height.
     if (shapesOn) {
       delete shapeDiag.dataset.last; // bypass the "no change" early return
       renderCurrentShape();
     }
-  });
-  document.addEventListener("mouseup", () => {
+  }
+  function onResizeEnd() {
     if (!dragging) return;
     dragging = false;
     document.body.style.userSelect = "";
-  });
+  }
+  document.addEventListener("mousemove", onResizeMove);
+  document.addEventListener("mouseup", onResizeEnd);
   overlay.querySelector("#play-slower").addEventListener("click", () => {
     speedInput.value = Math.max(0, parseFloat(speedInput.value) - 2);
     setSpeed(speedInput.value);
@@ -4976,6 +5089,8 @@ function openPlayMode(song) {
     pause();
     overlay.remove();
     document.removeEventListener("keydown", onKey);
+    document.removeEventListener("mousemove", onResizeMove);
+    document.removeEventListener("mouseup", onResizeEnd);
     playState = null;
   }
   function onKey(e) {
@@ -5465,7 +5580,12 @@ function renderPopover(target) {
       }
       else if (action === "edit-from-builtin") { hidePopover(true); openVoicingEditor(chordName, song, null, current, occ); }
       else if (action === "delete") {
-        if (confirm(`Delete this voicing of ${chordName}?`)) {
+        modalConfirm({
+          title: `Delete this voicing of ${chordName}?`,
+          confirmText: "Delete",
+          danger: true,
+        }).then(ok => {
+          if (!ok) return;
           if (current.perOccurrence) {
             pushUndo(song);
             song.positionVoicings = song.positionVoicings || {};
@@ -5475,22 +5595,30 @@ function renderPopover(target) {
             deleteVoicing(song, chordName, getUserVoicingIndex(song, chordName, current));
           }
           saveState({ songs: state.songs });
-          // After delete, rebuild and re-render at safe index
           const newVoicings = wantGuitar ? getVoicings(song, chordName, occ) : [];
           popoverState.index = Math.min(index, Math.max(0, newVoicings.length - 1));
           renderPopover(target);
-        }
+        });
       }
     });
   });
 }
 
 function getUserVoicingIndex(song, chordName, voicing) {
-  // Map a popover voicing back to its index in song.voicings[chordName]
+  // Map a popover voicing back to its index in song.voicings[chordName].
+  // Compare full identity (frets + fingers + barre + piano notes), not just
+  // frets — two voicings with identical frets but different fingers / barre /
+  // piano notation are distinct user records and edit/delete must hit the
+  // right one.
   if (!song.voicings || !song.voicings[chordName]) return -1;
-  return song.voicings[chordName].findIndex(v =>
-    JSON.stringify(v.frets) === JSON.stringify(voicing.frets)
-  );
+  const ident = v => JSON.stringify({
+    frets: v.frets || null,
+    fingers: v.fingers || null,
+    barre: v.barre || null,
+    pianoNotes: v.pianoNotes || null,
+  });
+  const target = ident(voicing);
+  return song.voicings[chordName].findIndex(v => ident(v) === target);
 }
 
 function showPopover(target, chordName, song, occ) {
@@ -5777,14 +5905,14 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
     };
     if (showGuitar && fretsInput && fretsInput.value.trim()) {
       const frets = stringToFrets(fretsInput.value.trim());
-      if (!frets) { alert("Invalid guitar shape — use 6 characters (digits or 'x'). Example: x32010"); return; }
+      if (!frets) { modalAlert({ title: "Invalid guitar shape", message: "Use 6 characters (digits or 'x'). Example: x32010" }); return; }
       voicing.frets = frets;
     }
     if (showPiano && pianoPcs.length) {
       voicing.pianoNotes = pianoPcs.slice();
     }
     if (!voicing.frets && !voicing.pianoNotes) {
-      alert("Add at least a guitar shape or piano notes."); return;
+      modalAlert({ title: "Add at least a shape", message: "Tap a fret on the guitar shape, click a key on the piano, or both." }); return;
     }
     // Use whatever the chord-name input currently has (auto-detected OR user-overridden).
     const inputName = bg.querySelector("#ve-chord-name").value.trim();
@@ -5858,8 +5986,13 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
     doSave("all");
   });
   if (isEdit) {
-    bg.querySelector("#ve-delete").addEventListener("click", () => {
-      if (!confirm(`Delete this voicing of ${chordName}?`)) return;
+    bg.querySelector("#ve-delete").addEventListener("click", async () => {
+      const ok = await modalConfirm({
+        title: `Delete this voicing of ${chordName}?`,
+        confirmText: "Delete",
+        danger: true,
+      });
+      if (!ok) return;
       deleteVoicing(song, chordName, editIndex);
       saveState({ songs: state.songs });
       bg.remove();
@@ -5955,12 +6088,17 @@ function openChordModal(chordName, song, occ) {
         bg.remove();
         openVoicingEditor(chordName, song, userIdx, null, knowOcc ? occ : undefined);
       } else if (action === "delete") {
-        if (confirm(`Delete this voicing of ${chordName}?`)) {
+        modalConfirm({
+          title: `Delete this voicing of ${chordName}?`,
+          confirmText: "Delete",
+          danger: true,
+        }).then(ok => {
+          if (!ok) return;
           deleteVoicing(song, chordName, userIdx);
           saveState({ songs: state.songs });
           bg.remove();
           openChordModal(chordName, song, knowOcc ? occ : null);
-        }
+        });
       }
     });
   });
@@ -6001,20 +6139,29 @@ function exportJson() {
 }
 function importJsonFile(file) {
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
+    let data;
     try {
-      const data = JSON.parse(reader.result);
+      data = JSON.parse(reader.result);
       if (!Array.isArray(data.songs)) throw new Error("No songs array in JSON");
-      if (!confirm(`Import ${data.songs.length} song(s)? This will merge with your existing collection.`)) return;
-      const map = new Map(state.songs.map(s => [s.id, s]));
-      for (const s of data.songs) {
-        const existing = map.get(s.id);
-        if (!existing || (s.updatedAt || 0) > (existing.updatedAt || 0)) map.set(s.id, s);
-      }
-      state.songs = [...map.values()];
-      saveState({ songs: state.songs });
-      renderList(); renderDetail();
-    } catch (e) { alert("Import failed: " + e.message); }
+    } catch (e) {
+      modalAlert({ title: "Import failed", message: e.message });
+      return;
+    }
+    const ok = await modalConfirm({
+      title: `Import ${data.songs.length} song(s)?`,
+      message: "This will merge with your existing collection. Songs with the same id pick the more recent updatedAt.",
+      confirmText: "Import",
+    });
+    if (!ok) return;
+    const map = new Map(state.songs.map(s => [s.id, s]));
+    for (const s of data.songs) {
+      const existing = map.get(s.id);
+      if (!existing || (s.updatedAt || 0) > (existing.updatedAt || 0)) map.set(s.id, s);
+    }
+    state.songs = [...map.values()];
+    saveState({ songs: state.songs });
+    renderList(); renderDetail();
   };
   reader.readAsText(file);
 }
