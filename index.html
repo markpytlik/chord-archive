@@ -130,6 +130,27 @@
   .pill.chord-pill { background: var(--chord-soft); color: var(--chord); border-color: #cdd9ed; cursor: pointer; }
   .pill.chord-pill:hover { background: #d4dff5; }
 
+  /* Pill-toggle (button-shaped pill that swaps active/muted state).
+     Only appears on the meta-row when a song has both guitar and piano. */
+  .pill.pill-toggle {
+    cursor: pointer;
+    font: inherit; font-size: 11px; font-weight: 500;
+    transition: opacity .12s, filter .12s, background .12s, transform .04s;
+  }
+  .pill.pill-toggle:active { transform: translateY(1px); }
+  .pill.pill-toggle.muted {
+    opacity: .42;
+    filter: saturate(.5);
+  }
+  .pill.pill-toggle.muted:hover { opacity: .8; filter: saturate(.85); }
+  .pill.pill-toggle.active::before {
+    content: "";
+    display: inline-block;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: currentColor;
+    margin-right: 6px; opacity: .7;
+  }
+
   .muted { color: var(--muted); }
   .hidden { display: none !important; }
   .small { font-size: 13px; }
@@ -1891,7 +1912,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.9.3";
+const APP_VERSION = "4.10.0";
 
 //=============================================================
 // STORAGE
@@ -4425,10 +4446,17 @@ function renderDetail() {
       </div>
     </div>
 
-    <div class="meta-row">
-      ${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}
-      ${(song.instruments || []).map(i => `<span class="pill ${i}">${i}</span>`).join("")}
-    </div>
+    ${(() => {
+      const insts = song.instruments || [];
+      const both = insts.includes("guitar") && insts.includes("piano");
+      const view = song.viewInstrument; // undefined = both, "guitar", "piano"
+      const pillsHtml = insts.map(i => {
+        if (!both) return `<span class="pill ${i}">${i}</span>`;
+        const active = (view === undefined) || (view === i);
+        return `<button type="button" class="pill ${i} pill-toggle${active ? " active" : " muted"}" data-inst-toggle="${i}" aria-pressed="${active ? "true" : "false"}" title="${active && view === i ? `Show both instruments` : (view === undefined ? `Show only ${i}` : `Show only ${i}`)}">${i}</button>`;
+      }).join("");
+      return `<div class="meta-row">${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}${pillsHtml}</div>`;
+    })()}
 
     <div class="lyrics${song.showRoman ? " show-roman" : ""}" id="lyrics-view">${renderLyrics(song.lyrics || "", song)}</div>
 
@@ -4489,6 +4517,31 @@ function renderDetail() {
     const toggle = e => {
       e.stopPropagation();
       song.capoShapes = !song.capoShapes;
+      song.updatedAt = now();
+      saveState({ songs: state.songs });
+      renderDetail();
+    };
+    btn.addEventListener("click", toggle);
+    btn.addEventListener("keydown", e => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(e); }
+    });
+  });
+  // Instrument-view toggle on the meta-row pills (only present when the song
+  // has both guitar and piano). Clicking a muted pill switches the view to
+  // that instrument only; clicking the active pill (when the other is muted)
+  // returns to "both".
+  el.querySelectorAll("[data-inst-toggle]").forEach(btn => {
+    const toggle = e => {
+      e.stopPropagation();
+      const inst = btn.dataset.instToggle;
+      const cur = song.viewInstrument;
+      // 3-state cycle: undefined (both) → only-clicked → undefined; click the
+      // other instrument to switch to only-other.
+      let next;
+      if (cur === undefined) next = inst;        // both → only this
+      else if (cur === inst) next = undefined;    // only this → both
+      else next = inst;                           // only other → only this
+      song.viewInstrument = next;
       song.updatedAt = now();
       saveState({ songs: state.songs });
       renderDetail();
@@ -4977,6 +5030,19 @@ function isSimpleMajorOrMinor(chordName) {
   return q === "" || q === "M" || q === "maj" || q === "m" || q === "min";
 }
 
+// Returns whether each instrument's diagrams should currently be shown for the
+// given song. Considers song.instruments (which instruments the user has
+// selected for the song) AND song.viewInstrument (the visual filter toggled
+// from the meta-row pills: undefined = both, "guitar" / "piano" = only that).
+function effectiveInstruments(song) {
+  const has = i => !song?.instruments?.length || song.instruments.includes(i);
+  const view = song?.viewInstrument;
+  return {
+    wantGuitar: has("guitar") && (view === undefined || view === "guitar"),
+    wantPiano:  has("piano")  && (view === undefined || view === "piano"),
+  };
+}
+
 // Build the human-readable label shown above each diagram in the popover/voicing card.
 function voicingLabel(v) {
   if (!v) return "";
@@ -5031,8 +5097,7 @@ function getVoicings(song, chordName, occ) {
   // Show suggestion for ALL chords when guitar-only is selected (since guitarists benefit from a shape
   // even for plain major/minor); skip simple triads otherwise (pianists usually know them).
   if (list.length === 0) {
-    const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
-    const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
+    const { wantGuitar, wantPiano } = effectiveInstruments(song);
     const isGuitarOnly = wantGuitar && !wantPiano;
     if (isGuitarOnly || !isSimpleMajorOrMinor(chordName)) {
       const parsed = splitChord(chordName);
@@ -5338,8 +5403,7 @@ function openPlayMode(song) {
     // so wider panels / fewer chords = bigger shapes (no wasted whitespace below).
     const size = "lg";
 
-    const wantGuitar = !song?.instruments?.length || song.instruments.includes("guitar");
-    const wantPiano  = !song?.instruments?.length || song.instruments.includes("piano");
+    const { wantGuitar, wantPiano } = effectiveInstruments(song);
 
     let html = "";
     for (const { name, occ } of lineChords) {
@@ -5841,8 +5905,7 @@ function renderPopover(target) {
   const pop = ensurePopover();
   if (!popoverState) return;
   const { chordName, song, index, occ } = popoverState;
-  const wantGuitar = !!song?.instruments?.includes("guitar");
-  const wantPiano  = !!song?.instruments?.includes("piano");
+  const { wantGuitar, wantPiano } = effectiveInstruments(song);
   const voicings = (wantGuitar || wantPiano) ? getVoicings(song, chordName, occ) : [];
   const current = voicings[index] || null;
   const total = voicings.length;
