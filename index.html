@@ -1721,7 +1721,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.6.0";
+const APP_VERSION = "4.6.1";
 
 //=============================================================
 // STORAGE
@@ -3481,8 +3481,9 @@ function snapChordsToWordBoundaries(text) {
   return text.split("\n").map(snapChordsInLine).join("\n");
 }
 
-function parseChordSheet(text) {
+function parseChordSheet(text, opts) {
   if (!text || !text.trim()) return { lyrics: "" };
+  const snap = opts?.snap !== false; // default true; Tidy passes { snap: false }
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const out = [];
   let title = null, artist = null, key = null;
@@ -3532,9 +3533,12 @@ function parseChordSheet(text) {
       i++;
     }
   }
-  // Snap any mid-word chord brackets back to the start of their word.
-  // Catches the common UG case where [ch]F[/ch] → [F] shifts column alignment.
-  const cleaned = snapChordsToWordBoundaries(out.join("\n")).trim();
+  // Snap any mid-word chord brackets back to the start of their word —
+  // catches the UG case where [ch]F[/ch] → [F] shifts column alignment when
+  // the extension scraped chord-line-above-lyric content. Tidy bypasses this
+  // (snap: false) so the user's deliberate chord positions are preserved.
+  const joined = out.join("\n");
+  const cleaned = (snap ? snapChordsToWordBoundaries(joined) : joined).trim();
   return { lyrics: cleaned, title, artist, key };
 }
 
@@ -4452,13 +4456,15 @@ Section labels go in [brackets]. Use the monospace font — chord positions alig
 
   document.getElementById("t-tidy").addEventListener("click", () => {
     const ta = document.getElementById("f-lyrics");
-    // Round-trip through parseChordSheet → chordProToChordSheet to clean up alignment
-    const parsed = parseChordSheet(ta.value);
+    // Round-trip through parseChordSheet → chordProToChordSheet, preserving
+    // deliberate chord positions (snap:false) and re-emitting blank lines
+    // around section labels so verses/choruses breathe.
+    const parsed = parseChordSheet(ta.value, { snap: false });
     ta.value = chordProToChordSheet(parsed.lyrics);
     if (parsed.title && !document.getElementById("f-title").value) document.getElementById("f-title").value = parsed.title;
     if (parsed.artist && !document.getElementById("f-artist").value) document.getElementById("f-artist").value = parsed.artist;
     if (parsed.key && !document.getElementById("f-key").value) document.getElementById("f-key").value = parsed.key;
-    setHelper("Tidied — chords aligned to word starts.", "ok");
+    setHelper("Tidied — chord positions preserved, sections separated.", "ok");
   });
 
   // Swap artist <-> title for cases where the scraper got them backwards
