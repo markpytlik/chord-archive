@@ -446,6 +446,53 @@
   .sc-pill.sc-analysis-ctrls .sc-toggle[aria-pressed="true"] .sc-toggle-knob {
     transform: translateX(12px);
   }
+
+  /* === Capo (violet) — only appears when song.capo > 0.
+     Switch toggle controls "show shapes" mode (diagrams transposed -capo). === */
+  .sc-pill.sc-capo-state, .sc-pill.sc-capo-ctrls {
+    background: #ece4f5;
+    color: #5a3eb1;
+    border-color: #d3c8e0;
+    --sc-div: rgba(90, 62, 177, .16);
+  }
+  .sc-pill.sc-capo-state .sc-value {
+    font-family: var(--serif);
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 18px;
+  }
+  .sc-pill.sc-capo-ctrls .sc-toggle {
+    background: transparent;
+    border: 0;
+    padding: 0 9px;
+    height: 100%;
+    display: inline-flex; align-items: center;
+    cursor: pointer;
+    color: inherit;
+  }
+  .sc-pill.sc-capo-ctrls .sc-toggle-track {
+    position: relative;
+    width: 26px; height: 14px;
+    background: rgba(90, 62, 177, .25);
+    border-radius: 999px;
+    transition: background .15s;
+  }
+  .sc-pill.sc-capo-ctrls .sc-toggle[aria-pressed="true"] .sc-toggle-track {
+    background: #5a3eb1;
+  }
+  .sc-pill.sc-capo-ctrls .sc-toggle-knob {
+    position: absolute;
+    top: 1px; left: 1px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+    transition: transform .15s;
+  }
+  .sc-pill.sc-capo-ctrls .sc-toggle[aria-pressed="true"] .sc-toggle-knob {
+    transform: translateX(12px);
+  }
+
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
   .lyrics .seg .chord .rn-tag {
@@ -1736,7 +1783,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.6.3";
+const APP_VERSION = "4.7.0";
 
 //=============================================================
 // STORAGE
@@ -3136,7 +3183,49 @@ function qualityToShapeKey(q) {
   return null;
 }
 
+// Open-string pitch classes — strings 0..5 = low E, A, D, G, B, high e.
+const GUITAR_OPEN_PCS = [4, 9, 2, 7, 11, 4];
+
+// Re-anchor a guitar shape so the requested bass pitch class is the lowest
+// sounding string. If the bass pc is already in the shape, mute strings below
+// the lowest string that plays it. Otherwise, try to add the bass note on a
+// previously-muted lower string within the first 4 frets and mute below it.
+// Returns a {frets, barre?, derived: true} or null if not playable.
+function applyBassToShape(shape, bassPc) {
+  if (!shape || bassPc === undefined || bassPc === null) return shape;
+  const frets = shape.frets.slice();
+  const stringPc = i => frets[i] < 0 ? null : (GUITAR_OPEN_PCS[i] + frets[i]) % 12;
+
+  let bassString = -1;
+  for (let i = 0; i < 6; i++) {
+    if (stringPc(i) === bassPc) { bassString = i; break; }
+  }
+  if (bassString >= 0) {
+    for (let i = 0; i < bassString; i++) frets[i] = -1;
+    const out = { frets, derived: true };
+    if (shape.fingers) out.fingers = shape.fingers.slice();
+    if (shape.barre)   out.barre   = { ...shape.barre, from: Math.max(shape.barre.from, bassString) };
+    return out;
+  }
+  // Bass not currently played. Try adding it on a low muted string.
+  let lowestPlayed = 6;
+  for (let i = 0; i < 6; i++) { if (frets[i] >= 0) { lowestPlayed = i; break; } }
+  for (let s = 0; s < lowestPlayed; s++) {
+    const fret = ((bassPc - GUITAR_OPEN_PCS[s]) + 12) % 12;
+    if (fret <= 4) {
+      frets[s] = fret;
+      for (let i = 0; i < s; i++) frets[i] = -1;
+      const out = { frets, derived: true };
+      if (shape.fingers) out.fingers = shape.fingers.slice();
+      if (shape.barre)   out.barre   = shape.barre;
+      return out;
+    }
+  }
+  return null;
+}
+
 function lookupShape(chordName) {
+  // Explicit table entries (covers common slashes like C/G, D/F#).
   if (GUITAR_SHAPES[chordName]) return GUITAR_SHAPES[chordName];
   const parsed = splitChord(chordName);
   if (!parsed) return null;
@@ -3153,9 +3242,21 @@ function lookupShape(chordName) {
   candidates.sort((a, b) => a.offset - b.offset);
   const pick = candidates[0];
 
-  if (pick.offset === 0) return { frets: pick.tpl.slice(), derived: true };
-  const frets = pick.tpl.map(f => f === -1 ? -1 : f + pick.offset);
-  return { frets, derived: true, barre: { fret: pick.offset, from: pick.fromString, to: 5 } };
+  let baseShape;
+  if (pick.offset === 0) {
+    baseShape = { frets: pick.tpl.slice(), derived: true };
+  } else {
+    const frets = pick.tpl.map(f => f === -1 ? -1 : f + pick.offset);
+    baseShape = { frets, derived: true, barre: { fret: pick.offset, from: pick.fromString, to: 5 } };
+  }
+
+  // Slash chord — re-anchor for the requested bass note. If we can't place it,
+  // fall back to the base shape so the user at least sees the chord (better than nothing).
+  if (parsed.bass !== null) {
+    const slash = applyBassToShape(baseShape, parsed.bass);
+    if (slash) return slash;
+  }
+  return baseShape;
 }
 
 //=============================================================
@@ -4145,6 +4246,18 @@ function renderDetail() {
                 </button>
               </div>
             </div>` : ""}
+            ${song.capo > 0 ? `
+            <div class="sc-group">
+              <div class="sc-pill sc-capo-state" title="Capo position">
+                <span class="sc-cap">Capo</span>
+                <span class="sc-value">${song.capo}</span>
+              </div>
+              <div class="sc-pill sc-capo-ctrls" title="${song.capoShapes ? "Diagrams show shapes (transposed −" + song.capo + " for capo). Toggle off to show sounding pitches." : "Diagrams show sounding pitches. Toggle on to show shapes (what your fingers play with capo on)."}">
+                <button class="sc-toggle" data-capo-shapes-toggle aria-pressed="${song.capoShapes ? "true" : "false"}" aria-label="Toggle capo-shape diagrams">
+                  <span class="sc-toggle-track"><span class="sc-toggle-knob"></span></span>
+                </button>
+              </div>
+            </div>` : ""}
           </div>`;
         })()}
       </div>
@@ -4213,6 +4326,22 @@ function renderDetail() {
     const toggle = e => {
       e.stopPropagation();
       song.showRoman = !song.showRoman;
+      saveState({ songs: state.songs });
+      renderDetail();
+    };
+    btn.addEventListener("click", toggle);
+    btn.addEventListener("keydown", e => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(e); }
+    });
+  });
+  // Capo-shapes switch — when on, guitar diagrams render at chord transposed
+  // by -song.capo so they show what the user's fingers actually play with the
+  // capo on. Off (default) interprets chord names as the as-written shape.
+  el.querySelectorAll("[data-capo-shapes-toggle]").forEach(btn => {
+    const toggle = e => {
+      e.stopPropagation();
+      song.capoShapes = !song.capoShapes;
+      song.updatedAt = now();
       saveState({ songs: state.songs });
       renderDetail();
     };
@@ -4759,7 +4888,13 @@ function getVoicings(song, chordName, occ) {
     const isGuitarOnly = wantGuitar && !wantPiano;
     if (isGuitarOnly || !isSimpleMajorOrMinor(chordName)) {
       const parsed = splitChord(chordName);
-      const builtIn = wantGuitar ? lookupShape(chordName) : null;
+      // Capo-aware: if song.capoShapes is on and capo > 0, look up the SHAPE
+      // (chord transposed −capo). The visible chord name in the UI stays
+      // unchanged — only the diagram switches to what the fingers play.
+      const shapeLookup = (song?.capo > 0 && song?.capoShapes)
+        ? transposeChord(chordName, -song.capo, song.preferFlat)
+        : chordName;
+      const builtIn = wantGuitar ? lookupShape(shapeLookup) : null;
       const pianoNotes = wantPiano && parsed ? qualityToIntervals(parsed.quality).map(i => (parsed.root + i) % 12) : null;
       if (builtIn || (pianoNotes && pianoNotes.length)) {
         list.push({
@@ -4767,7 +4902,7 @@ function getVoicings(song, chordName, occ) {
           fingers:   builtIn?.fingers,
           barre:     builtIn?.barre,
           pianoNotes: pianoNotes,
-          note:      builtIn?.derived ? "Movable barre shape" : "",
+          note:      builtIn?.derived ? "Movable barre shape" : (song?.capoShapes && song?.capo > 0 ? `Capo ${song.capo} shape` : ""),
           builtIn:   true,
         });
       }
