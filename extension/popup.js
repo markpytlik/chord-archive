@@ -67,10 +67,14 @@ $("grab").addEventListener("click", async () => {
     const existing = await findExistingChordpadTab();
     if (existing) {
       try {
+        // world: "MAIN" is critical here — by default executeScript runs in the
+        // extension's isolated world, where CustomEvents don't cross over to
+        // chordpad's own listener. Tab pulls focus but the import never lands.
         await api.scripting.executeScript({
           target: { tabId: existing.id },
           func: (p) => window.dispatchEvent(new CustomEvent("chordpad:import", { detail: p })),
           args: [payloadObj],
+          world: "MAIN",
         });
         await api.tabs.update(existing.id, { active: true });
         if (existing.windowId !== undefined) {
