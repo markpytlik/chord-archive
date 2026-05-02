@@ -1783,7 +1783,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.7.2";
+const APP_VERSION = "4.8.0";
 
 //=============================================================
 // STORAGE
@@ -1826,43 +1826,19 @@ function initAuth() {
     console.warn("Supabase SDK not loaded — running in localStorage-only mode");
     return;
   }
+  // Default Supabase config. Earlier versions (4.5.0–4.5.6) layered three
+  // defenses against multi-tab session lockups: a `lock: fn()` no-op override,
+  // a 10s getSession probe, and a 3s INITIAL_SESSION safety-net timer. Now
+  // that extension 1.5.1 routes captures into an existing chordpad tab rather
+  // than opening a second one, the multi-tab race is no longer the common
+  // case, and the remaining defense — withTimeout + recreateAuthClient
+  // watchdog — handles the rare case correctly without needing those layers.
   auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // Disable Supabase's cross-tab navigator.locks coordination. With multiple
-      // chordpad.app tabs open (e.g., extension opens a new tab while the original
-      // is still alive), a stuck refresh in one tab would block ALL queries in the
-      // other. The trade-off is harmless here: two tabs may both attempt a refresh
-      // briefly. Without this override, "Saving…" hung forever for some users.
-      lock: async (_key, _acquireTimeout, fn) => fn(),
     },
   });
-  // Defensive: if the persisted refresh token is dead, Supabase's auto-refresh
-  // hangs and so does every subsequent query (including getSession). Race a quick
-  // session probe against a 5s timeout — if it loses, force-sign-out so the user
-  // can sign back in cleanly instead of staring at a frozen "Saving…" indicator.
-  // Diagnostic only — don't auto-purge on timeout. Earlier auto-purge was kicking
-  // out users whose getSession() simply took 5+ seconds to resolve (e.g. extension
-  // opens a new tab and the SDK takes its time). Surface a visible reconnect
-  // option via the sync indicator instead; never destroy a session preemptively.
-  Promise.race([
-    auth.client.auth.getSession(),
-    new Promise((_, rej) => setTimeout(() => rej(new Error("getSession >10s")), 10000)),
-  ]).catch((e) => {
-    if (auth.initialized) return; // it actually resolved later — false alarm
-    console.warn("[auth] session probe took longer than 10s; not auto-purging", e);
-    setSyncStatus("error", "Session is slow to load. Click to reconnect if it stays stuck.");
-  });
-  // Safety net: if Supabase never fires INITIAL_SESSION (rare SDK hiccup), don't
-  // leave the loader spinning forever. After 3s, mark initialized and continue.
-  setTimeout(() => {
-    if (!auth.initialized) {
-      auth.initialized = true;
-      renderAuthArea();
-      renderDetail();
-    }
-  }, 3000);
   // Auth events Supabase emits — handled differently to avoid sign-in/sign-out flapping:
   //   INITIAL_SESSION  — once on listener attach. Real source of truth on page load.
   //   SIGNED_IN        — explicit sign-in (new session).
@@ -2189,7 +2165,6 @@ function recreateAuthClient() {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        lock: async (_k, _t, fn) => fn(),
       },
     });
     const sbKey = Object.keys(localStorage).find(k => k.startsWith("sb-") && k.endsWith("-auth-token"));
@@ -4171,20 +4146,18 @@ function renderDetail() {
   const search = window.location.search || "";
   const inAuthCallback = /access_token=|refresh_token=|type=(magiclink|recovery|signup|invite)/.test(hash)
                       || /[?&]code=/.test(search);
-  // Until Supabase resolves the initial session, show a clean loading shell rather
-  // than flashing the marketing landing page or the editor (which would briefly show
-  // a "Sign in" button instead of the user chip while the session restores).
-  const stillResolvingAuth = !auth.initialized && !!auth.client;
+  // Auth-callback flow (magic-link / OAuth redirect) — user explicitly expects
+  // a "Signing you in…" screen. Keep this loader.
   if (inAuthCallback && !auth.user) {
     document.body.classList.remove("landing-active");
     el.innerHTML = renderAuthCallbackLoader();
     return;
   }
-  if (stillResolvingAuth) {
-    document.body.classList.remove("landing-active");
-    el.innerHTML = renderInitialLoader();
-    return;
-  }
+  // Otherwise render whatever cached state we have (localStorage). If
+  // INITIAL_SESSION resolves later with a signed-in user, renderDetail re-runs
+  // and the page updates seamlessly. No more "Loading your songbook…" spinner
+  // gating the UI on Supabase init — previous defensive 3s/8s timers were
+  // band-aids for layered multi-tab issues that extension 1.5.1 sidesteps.
   // Editor (incl. extension/bookmarklet imports) only opens after auth has resolved
   // so the auth chip and cloud sync are wired up before the user starts typing.
   if (state.editing) { renderEditor(el); return; }
