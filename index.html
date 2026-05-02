@@ -1913,7 +1913,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.9.1";
+const APP_VERSION = "4.9.2";
 
 //=============================================================
 // STORAGE
@@ -4220,10 +4220,12 @@ function renderLandingPage() {
   // panel. Lyrics are clearly placeholder rather than an existing song, so the
   // preview demos the chord-pill-above-lyric format without borrowing copyright
   // or pretending to be content the user didn't write.
+  // Each chord col lands on the first character of its anchor word so pills
+  // never split a word ("y|Bb|our" was a tell that the column was off).
   const sample = [
-    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Dm", col: 22}, {c: "Bb", col: 36}],   lyric: "This is a sample line of lyrics in your songbook" },
-    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Bb", col: 25}, {c: "Dm", col: 38}],   lyric: "Hover any chord pill to see the diagram instantly" },
-    { chords: [{c: "F",  col: 0}, {c: "Am", col: 9},  {c: "Bb", col: 22}, {c: "Dm", col: 41}],   lyric: "Click to save your own preferred voicings per song" },
+    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Dm", col: 22}, {c: "Bb", col: 35}], lyric: "This is a sample line of lyrics in your songbook" },
+    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Bb", col: 24}, {c: "Dm", col: 32}], lyric: "Hover any chord pill to see the diagram instantly" },
+    { chords: [{c: "F",  col: 0}, {c: "Am", col: 9},  {c: "Bb", col: 23}, {c: "Dm", col: 33}], lyric: "Click to save your own preferred voicings per song" },
   ];
   const previewLines = sample.map(line => {
     const segs = [];
