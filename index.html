@@ -366,7 +366,9 @@
     border-color: #e8c8b8;
     --sc-div: rgba(138, 56, 25, .16);
   }
-  .sc-pill.sc-key-state .sc-value { min-width: 36px; }
+  /* Reserve enough width for long keys ("F#m7", "Bbm7b5") so transposing a
+     song doesn't shift the controls pill left/right. */
+  .sc-pill.sc-key-state .sc-value { min-width: 56px; }
 
   /* === Accidentals (cool blue) === */
   .sc-pill.sc-acc-state, .sc-pill.sc-acc-ctrls {
@@ -397,12 +399,6 @@
     color: #2d6a3d;
     border-color: #cee2d2;
     --sc-div: rgba(45, 106, 61, .16);
-    transition: background .12s, color .12s, border-color .12s;
-  }
-  .sc-pill.sc-analysis-state[data-on="true"] {
-    background: #2d6a3d;
-    color: #fff;
-    border-color: #2d6a3d;
   }
   .sc-pill.sc-analysis-state .sc-value {
     font-family: var(--sans);
@@ -410,7 +406,8 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .08em;
-    min-width: 28px;
+    /* Fixed width fits both "ON" and "OFF" so flipping doesn't shift layout. */
+    min-width: 32px;
   }
   /* Analysis controls — single switch-style toggle button */
   .sc-pill.sc-analysis-ctrls .sc-toggle {
@@ -1623,7 +1620,7 @@
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
   <input type="url" id="header-url" class="header-url-input" placeholder="Paste a chord-site URL to import…" />
-  <button id="header-fetch" class="primary header-btn" title="Fetch & import this URL">Import</button>
+  <button id="header-fetch" class="header-btn" title="Fetch & import this URL">Import</button>
   <button id="btn-practice" class="ghost header-btn" title="Piano practice drills (circle of fifths, scales, ii–V–I, etc.)">Practice</button>
   <button id="btn-new" class="header-btn header-icon-btn" title="Add a new song" aria-label="New song">+</button>
   <div id="auth-area" class="auth-area">
@@ -1739,7 +1736,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.11";
+const APP_VERSION = "4.5.12";
 
 //=============================================================
 // STORAGE
@@ -4225,7 +4222,7 @@ function renderDetail() {
             </div>
             ${song.key ? `
             <div class="sc-group">
-              <div class="sc-pill sc-analysis-state" data-on="${song.showRoman ? "true" : "false"}" title="Whether chord analysis (i, IV, V…) is shown">
+              <div class="sc-pill sc-analysis-state" title="Whether chord analysis (i, IV, V…) is shown">
                 <span class="sc-cap">Analysis</span>
                 <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
               </div>
