@@ -1736,7 +1736,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.6.2";
+const APP_VERSION = "4.6.3";
 
 //=============================================================
 // STORAGE
@@ -3159,12 +3159,43 @@ function lookupShape(chordName) {
 }
 
 //=============================================================
+// SVG cache — chord-shape SVGs are pure functions of their inputs
+// (chord name, size, optional custom shape, root pc). Hover popovers
+// and play-mode shape rendering can rebuild the same chord several
+// times per second; memoize the output string.
+//=============================================================
+function _makeLRU(max = 128) {
+  const m = new Map();
+  return {
+    get(k) {
+      if (!m.has(k)) return undefined;
+      const v = m.get(k); m.delete(k); m.set(k, v); // bump to most-recent
+      return v;
+    },
+    set(k, v) {
+      if (m.has(k)) m.delete(k);
+      m.set(k, v);
+      if (m.size > max) m.delete(m.keys().next().value);
+    },
+    clear() { m.clear(); },
+  };
+}
+const _svgCache = _makeLRU(192);
+
+//=============================================================
 // SVG: Guitar
 //=============================================================
 function svgGuitar(chordName, custom, size="md") {
+  // Cache key includes everything that affects the rendered SVG.
+  const key = "g|" + size + "|" + chordName + "|" +
+    (custom ? JSON.stringify({ f: custom.frets, fg: custom.fingers, b: custom.barre }) : "");
+  const hit = _svgCache.get(key);
+  if (hit !== undefined) return hit;
   const shape = custom || lookupShape(chordName);
   if (!shape) {
-    return `<div class="muted small" style="text-align:center;padding:24px 0;">No diagram for <b>${escapeHtml(chordName)}</b><br><span class="micro">Add a custom shape below.</span></div>`;
+    const noShape = `<div class="muted small" style="text-align:center;padding:24px 0;">No diagram for <b>${escapeHtml(chordName)}</b><br><span class="micro">Add a custom shape below.</span></div>`;
+    _svgCache.set(key, noShape);
+    return noShape;
   }
   const frets = shape.frets;
   const fingers = shape.fingers || [];
@@ -3225,6 +3256,7 @@ function svgGuitar(chordName, custom, size="md") {
     }
   }
   svg += `</svg>`;
+  _svgCache.set(key, svg);
   return svg;
 }
 
@@ -3298,6 +3330,10 @@ function normalizePianoNotes(notes, rootPc) {
 // rootPc: pitch class of the root — highlighted darker blue wherever it appears.
 function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
   const positions = normalizePianoNotes(notesIn, rootPc);
+  // Cache key: positions (sorted for stability) + rootPc + size.
+  const key = "pp|" + size + "|" + (rootPc ?? "n") + "|" + positions.slice().sort((a,b) => a-b).join(",");
+  const hit = _svgCache.get(key);
+  if (hit !== undefined) return hit;
   const positionSet = new Set(positions);
   // Slimmer white keys; all "hit" keys share the same blue. Root marked with a small dot.
   const dim = size === "sm" ? { whiteW: 14, whiteH: 76, blackW:  9, blackH: 46 } :
@@ -3342,17 +3378,27 @@ function svgPianoFromPcs(notesIn, rootPc, _octavesIgnored, size="md") {
     }
   }
   svg += `</svg>`;
+  _svgCache.set(key, svg);
   return svg;
 }
 
 function svgPiano(chordName, _octavesIgnored, size="md") {
+  const key = "p|" + size + "|" + chordName;
+  const hit = _svgCache.get(key);
+  if (hit !== undefined) return hit;
   const parsed = splitChord(chordName);
-  if (!parsed) return `<div class="muted small">No piano diagram for ${escapeHtml(chordName)}</div>`;
+  if (!parsed) {
+    const msg = `<div class="muted small">No piano diagram for ${escapeHtml(chordName)}</div>`;
+    _svgCache.set(key, msg);
+    return msg;
+  }
   // Pass the raw pitch classes — svgPianoFromPcs's normalizePianoNotes will stack them once
   // ascending from the root. (Pre-stacking here caused a double-stack bug where positions like
   // [4, 8, 11] were re-interpreted as pitch classes B/E/G# instead of A/C#/E.)
   const pcs = chordNotes(parsed).map(n => n.pc);
-  return svgPianoFromPcs(pcs, parsed.root, undefined, size);
+  const out = svgPianoFromPcs(pcs, parsed.root, undefined, size);
+  _svgCache.set(key, out);
+  return out;
 }
 
 //=============================================================
