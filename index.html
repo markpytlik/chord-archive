@@ -1516,42 +1516,20 @@
   .lp-preview-pill.cap-pill,
   .lp-preview-pill.cap { background: #ece4f5; color: #5a3eb1; border-color: #d3c8e0; }
 
-  .lp-preview-section {
-    color: var(--accent); font-size: 12px; font-weight: 600;
-    letter-spacing: .1em; text-transform: uppercase;
-    margin: 4px 0 -4px;
+  /* The preview-card .lyrics inherits the app's chord-line-above-lyric styling
+     from the global .lyrics rules. Constrain a bit so it sits inside the card
+     cleanly. */
+  .lp-preview-card .lyrics {
+    margin: 0;
+    padding: 4px 0 4px;
   }
-  .lp-preview-lyrics {
-    font-family: var(--mono);
-    font-size: 14px; line-height: 2.4;
-    color: var(--ink);
-  }
-  .lp-pv-line { white-space: nowrap; overflow: hidden; }
-  .lp-pv-text { display: inline; }
-  .lp-pv-chord {
-    display: inline-block;
-    background: var(--chord-soft); color: var(--chord);
-    border: 1px solid #cdd9ed;
-    border-radius: 6px;
-    padding: 1px 7px;
-    margin: 0 4px 0 0;
-    font-family: var(--sans); font-size: 11.5px; font-weight: 600;
-    vertical-align: 1px;
-  }
-  .lp-preview-hover {
+  .lp-preview-card .lyrics .section-row { margin-bottom: 6px; }
+  .lp-preview-hint {
     border-top: 1px dashed var(--line);
-    padding-top: 16px;
-    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+    padding-top: 12px; margin-top: 4px;
+    font-size: 11.5px; letter-spacing: .04em;
+    color: var(--muted); text-align: center;
   }
-  .lp-preview-hover-label {
-    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-    color: var(--muted); font-weight: 600;
-  }
-  .lp-preview-hover-diags {
-    display: flex; gap: 18px; align-items: center; flex: 1;
-    justify-content: flex-end;
-  }
-  .lp-preview-hover-diags svg { max-width: 130px !important; height: auto !important; width: auto !important; }
 
   .lp-hero .lp-title {
     font-family: var(--serif);
@@ -1913,7 +1891,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.9.2";
+const APP_VERSION = "4.9.3";
 
 //=============================================================
 // STORAGE
@@ -4198,8 +4176,6 @@ function renderAuthCallbackLoader() {
 
 function renderLandingPage() {
   // Real rendered diagrams used as feature visuals — same code paths as the app.
-  const visGuitar = svgGuitar("Cmaj7", null, "md");
-  const visPiano  = svgPianoFromPcs([0, 4, 7, 11, 2], 0, undefined, "md"); // Cmaj9
   const visBarre  = svgGuitar("F#m7", null, "md"); // a derived movable shape
 
   // Side-row of additional chord tiles to anchor "what diagrams look like".
@@ -4216,28 +4192,25 @@ function renderLandingPage() {
     </div>
   `).join("");
 
-  // Songbook preview — actual chord pills + lyrics, styled like the real detail
-  // panel. Lyrics are clearly placeholder rather than an existing song, so the
-  // preview demos the chord-pill-above-lyric format without borrowing copyright
-  // or pretending to be content the user didn't write.
-  // Each chord col lands on the first character of its anchor word so pills
-  // never split a word ("y|Bb|our" was a tell that the column was off).
-  const sample = [
-    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Dm", col: 22}, {c: "Bb", col: 35}], lyric: "This is a sample line of lyrics in your songbook" },
-    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Bb", col: 24}, {c: "Dm", col: 32}], lyric: "Hover any chord pill to see the diagram instantly" },
-    { chords: [{c: "F",  col: 0}, {c: "Am", col: 9},  {c: "Bb", col: 23}, {c: "Dm", col: 33}], lyric: "Click to save your own preferred voicings per song" },
-  ];
-  const previewLines = sample.map(line => {
-    const segs = [];
-    let cursor = 0;
-    for (const ch of line.chords) {
-      if (ch.col > cursor) segs.push(`<span class="lp-pv-text">${escapeHtml(line.lyric.slice(cursor, ch.col))}</span>`);
-      segs.push(`<span class="lp-pv-chord">${escapeHtml(ch.c)}</span>`);
-      cursor = ch.col;
-    }
-    if (cursor < line.lyric.length) segs.push(`<span class="lp-pv-text">${escapeHtml(line.lyric.slice(cursor))}</span>`);
-    return `<div class="lp-pv-line">${segs.join("")}</div>`;
-  }).join("");
+  // Songbook preview — runs the real renderLyrics + attachHoverPopover so the
+  // chord-line-above-lyric layout matches the actual app exactly and hovering
+  // chord pills reveals genuine guitar/piano shape diagrams. Lyrics are clearly
+  // placeholder rather than an existing song so the preview demos the format
+  // without borrowing copyright.
+  const previewSong = {
+    id: "lp-preview",
+    title: "Your first song",
+    artist: "SAMPLE CHART",
+    key: "F",
+    capo: 2,
+    instruments: ["guitar", "piano"],
+    lyrics: "{Verse}\n[F]This is a [Am]sample line [Dm]of lyrics in [Bb]your songbook\n[F]Hover any [Am]chord pill to [Bb]see the [Dm]diagram instantly\n[F]Click to [Am]save your own [Bb]preferred [Dm]voicings per song",
+    voicings: {},
+  };
+  // Stash on window so wireLandingPage can find the rendered preview and
+  // attach the hover-popover wiring after the markup mounts.
+  window._lpPreviewSong = previewSong;
+  const previewLyricsHTML = renderLyrics(previewSong.lyrics, previewSong);
 
   return `
     <div class="lp-page">
@@ -4267,15 +4240,8 @@ function renderLandingPage() {
               <span class="lp-preview-pill cap"><span class="cap">Capo</span><span class="val">2</span></span>
             </div>
           </div>
-          <div class="lp-preview-section">— Verse —</div>
-          <div class="lp-preview-lyrics">${previewLines}</div>
-          <div class="lp-preview-hover">
-            <div class="lp-preview-hover-label">Hover any chord</div>
-            <div class="lp-preview-hover-diags">
-              ${visGuitar}
-              ${visPiano}
-            </div>
-          </div>
+          <div class="lp-preview-lyrics lyrics">${previewLyricsHTML}</div>
+          <div class="lp-preview-hint">Hover any chord pill to see the diagram</div>
         </div>
       </section>
 
@@ -4333,6 +4299,12 @@ function wireLandingPage() {
   });
   const signupBtns = [document.getElementById("lp-signup"), document.getElementById("lp-signup-2")].filter(Boolean);
   signupBtns.forEach(b => b.addEventListener("click", () => openAuthModal({ initialMode: "signup" })));
+  // Wire live hover-popovers on the preview chord pills so visitors actually
+  // experience the feature instead of seeing static images.
+  const previewLyrics = document.querySelector(".lp-preview-card .lyrics");
+  if (previewLyrics && window._lpPreviewSong) {
+    attachHoverPopover(previewLyrics, window._lpPreviewSong);
+  }
 }
 
 function renderDetail() {
