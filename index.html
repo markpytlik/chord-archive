@@ -1672,7 +1672,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.5";
+const APP_VERSION = "4.5.6";
 
 //=============================================================
 // STORAGE
@@ -1797,17 +1797,44 @@ function initAuth() {
           await runOnSignInOnce(); // refreshes list/detail when cloud songs arrive
         }
       } else if (event === "INITIAL_SESSION") {
-        // Guest mode (no session). Clear the loader by re-rendering the detail panel.
-        if (auth.user) { auth.user = null; onSignOut(); }
+        // No session in this event. With multiple chordpad tabs sharing one
+        // localStorage, the SDK can spuriously emit INITIAL_SESSION with a null
+        // session even when a valid one is on disk — and onSignOut() wipes the
+        // localStorage cache, losing any unsynced songs. Re-probe before trusting
+        // the null.
+        if (auth.user) {
+          const real = await reprobeSession();
+          if (real) {
+            auth.user = { id: real.user.id, email: real.user.email };
+            console.log("[auth] INITIAL_SESSION had null session, but re-probe found one — keeping local state");
+          } else {
+            console.warn("[auth] INITIAL_SESSION had null session and re-probe agreed — signing out locally");
+            auth.user = null;
+            onSignOut();
+          }
+        }
         renderAuthArea();
         renderDetail();
       }
       return;
     }
 
-    // Explicit sign-out only — never wipe local state on a transient null session.
+    // Explicit sign-out (or apparent sign-out) — re-probe before wiping local
+    // state, same as the INITIAL_SESSION-without-session path. The button-click
+    // handler already nulls auth.user optimistically, so reaching here with
+    // auth.user still set means the sign-out came from somewhere else (server
+    // revoke, expired token, cross-tab race) and may be transient.
     if (event === "SIGNED_OUT") {
-      if (auth.user) { auth.user = null; onSignOut(); }
+      if (auth.user) {
+        const real = await reprobeSession();
+        if (real) {
+          auth.user = { id: real.user.id, email: real.user.email };
+          console.log("[auth] SIGNED_OUT but re-probe found a live session — keeping local state");
+        } else {
+          auth.user = null;
+          onSignOut();
+        }
+      }
       renderAuthArea();
       renderDetail();
       return;
@@ -2054,6 +2081,38 @@ function recreateAuthClient() {
     }
   })().finally(() => { _recreatePromise = null; });
   return _recreatePromise;
+}
+
+// Re-verify whether we genuinely have a session, used before wiping local state
+// on null-session events (INITIAL_SESSION-without-session, SIGNED_OUT). Strategy:
+//   1) ask the live client; if it answers in time and has a session, we're done.
+//   2) if the live client hangs, recreate it and ask again.
+//   3) last resort: try refreshSession on whatever client we have.
+// Returns the session object or null if there's truly no session anywhere.
+async function reprobeSession() {
+  try {
+    const r1 = await Promise.race([
+      auth.client.auth.getSession().then(r => r?.data?.session || null).catch(() => null),
+      new Promise(r => setTimeout(() => r("HUNG"), 4000))
+    ]);
+    if (r1 && r1 !== "HUNG") return r1;
+    if (r1 === "HUNG") {
+      await recreateAuthClient();
+      const r2 = await Promise.race([
+        auth.client.auth.getSession().then(r => r?.data?.session || null).catch(() => null),
+        new Promise(r => setTimeout(() => r(null), 4000))
+      ]);
+      if (r2) return r2;
+    }
+    const r3 = await Promise.race([
+      auth.client.auth.refreshSession().then(r => r?.data?.session || null).catch(() => null),
+      new Promise(r => setTimeout(() => r(null), 5000))
+    ]);
+    return r3 || null;
+  } catch (e) {
+    console.warn("[auth] reprobeSession threw:", e);
+    return null;
+  }
 }
 
 // --------- Auth UI ---------
