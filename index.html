@@ -283,18 +283,22 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  /* === Song-controls toolbar v6 — one pill per concept, internal dividers.
-     Each feature (Key, Accidentals, Analysis) is a single pill containing
-     the cap label, current value, and any controls separated by hairline
-     dividers. The Analysis pill is itself the toggle button. === */
+  /* === Song-controls toolbar v7 — state pill + controls pill per concept.
+     v6's hairline-divider treatment + 24px height retained; the v5 split
+     between "what's the current state" and "how to change it" restored. === */
   .song-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 12px; /* gap BETWEEN feature groups */
     margin-top: 12px;
     font-family: var(--sans);
     line-height: 1;
+  }
+  .sc-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px; /* gap WITHIN a feature group (state ↔ controls) */
   }
   .sc-pill {
     display: inline-flex;
@@ -307,7 +311,6 @@
     letter-spacing: .02em;
     overflow: hidden;
     box-sizing: border-box;
-    /* Internal dividers — semi-transparent so they read as hairlines, not borders */
     --sc-div: rgba(0, 0, 0, .1);
   }
   .sc-pill > * + * { border-left: 1px solid var(--sc-div); }
@@ -351,57 +354,68 @@
   .sc-pill .sc-reset { font-size: 12px; }
 
   /* === Key (warm rust) === */
-  .sc-pill.sc-key {
+  .sc-pill.sc-key-state, .sc-pill.sc-key-ctrls {
     background: #f5e3da;
     color: var(--accent-deep);
     border-color: #e8c8b8;
     --sc-div: rgba(138, 56, 25, .16);
   }
-  .sc-pill.sc-key .sc-value { min-width: 36px; }
+  .sc-pill.sc-key-state .sc-value { min-width: 36px; }
 
   /* === Accidentals (cool blue) === */
-  .sc-pill.sc-acc {
+  .sc-pill.sc-acc-state, .sc-pill.sc-acc-ctrls {
     background: #e0e9f5;
     color: #1f4a99;
     border-color: #c9d6ec;
     --sc-div: rgba(31, 74, 153, .16);
   }
-  .sc-pill.sc-acc .sc-seg {
+  .sc-pill.sc-acc-state .sc-value {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 700;
+    min-width: 22px;
+  }
+  .sc-pill.sc-acc-ctrls .sc-seg {
     font-family: var(--serif);
     font-size: 14px;
     width: 28px;
   }
-  .sc-pill.sc-acc .sc-seg[aria-pressed="true"] {
+  .sc-pill.sc-acc-ctrls .sc-seg[aria-pressed="true"] {
     background: #1f4a99;
     color: #fff;
   }
 
-  /* === Analysis (green) — the whole pill is the toggle button === */
-  .sc-pill.sc-analysis {
+  /* === Analysis (green) === */
+  .sc-pill.sc-analysis-state, .sc-pill.sc-analysis-ctrls {
     background: #eef4ee;
     color: #2d6a3d;
     border-color: #cee2d2;
     --sc-div: rgba(45, 106, 61, .16);
-    cursor: pointer;
-    padding: 0;
-    font: inherit;
     transition: background .12s, color .12s, border-color .12s;
   }
-  .sc-pill.sc-analysis:hover { background: #e2eee5; }
-  .sc-pill.sc-analysis[aria-pressed="true"] {
+  .sc-pill.sc-analysis-state[data-on="true"] {
     background: #2d6a3d;
     color: #fff;
     border-color: #2d6a3d;
-    --sc-div: rgba(255, 255, 255, .25);
   }
-  .sc-pill.sc-analysis[aria-pressed="true"]:hover { background: #245430; }
-  .sc-pill.sc-analysis .sc-value {
+  .sc-pill.sc-analysis-state .sc-value {
     font-family: var(--sans);
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .08em;
     min-width: 28px;
+  }
+  .sc-pill.sc-analysis-ctrls .sc-seg {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    width: 38px;
+  }
+  .sc-pill.sc-analysis-ctrls .sc-seg[aria-pressed="true"] {
+    background: #2d6a3d;
+    color: #fff;
   }
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
@@ -1644,7 +1658,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.7";
+const APP_VERSION = "4.5.8";
 
 //=============================================================
 // STORAGE
@@ -4106,24 +4120,39 @@ function renderDetail() {
           const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
           return `
           <div class="song-controls" role="toolbar" aria-label="Song display controls">
-            <div class="sc-pill sc-key" title="Transpose this song">
-              <span class="sc-cap">Key</span>
-              <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
-              <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
-              <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
-              <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
+            <div class="sc-group">
+              <div class="sc-pill sc-key-state" title="Current key">
+                <span class="sc-cap">Key</span>
+                <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
+              </div>
+              <div class="sc-pill sc-key-ctrls" title="Transpose this song">
+                <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
+                <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
+                <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
+              </div>
             </div>
-            <div class="sc-pill sc-acc" role="radiogroup" aria-label="Accidentals" title="Switch sharps / flats">
-              <span class="sc-cap">Accidentals</span>
-              <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
-              <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
-              <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
+            <div class="sc-group">
+              <div class="sc-pill sc-acc-state" title="Current accidental style">
+                <span class="sc-cap">Accidentals</span>
+                <span class="sc-value">${song.preferFlat ? "♭" : "♯"}</span>
+              </div>
+              <div class="sc-pill sc-acc-ctrls" role="radiogroup" aria-label="Accidentals" title="Switch sharps / flats">
+                <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
+                <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
+                <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
+              </div>
             </div>
             ${song.key ? `
-            <button class="sc-pill sc-analysis" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
-              <span class="sc-cap">Analysis</span>
-              <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
-            </button>` : ""}
+            <div class="sc-group">
+              <div class="sc-pill sc-analysis-state" data-on="${song.showRoman ? "true" : "false"}" title="Whether chord analysis (i, IV, V…) is shown">
+                <span class="sc-cap">Analysis</span>
+                <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
+              </div>
+              <div class="sc-pill sc-analysis-ctrls" role="radiogroup" aria-label="Analysis" title="Show how each chord relates to the key of ${escapeHtml(song.key)}">
+                <button class="sc-seg" data-rn-set="on"  aria-pressed="${song.showRoman ? "true" : "false"}" title="Turn analysis on">On</button>
+                <button class="sc-seg" data-rn-set="off" aria-pressed="${song.showRoman ? "false" : "true"}" title="Turn analysis off">Off</button>
+              </div>
+            </div>` : ""}
           </div>`;
         })()}
       </div>
@@ -4187,17 +4216,20 @@ function renderDetail() {
       renderDetail();
     });
   });
-  // Show-analysis toggle (formerly "Roman numerals")
-  el.querySelectorAll("[data-rn-toggle]").forEach(btn => {
-    const toggle = e => {
+  // Show-analysis On/Off segmented control. Each button carries its target
+  // value in data-rn-set, so clicking the already-active segment is a no-op.
+  el.querySelectorAll("[data-rn-set]").forEach(btn => {
+    const set = e => {
       e.stopPropagation();
-      song.showRoman = !song.showRoman;
+      const target = btn.dataset.rnSet === "on";
+      if (!!song.showRoman === target) return;
+      song.showRoman = target;
       saveState({ songs: state.songs });
       renderDetail();
     };
-    btn.addEventListener("click", toggle);
+    btn.addEventListener("click", set);
     btn.addEventListener("keydown", e => {
-      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(e); }
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); set(e); }
     });
   });
   // ↺ reset accidentals to the song's original style
