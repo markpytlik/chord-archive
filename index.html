@@ -283,154 +283,126 @@
     letter-spacing: -.015em;
     color: var(--ink);
   }
-  /* === Song-controls toolbar v5 — STATE and CONTROLS as separate adjacent pills.
-     Each feature (Key, Accidentals, Analysis) is two pills with a small gap.
-     State pills have fixed widths so changing the value never shifts adjacent pills. === */
+  /* === Song-controls toolbar v6 — one pill per concept, internal dividers.
+     Each feature (Key, Accidentals, Analysis) is a single pill containing
+     the cap label, current value, and any controls separated by hairline
+     dividers. The Analysis pill is itself the toggle button. === */
   .song-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 14px; /* gap BETWEEN feature groups */
+    gap: 8px;
     margin-top: 12px;
     font-family: var(--sans);
     line-height: 1;
   }
-  .sc-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px; /* gap WITHIN a feature group (state ↔ controls) */
-  }
   .sc-pill {
     display: inline-flex;
-    align-items: center;
-    height: 26px;
+    align-items: stretch;
+    height: 24px;
     border-radius: 999px;
+    border: 1px solid;
     font-size: 12px;
     font-weight: 600;
     letter-spacing: .02em;
+    overflow: hidden;
     box-sizing: border-box;
+    /* Internal dividers — semi-transparent so they read as hairlines, not borders */
+    --sc-div: rgba(0, 0, 0, .1);
   }
+  .sc-pill > * + * { border-left: 1px solid var(--sc-div); }
   .sc-pill .sc-cap {
     display: inline-flex; align-items: center;
-    padding: 0 8px 0 11px;
+    padding: 0 9px;
     text-transform: uppercase;
     font-size: 9.5px;
     font-weight: 700;
-    letter-spacing: .12em;
-    opacity: .75;
+    letter-spacing: .1em;
+    opacity: .7;
   }
   .sc-pill .sc-value {
     display: inline-flex; align-items: center; justify-content: center;
-    padding: 0 11px 0 0;
+    padding: 0 10px;
     font-family: var(--serif);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     letter-spacing: 0;
   }
-  .sc-pill .sc-btn {
+  .sc-pill .sc-btn,
+  .sc-pill .sc-seg {
     background: transparent;
     border: 0;
-    width: 28px;
-    height: 100%;
+    padding: 0;
+    width: 26px;
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     color: inherit;
     font-family: var(--sans);
-    transition: background .12s;
+    transition: background .12s, color .12s;
     line-height: 1;
   }
-  .sc-pill .sc-btn:not(:last-child) { border-right: 1px solid currentColor; }
-  .sc-pill .sc-btn:hover:not(:disabled) { background: rgba(255,255,255,.4); }
-  .sc-pill .sc-btn:disabled { opacity: .3; cursor: default; }
+  .sc-pill .sc-btn:hover:not(:disabled),
+  .sc-pill .sc-seg:hover:not([aria-pressed="true"]) {
+    background: rgba(0, 0, 0, .06);
+  }
+  .sc-pill .sc-btn:disabled { opacity: .25; cursor: default; }
+  .sc-pill .sc-reset { font-size: 12px; }
 
   /* === Key (warm rust) === */
-  .sc-pill.sc-key-state, .sc-pill.sc-key-ctrls {
+  .sc-pill.sc-key {
     background: #f5e3da;
     color: var(--accent-deep);
-    border: 1px solid #e8c8b8;
+    border-color: #e8c8b8;
+    --sc-div: rgba(138, 56, 25, .16);
   }
-  .sc-pill.sc-key-state {
-    /* fixed-width value cell so transposing Em → A♭m7 doesn't shift the layout */
-    min-width: 124px;
-  }
-  .sc-pill.sc-key-state .sc-value { min-width: 0; }
-  .sc-pill.sc-key-ctrls .sc-btn { border-right-color: rgba(138, 56, 25, .18); }
-  .sc-pill.sc-key-ctrls .sc-btn:hover:not(:disabled) { background: rgba(177, 74, 44, .14); }
+  .sc-pill.sc-key .sc-value { min-width: 36px; }
 
   /* === Accidentals (cool blue) === */
-  .sc-pill.sc-acc-state, .sc-pill.sc-acc-ctrls {
+  .sc-pill.sc-acc {
     background: #e0e9f5;
     color: #1f4a99;
-    border: 1px solid #c9d6ec;
+    border-color: #c9d6ec;
+    --sc-div: rgba(31, 74, 153, .16);
   }
-  .sc-pill.sc-acc-state {
-    min-width: 124px;
-  }
-  .sc-pill.sc-acc-state .sc-value {
-    font-family: var(--serif); font-size: 18px; font-weight: 700;
-  }
-  .sc-pill.sc-acc-ctrls .sc-seg-row {
-    display: inline-flex; align-items: stretch;
-    padding: 0 2px;
-  }
-  .sc-pill.sc-acc-ctrls .sc-seg {
-    background: transparent;
-    border: 0;
-    padding: 0;
-    width: 26px; height: 22px;
-    display: inline-flex; align-items: center; justify-content: center;
+  .sc-pill.sc-acc .sc-seg {
     font-family: var(--serif);
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    color: #1f4a99;
-    border-radius: 999px;
-    line-height: 1;
-    margin: 0 1px;
-    transition: background .12s, color .12s;
+    font-size: 14px;
+    width: 28px;
   }
-  .sc-pill.sc-acc-ctrls .sc-seg:hover:not([aria-pressed="true"]) { background: rgba(31, 74, 153, .12); }
-  .sc-pill.sc-acc-ctrls .sc-seg[aria-pressed="true"] {
+  .sc-pill.sc-acc .sc-seg[aria-pressed="true"] {
     background: #1f4a99;
     color: #fff;
   }
-  .sc-pill.sc-acc-ctrls .sc-btn { border-right-color: rgba(31, 74, 153, .18); }
-  .sc-pill.sc-acc-ctrls .sc-btn:hover:not(:disabled) { background: rgba(31, 74, 153, .14); }
 
-  /* === Analysis (green) === */
-  .sc-pill.sc-analysis-state, .sc-pill.sc-analysis-ctrls {
+  /* === Analysis (green) — the whole pill is the toggle button === */
+  .sc-pill.sc-analysis {
     background: #eef4ee;
     color: #2d6a3d;
-    border: 1px solid #cee2d2;
-  }
-  .sc-pill.sc-analysis-state {
-    min-width: 156px;
+    border-color: #cee2d2;
+    --sc-div: rgba(45, 106, 61, .16);
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
     transition: background .12s, color .12s, border-color .12s;
   }
-  .sc-pill.sc-analysis-state[data-on="true"] {
+  .sc-pill.sc-analysis:hover { background: #e2eee5; }
+  .sc-pill.sc-analysis[aria-pressed="true"] {
     background: #2d6a3d;
     color: #fff;
     border-color: #2d6a3d;
+    --sc-div: rgba(255, 255, 255, .25);
   }
-  .sc-pill.sc-analysis-state .sc-value {
-    font-family: var(--sans); font-size: 11.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .08em;
+  .sc-pill.sc-analysis[aria-pressed="true"]:hover { background: #245430; }
+  .sc-pill.sc-analysis .sc-value {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    min-width: 28px;
   }
-  .sc-pill.sc-analysis-ctrls {
-    cursor: pointer;
-    transition: background .12s;
-  }
-  .sc-pill.sc-analysis-ctrls:hover { background: #e2eee5; }
-  .sc-pill.sc-analysis-ctrls .sc-toggle-btn {
-    background: transparent; border: 0;
-    padding: 0 14px; height: 100%;
-    font: inherit; cursor: pointer; color: inherit;
-    font-size: 11.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .08em;
-  }
-  /* (Old .rn-pill inside-h1 styles removed — Roman toggle now lives in .song-controls.) */
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
   .lyrics .seg .chord .rn-tag {
@@ -1672,7 +1644,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.6";
+const APP_VERSION = "4.5.7";
 
 //=============================================================
 // STORAGE
@@ -4134,40 +4106,24 @@ function renderDetail() {
           const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
           return `
           <div class="song-controls" role="toolbar" aria-label="Song display controls">
-            <div class="sc-group">
-              <div class="sc-pill sc-key-state" title="Current key">
-                <span class="sc-cap">Key</span>
-                <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
-              </div>
-              <div class="sc-pill sc-key-ctrls" title="Transpose this song">
-                <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
-                <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
-                <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
-              </div>
+            <div class="sc-pill sc-key" title="Transpose this song">
+              <span class="sc-cap">Key</span>
+              <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
+              <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
+              <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
+              <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
             </div>
-            <div class="sc-group">
-              <div class="sc-pill sc-acc-state" title="Current accidental style">
-                <span class="sc-cap">Accidentals</span>
-                <span class="sc-value">${song.preferFlat ? "♭" : "♯"}</span>
-              </div>
-              <div class="sc-pill sc-acc-ctrls" title="Switch sharps / flats">
-                <div class="sc-seg-row" role="radiogroup" aria-label="Accidentals">
-                  <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
-                  <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
-                </div>
-                <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
-              </div>
+            <div class="sc-pill sc-acc" role="radiogroup" aria-label="Accidentals" title="Switch sharps / flats">
+              <span class="sc-cap">Accidentals</span>
+              <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
+              <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
+              <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
             </div>
             ${song.key ? `
-            <div class="sc-group">
-              <div class="sc-pill sc-analysis-state" data-on="${song.showRoman ? "true" : "false"}" title="Whether chord analysis (i, IV, V…) is shown">
-                <span class="sc-cap">Show analysis</span>
-                <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
-              </div>
-              <div class="sc-pill sc-analysis-ctrls" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
-                <button class="sc-toggle-btn" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}">${song.showRoman ? "Turn off" : "Turn on"}</button>
-              </div>
-            </div>` : ""}
+            <button class="sc-pill sc-analysis" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
+              <span class="sc-cap">Analysis</span>
+              <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
+            </button>` : ""}
           </div>`;
         })()}
       </div>
