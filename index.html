@@ -288,7 +288,7 @@
      between "what's the current state" and "how to change it" restored. === */
   .song-controls {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 12px; /* gap BETWEEN feature groups */
     margin-top: 12px;
@@ -406,16 +406,38 @@
     letter-spacing: .08em;
     min-width: 28px;
   }
-  .sc-pill.sc-analysis-ctrls .sc-seg {
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    width: 38px;
+  /* Analysis controls — single switch-style toggle button */
+  .sc-pill.sc-analysis-ctrls .sc-toggle {
+    background: transparent;
+    border: 0;
+    padding: 0 9px;
+    height: 100%;
+    display: inline-flex; align-items: center;
+    cursor: pointer;
+    color: inherit;
   }
-  .sc-pill.sc-analysis-ctrls .sc-seg[aria-pressed="true"] {
+  .sc-pill.sc-analysis-ctrls .sc-toggle-track {
+    position: relative;
+    width: 26px;
+    height: 14px;
+    background: rgba(45, 106, 61, .25);
+    border-radius: 999px;
+    transition: background .15s;
+  }
+  .sc-pill.sc-analysis-ctrls .sc-toggle[aria-pressed="true"] .sc-toggle-track {
     background: #2d6a3d;
-    color: #fff;
+  }
+  .sc-pill.sc-analysis-ctrls .sc-toggle-knob {
+    position: absolute;
+    top: 1px; left: 1px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+    transition: transform .15s;
+  }
+  .sc-pill.sc-analysis-ctrls .sc-toggle[aria-pressed="true"] .sc-toggle-knob {
+    transform: translateX(12px);
   }
   /* Inline Roman-numeral tag attached under each chord pill */
   .lyrics .chord-pill-inline .rn-tag,
@@ -1658,7 +1680,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.8";
+const APP_VERSION = "4.5.9";
 
 //=============================================================
 // STORAGE
@@ -4148,9 +4170,10 @@ function renderDetail() {
                 <span class="sc-cap">Analysis</span>
                 <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
               </div>
-              <div class="sc-pill sc-analysis-ctrls" role="radiogroup" aria-label="Analysis" title="Show how each chord relates to the key of ${escapeHtml(song.key)}">
-                <button class="sc-seg" data-rn-set="on"  aria-pressed="${song.showRoman ? "true" : "false"}" title="Turn analysis on">On</button>
-                <button class="sc-seg" data-rn-set="off" aria-pressed="${song.showRoman ? "false" : "true"}" title="Turn analysis off">Off</button>
+              <div class="sc-pill sc-analysis-ctrls" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
+                <button class="sc-toggle" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" aria-label="Toggle chord analysis">
+                  <span class="sc-toggle-track"><span class="sc-toggle-knob"></span></span>
+                </button>
               </div>
             </div>` : ""}
           </div>`;
@@ -4216,20 +4239,17 @@ function renderDetail() {
       renderDetail();
     });
   });
-  // Show-analysis On/Off segmented control. Each button carries its target
-  // value in data-rn-set, so clicking the already-active segment is a no-op.
-  el.querySelectorAll("[data-rn-set]").forEach(btn => {
-    const set = e => {
+  // Show-analysis switch — single toggle button, flips song.showRoman.
+  el.querySelectorAll("[data-rn-toggle]").forEach(btn => {
+    const toggle = e => {
       e.stopPropagation();
-      const target = btn.dataset.rnSet === "on";
-      if (!!song.showRoman === target) return;
-      song.showRoman = target;
+      song.showRoman = !song.showRoman;
       saveState({ songs: state.songs });
       renderDetail();
     };
-    btn.addEventListener("click", set);
+    btn.addEventListener("click", toggle);
     btn.addEventListener("keydown", e => {
-      if (e.key === " " || e.key === "Enter") { e.preventDefault(); set(e); }
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(e); }
     });
   });
   // ↺ reset accidentals to the song's original style
