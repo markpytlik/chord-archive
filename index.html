@@ -1672,7 +1672,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.5.3";
+const APP_VERSION = "4.5.5";
 
 //=============================================================
 // STORAGE
@@ -1828,8 +1828,33 @@ function runOnSignInOnce() {
 // (typically the seed library or anything the user added as a guest).
 async function onSignIn() {
   if (!auth.client || !auth.user) return;
-  const { data, error } = await auth.client.from("songs").select("data, updated_at");
-  if (error) { console.warn("Cloud fetch failed:", error); return; }
+  let res;
+  // Bound the SELECT — without a timeout, a wedged Supabase client (e.g. from a
+  // sibling tab refreshing the persisted session mid-init) silently leaves
+  // auth.knownIds empty and state.songs still showing only the localStorage cache,
+  // which then snowballs into every subsequent cloudSyncOut also hanging.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      res = await withTimeout(
+        auth.client.from("songs").select("data, updated_at"),
+        10000,
+        "songs select"
+      );
+      break;
+    } catch (e) {
+      console.warn("[onSignIn] cloud fetch attempt", attempt, "failed:", e);
+      const isTimeout = /timed out/i.test(e?.message || "");
+      if (isTimeout && attempt === 1) {
+        // Watchdog: replace wedged client and retry once.
+        await recreateAuthClient();
+        continue;
+      }
+      setSyncStatus("error", e?.message || "Couldn't load your library — click to reconnect.");
+      return;
+    }
+  }
+  const { data, error } = res;
+  if (error) { console.warn("Cloud fetch failed:", error); setSyncStatus("error", error.message || "Couldn't load your library"); return; }
   if (data && data.length) {
     state.songs = data.map(r => r.data);
     auth.knownIds = new Set(state.songs.map(s => s.id));
@@ -1883,7 +1908,7 @@ function renderSyncIndicator() {
     idle:    { txt: "",                 cls: "sync-indicator",         tip: "" },
     syncing: { txt: "↻ Saving…",        cls: "sync-indicator syncing", tip: "Saving to your cloud library" },
     synced:  { txt: "✓ Saved to cloud", cls: "sync-indicator synced",  tip: "All changes saved to your cloud library" },
-    error:   { txt: "⚠ Save failed · Reconnect", cls: "sync-indicator error", tip: "Couldn't save to cloud: " + (auth.syncDetail || "unknown error") + ". Click to clear the session and sign back in. Your songs are safe locally." },
+    error:   { txt: "⚠ Connection problem · Reconnect", cls: "sync-indicator error", tip: "Cloud connection problem: " + (auth.syncDetail || "unknown error") + ". Click to clear the session and sign back in. Your songs are safe locally." },
     offline: { txt: "Offline",          cls: "sync-indicator offline", tip: "No network — changes saved locally and will sync when you're back online" },
   };
   el.onclick = (s === "error")
@@ -1920,60 +1945,61 @@ async function cloudSyncOut(songs) {
   // Debounce — coalesce rapid mutations into a single round trip.
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(async () => {
-    try {
-      // Defensive: only push songs with a valid id. Songs without ids will fail
-      // upsert with a cryptic message — drop them and log so we know.
-      const validSongs = songs.filter(s => s && s.id);
-      if (validSongs.length !== songs.length) {
-        console.warn("[cloudSyncOut] skipping", songs.length - validSongs.length, "songs without an id");
-      }
-      const rows = validSongs.map(song => ({
-        id: song.id,
-        user_id: auth.user.id,
-        data: song,
-        updated_at: new Date(song.updatedAt || Date.now()).toISOString(),
-      }));
-      console.log("[cloudSyncOut] upserting", rows.length, "rows");
-      if (rows.length) {
-        const { error } = await withTimeout(
-          auth.client.from("songs").upsert(rows),
-          15000,
-          "songs upsert"
-        );
-        if (error) {
-          console.error("[cloudSyncOut] upsert error", error);
-          throw error;
+    // Defensive: only push songs with a valid id. Songs without ids will fail
+    // upsert with a cryptic message — drop them and log so we know.
+    const validSongs = songs.filter(s => s && s.id);
+    if (validSongs.length !== songs.length) {
+      console.warn("[cloudSyncOut] skipping", songs.length - validSongs.length, "songs without an id");
+    }
+    const rows = validSongs.map(song => ({
+      id: song.id,
+      user_id: auth.user.id,
+      data: song,
+      updated_at: new Date(song.updatedAt || Date.now()).toISOString(),
+    }));
+
+    // Try once; if a hang trips withTimeout, the SDK is likely wedged. Recreate
+    // the client and retry once before surfacing the error.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log("[cloudSyncOut] upserting", rows.length, "rows (attempt", attempt + ")");
+        if (rows.length) {
+          const { error } = await withTimeout(
+            auth.client.from("songs").upsert(rows),
+            15000,
+            "songs upsert"
+          );
+          if (error) { console.error("[cloudSyncOut] upsert error", error); throw error; }
         }
-      }
-      // Detect deletions: any ID that was previously in cloud but isn't in current state
-      const currentIds = new Set(validSongs.map(s => s.id));
-      const removed = [...auth.knownIds].filter(id => !currentIds.has(id));
-      if (removed.length) {
-        const { error } = await withTimeout(
-          auth.client.from("songs").delete().in("id", removed),
-          15000,
-          "songs delete"
-        );
-        if (error) {
-          console.error("[cloudSyncOut] delete error", error);
-          throw error;
+        const currentIds = new Set(validSongs.map(s => s.id));
+        const removed = [...auth.knownIds].filter(id => !currentIds.has(id));
+        if (removed.length) {
+          const { error } = await withTimeout(
+            auth.client.from("songs").delete().in("id", removed),
+            15000,
+            "songs delete"
+          );
+          if (error) { console.error("[cloudSyncOut] delete error", error); throw error; }
         }
-      }
-      auth.knownIds = currentIds;
-      console.log("[cloudSyncOut] sync complete");
-      setSyncStatus("synced");
-      setTimeout(() => { if (auth.syncStatus === "synced") setSyncStatus("idle"); }, 2400);
-    } catch (e) {
-      // Surface as an explicit error in console so it's easy to see even at default log level.
-      console.error("[cloudSyncOut] FAILED", e);
-      const detail = e?.message || e?.error_description || e?.hint || String(e);
-      // Don't auto-sign-out on timeouts — that surprised the user when a single
-      // hung save kicked them out mid-edit. Just surface the error; the indicator
-      // exposes a "Reconnect" link the user can click if it persists.
-      if (/timed out/i.test(detail)) {
-        setSyncStatus("error", "Save timed out. Click the indicator to reconnect.");
-      } else {
-        setSyncStatus("error", detail);
+        auth.knownIds = currentIds;
+        console.log("[cloudSyncOut] sync complete");
+        setSyncStatus("synced");
+        setTimeout(() => { if (auth.syncStatus === "synced") setSyncStatus("idle"); }, 2400);
+        return;
+      } catch (e) {
+        console.error("[cloudSyncOut] attempt", attempt, "FAILED", e);
+        const detail = e?.message || e?.error_description || e?.hint || String(e);
+        const isTimeout = /timed out/i.test(detail);
+        if (isTimeout && attempt === 1) {
+          // Watchdog: the live client is wedged. Replace with a fresh one and retry.
+          await recreateAuthClient();
+          continue;
+        }
+        // Don't auto-sign-out on timeouts — that surprised the user when a single
+        // hung save kicked them out mid-edit. Just surface the error; the indicator
+        // exposes a "Reconnect" link the user can click if it persists.
+        setSyncStatus("error", isTimeout ? "Save timed out. Click the indicator to reconnect." : detail);
+        return;
       }
     }
   }, 600);
@@ -1989,6 +2015,45 @@ function forceSessionPurgeAndReload() {
   } catch (_) {}
   // Tiny delay so the user sees the error indicator update before the reload.
   setTimeout(() => location.reload(), 300);
+}
+
+// Watchdog: replace auth.client with a fresh instance, rehydrating the session
+// from localStorage. Used when the live client wedges (every method hangs even
+// though the network and token are healthy). A fresh instance comes up in <1s
+// and lets the failed call retry without a full page reload. Returns true if
+// the new client was rehydrated with a session, false otherwise.
+let _recreatePromise = null;
+function recreateAuthClient() {
+  // Coalesce concurrent watchdog triggers (cloudSyncOut + onSignIn could both fire).
+  if (_recreatePromise) return _recreatePromise;
+  _recreatePromise = (async () => {
+    console.warn("[auth] recreating Supabase client (suspected wedge)");
+    if (typeof window.supabase === "undefined") return false;
+    auth.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        lock: async (_k, _t, fn) => fn(),
+      },
+    });
+    const sbKey = Object.keys(localStorage).find(k => k.startsWith("sb-") && k.endsWith("-auth-token"));
+    if (!sbKey) return false;
+    let sess = null;
+    try { sess = JSON.parse(localStorage.getItem(sbKey)); } catch (_) {}
+    if (!sess?.access_token || !sess?.refresh_token) return false;
+    try {
+      await withTimeout(
+        auth.client.auth.setSession({ access_token: sess.access_token, refresh_token: sess.refresh_token }),
+        5000,
+        "watchdog setSession"
+      );
+      return true;
+    } catch (e) {
+      console.warn("[auth] watchdog setSession failed:", e);
+      return false;
+    }
+  })().finally(() => { _recreatePromise = null; });
+  return _recreatePromise;
 }
 
 // --------- Auth UI ---------
@@ -6150,30 +6215,32 @@ function importJsonFile(file) {
 //=============================================================
 // INIT
 //=============================================================
-// Decode a #new=<base64> hash payload from the extension/bookmarklet.
-// Returns a partial song object or null.
+// Build a draft song from an extension/bookmarklet payload {title, artist, lyrics, sourceUrl, key?}.
+// Always runs the chord-sheet parser — handles inline ChordPro, chord-line-above-lyrics, and ChordPro directives.
+function importSongFromPayload(payload) {
+  const parsed = parseChordSheet(payload.lyrics || "");
+  let key = payload.key || parsed.key || "";
+  if (!key) {
+    const chords = extractChords(parsed.lyrics || payload.lyrics || "");
+    const detected = detectKey(chords);
+    if (detected) key = detected;
+  }
+  return Object.assign(blankSong(), {
+    title: cleanScrapedTitle(payload.title || parsed.title || ""),
+    artist: cleanScrapedTitle(payload.artist || parsed.artist || ""),
+    key,
+    lyrics: parsed.lyrics || payload.lyrics || "",
+    sourceUrl: payload.sourceUrl || "",
+  });
+}
+
 function consumeImportHash() {
   const h = location.hash;
   if (!h.startsWith("#new=")) return null;
   try {
     const raw = decodeURIComponent(escape(atob(h.slice(5))));
     const payload = JSON.parse(raw);
-    // Always run the chord-sheet parser — handles inline ChordPro, chord-line-above-lyrics, and ChordPro directives.
-    const parsed = parseChordSheet(payload.lyrics || "");
-    // Autodetect key from chord set if not provided
-    let key = payload.key || parsed.key || "";
-    if (!key) {
-      const chords = extractChords(parsed.lyrics || payload.lyrics || "");
-      const detected = detectKey(chords);
-      if (detected) key = detected;
-    }
-    const song = Object.assign(blankSong(), {
-      title: cleanScrapedTitle(payload.title || parsed.title || ""),
-      artist: cleanScrapedTitle(payload.artist || parsed.artist || ""),
-      key,
-      lyrics: parsed.lyrics || payload.lyrics || "",
-      sourceUrl: payload.sourceUrl || "",
-    });
+    const song = importSongFromPayload(payload);
     // Clear the hash so reload doesn't double-create
     history.replaceState(null, "", location.pathname + location.search);
     return song;
@@ -6219,6 +6286,22 @@ async function init() {
   if (imported) {
     state.editing = imported;  // open editor with pre-filled values
   }
+
+  // In-tab import from the browser extension. Preferred over opening a new chordpad
+  // tab — two tabs sharing one Supabase session can wedge each other's SDK (the
+  // newer tab's auth.client gets stuck with every method hung indefinitely, even
+  // though the network and auth token are fine). The extension dispatches this
+  // event into an already-open chordpad tab via chrome.scripting.executeScript.
+  window.addEventListener("chordpad:import", e => {
+    if (!e || !e.detail) return;
+    try {
+      const song = importSongFromPayload(e.detail);
+      state.editing = song;
+      renderDetail();
+    } catch (err) {
+      console.warn("chordpad:import failed:", err);
+    }
+  });
 
   document.getElementById("btn-new").addEventListener("click", () => {
     state.editing = "new"; renderDetail();

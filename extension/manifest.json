@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chordpad — Grab Chords",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "One-click chord-chart capture for Chordpad (chordpad.app). Works on Ultimate Guitar, E-Chords, Chordie, and any page with a <pre> chord chart.",
   "icons": {
     "48":  "icon.svg",

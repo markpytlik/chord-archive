@@ -54,22 +54,46 @@ $("grab").addEventListener("click", async () => {
       btn.disabled = false;
       return;
     }
-    // Build payload, base64-encode, redirect to Chordpad's #new= URL.
-    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+    const payloadObj = {
       title: cleanScrapedTitle(result.title || ""),
       artist: cleanScrapedTitle(result.artist || ""),
       lyrics: result.lyrics,
       sourceUrl: tab.url || "",
-    }))));
+    };
+
+    // Prefer handing off to an already-open chordpad tab. Two chordpad tabs
+    // sharing one Supabase session can wedge each other's SDK (every call hangs,
+    // including saves) — the in-tab handoff sidesteps that entirely.
+    const existing = await findExistingChordpadTab();
+    if (existing) {
+      try {
+        await api.scripting.executeScript({
+          target: { tabId: existing.id },
+          func: (p) => window.dispatchEvent(new CustomEvent("chordpad:import", { detail: p })),
+          args: [payloadObj],
+        });
+        await api.tabs.update(existing.id, { active: true });
+        if (existing.windowId !== undefined) {
+          try { await api.windows.update(existing.windowId, { focused: true }); } catch (_) {}
+        }
+        setStatus("Sent " + result.lyrics.length + " chars to your open Chordpad tab.", "ok");
+        setTimeout(() => window.close(), 400);
+        return;
+      } catch (e) {
+        console.warn("In-tab import failed, falling back to new tab:", e);
+        // fall through to new-tab path
+      }
+    }
+
+    // Fallback: open a fresh chordpad tab with the payload encoded in the URL hash.
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
     const targetUrl = ARCHIVE_URL + "#new=" + payload;
 
     if (targetUrl.length > 500000) {
       // Massive chart — fallback to clipboard so we don't blow URL limits
       let out = "";
-      const cleanTitle = cleanScrapedTitle(result.title || "");
-      const cleanArtist = cleanScrapedTitle(result.artist || "");
-      if (cleanTitle)  out += "{title: "  + cleanTitle.replace(/[{}]/g, "") + "}\n";
-      if (cleanArtist) out += "{artist: " + cleanArtist.replace(/[{}]/g, "") + "}\n";
+      if (payloadObj.title)  out += "{title: "  + payloadObj.title.replace(/[{}]/g, "") + "}\n";
+      if (payloadObj.artist) out += "{artist: " + payloadObj.artist.replace(/[{}]/g, "") + "}\n";
       out += "\n" + result.lyrics;
       await navigator.clipboard.writeText(out);
       setStatus("Chart was too large for direct import. Copied to clipboard — paste into the lyrics field.", "ok");
@@ -77,8 +101,7 @@ $("grab").addEventListener("click", async () => {
       return;
     }
 
-    const charCount = result.lyrics.length;
-    setStatus("Got it — opening Chordpad with " + charCount + " chars pre-filled.", "ok");
+    setStatus("Got it — opening Chordpad with " + result.lyrics.length + " chars pre-filled.", "ok");
     setTimeout(() => api.tabs.create({ url: targetUrl }), 200);
   } catch (e) {
     setStatus("Error: " + e.message, "err");
@@ -86,6 +109,22 @@ $("grab").addEventListener("click", async () => {
     btn.disabled = false;
   }
 });
+
+// Find the most-recently-active chordpad.app tab across all windows, or null.
+async function findExistingChordpadTab() {
+  try {
+    const tabs = await api.tabs.query({ url: "https://chordpad.app/*" });
+    if (!tabs || !tabs.length) return null;
+    // Prefer the active tab in the focused window if it's chordpad; otherwise
+    // pick whichever was accessed most recently.
+    const active = tabs.find(t => t.active && t.lastFocusedWindow);
+    if (active) return active;
+    return tabs.slice().sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+  } catch (e) {
+    console.warn("findExistingChordpadTab failed:", e);
+    return null;
+  }
+}
 
 // Strip "(chords)" / "(tab)" / etc. trailing noise from a song title
 function cleanScrapedTitle(t) {
