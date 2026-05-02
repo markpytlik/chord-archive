@@ -1913,7 +1913,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.9.0";
+const APP_VERSION = "4.9.1";
 
 //=============================================================
 // STORAGE
@@ -4216,13 +4216,14 @@ function renderLandingPage() {
     </div>
   `).join("");
 
-  // Songbook preview — actual chord pills + lyrics, styled like the real detail panel,
-  // so visitors see exactly what they'll get instead of reading a paragraph about it.
+  // Songbook preview — actual chord pills + lyrics, styled like the real detail
+  // panel. Lyrics are clearly placeholder rather than an existing song, so the
+  // preview demos the chord-pill-above-lyric format without borrowing copyright
+  // or pretending to be content the user didn't write.
   const sample = [
-    { chords: [{c: "F",   col: 0}, {c: "Am",  col: 14}, {c: "Dm",  col: 26}, {c: "Bb", col: 36}], lyric: "A heart that's full up like a landfill" },
-    { chords: [{c: "F",   col: 0}, {c: "Am",  col: 12}, {c: "Dm",  col: 23}, {c: "Bb", col: 33}], lyric: "A job that slowly kills you, bruises that won't heal" },
-    { chords: [{c: "F",   col: 0}, {c: "Am",  col: 11}, {c: "Bb",  col: 22}], lyric: "You look so tired-unhappy" },
-    { chords: [{c: "Bb",  col: 0}, {c: "C",   col: 13}], lyric: "Bring down the government" },
+    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Dm", col: 22}, {c: "Bb", col: 36}],   lyric: "This is a sample line of lyrics in your songbook" },
+    { chords: [{c: "F",  col: 0}, {c: "Am", col: 10}, {c: "Bb", col: 25}, {c: "Dm", col: 38}],   lyric: "Hover any chord pill to see the diagram instantly" },
+    { chords: [{c: "F",  col: 0}, {c: "Am", col: 9},  {c: "Bb", col: 22}, {c: "Dm", col: 41}],   lyric: "Click to save your own preferred voicings per song" },
   ];
   const previewLines = sample.map(line => {
     const segs = [];
@@ -4241,7 +4242,7 @@ function renderLandingPage() {
       <section class="lp-hero">
         <h1 class="lp-title">Chord<em>pad</em></h1>
         <p class="lp-tagline">Your personal songbook for chords, lyrics, and voicings.</p>
-        <p class="lp-sub">Save chord charts from anywhere. Practice with auto-scrolling lyrics. Tailor voicings for guitar or piano. Free forever for personal use.</p>
+        <p class="lp-sub">Add your own songs from scratch, or paste a chord chart from anywhere into the editor and work with it. Practice with auto-scrolling lyrics. Tailor voicings for guitar or piano.</p>
         <div class="lp-cta-row">
           <button class="lp-btn primary" id="lp-signup">Sign up free</button>
           <button class="lp-btn ghost" id="lp-browse">Or browse the demo songs →</button>
@@ -4255,8 +4256,8 @@ function renderLandingPage() {
         <div class="lp-preview-card">
           <div class="lp-preview-head">
             <div class="lp-preview-meta">
-              <div class="lp-preview-artist">RADIOHEAD</div>
-              <div class="lp-preview-title">No Surprises</div>
+              <div class="lp-preview-artist">SAMPLE CHART</div>
+              <div class="lp-preview-title">Your first song</div>
             </div>
             <div class="lp-preview-pills">
               <span class="lp-preview-pill key"><span class="cap">Key</span><span class="val">F</span></span>
@@ -4264,7 +4265,7 @@ function renderLandingPage() {
               <span class="lp-preview-pill cap"><span class="cap">Capo</span><span class="val">2</span></span>
             </div>
           </div>
-          <div class="lp-preview-section">— Verse 1 —</div>
+          <div class="lp-preview-section">— Verse —</div>
           <div class="lp-preview-lyrics">${previewLines}</div>
           <div class="lp-preview-hover">
             <div class="lp-preview-hover-label">Hover any chord</div>
