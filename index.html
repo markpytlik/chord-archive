@@ -1459,10 +1459,100 @@
   body.landing-active .grow { flex: 1; }
 
   .lp-page {
-    max-width: 920px; margin: 0 auto; padding: 8vh 32px 6vh;
+    max-width: 1040px; margin: 0 auto; padding: 7vh 32px 6vh;
     font-family: var(--sans);
   }
-  .lp-hero { text-align: center; margin-bottom: 8vh; }
+  .lp-hero { text-align: center; margin-bottom: 6vh; }
+  .lp-trust {
+    margin-top: 30px;
+    display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    color: var(--muted); font-size: 12px; letter-spacing: .04em;
+  }
+  .lp-trust > span:nth-child(2n) { opacity: .5; }
+
+  /* === Songbook preview card — looks like the real detail panel === */
+  .lp-preview { margin: 0 0 8vh; }
+  .lp-preview-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px 32px 24px;
+    box-shadow: 0 1px 3px rgba(20, 22, 26, .04), 0 12px 36px rgba(20, 22, 26, .06);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .lp-preview-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 18px;
+    flex-wrap: wrap;
+  }
+  .lp-preview-artist {
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .lp-preview-title {
+    font-family: var(--serif); font-size: 30px; font-weight: 500; color: var(--ink);
+    letter-spacing: -.01em; line-height: 1.1;
+  }
+  .lp-preview-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .lp-preview-pill {
+    display: inline-flex; align-items: stretch;
+    height: 24px; border-radius: 999px; border: 1px solid;
+    font-size: 12px; font-weight: 600; overflow: hidden;
+  }
+  .lp-preview-pill .cap {
+    display: inline-flex; align-items: center; padding: 0 9px;
+    text-transform: uppercase; font-size: 9.5px; font-weight: 700;
+    letter-spacing: .1em; opacity: .7;
+  }
+  .lp-preview-pill .val {
+    display: inline-flex; align-items: center; padding: 0 10px;
+    border-left: 1px solid rgba(0,0,0,.1);
+    font-family: var(--serif); font-size: 13px; font-weight: 600;
+  }
+  .lp-preview-pill.key { background: #f5e3da; color: var(--accent-deep); border-color: #e8c8b8; }
+  .lp-preview-pill.acc { background: #e0e9f5; color: #1f4a99; border-color: #c9d6ec; }
+  .lp-preview-pill.acc .val { font-family: var(--serif); font-size: 16px; font-weight: 700; }
+  .lp-preview-pill.cap-pill,
+  .lp-preview-pill.cap { background: #ece4f5; color: #5a3eb1; border-color: #d3c8e0; }
+
+  .lp-preview-section {
+    color: var(--accent); font-size: 12px; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase;
+    margin: 4px 0 -4px;
+  }
+  .lp-preview-lyrics {
+    font-family: var(--mono);
+    font-size: 14px; line-height: 2.4;
+    color: var(--ink);
+  }
+  .lp-pv-line { white-space: nowrap; overflow: hidden; }
+  .lp-pv-text { display: inline; }
+  .lp-pv-chord {
+    display: inline-block;
+    background: var(--chord-soft); color: var(--chord);
+    border: 1px solid #cdd9ed;
+    border-radius: 6px;
+    padding: 1px 7px;
+    margin: 0 4px 0 0;
+    font-family: var(--sans); font-size: 11.5px; font-weight: 600;
+    vertical-align: 1px;
+  }
+  .lp-preview-hover {
+    border-top: 1px dashed var(--line);
+    padding-top: 16px;
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  }
+  .lp-preview-hover-label {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .lp-preview-hover-diags {
+    display: flex; gap: 18px; align-items: center; flex: 1;
+    justify-content: flex-end;
+  }
+  .lp-preview-hover-diags svg { max-width: 130px !important; height: auto !important; width: auto !important; }
+
   .lp-hero .lp-title {
     font-family: var(--serif);
     font-size: clamp(56px, 9vw, 96px);
@@ -1507,8 +1597,48 @@
     border-top: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
   }
-  .lp-feature .lp-feature-icon {
-    font-size: 28px; margin-bottom: 10px;
+  .lp-feature .lp-feature-icon { font-size: 28px; margin-bottom: 10px; }
+  .lp-feature-vis {
+    height: 110px;
+    display: flex; align-items: center; justify-content: flex-start;
+    margin-bottom: 14px;
+  }
+  .lp-feature-vis svg { max-width: 110px !important; height: auto !important; width: auto !important; }
+  .lp-feature-vis-stack { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .lp-mini-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--chord-soft); color: var(--chord);
+    border: 1px solid #cdd9ed;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-family: var(--sans); font-size: 11.5px; font-weight: 600;
+  }
+  .lp-mini-pill em {
+    font-family: var(--serif); font-style: italic; font-size: 11px;
+    color: #2d6a3d; font-weight: 500;
+  }
+  .lp-feature-vis-play {
+    flex-direction: column; align-items: stretch; gap: 8px;
+    padding: 10px 0;
+  }
+  .lp-play-bar {
+    height: 4px; border-radius: 999px; background: var(--line);
+    position: relative; overflow: hidden;
+  }
+  .lp-play-bar::before {
+    content: ""; position: absolute; left: 0; top: 0; height: 100%;
+    width: 38%; background: var(--accent); border-radius: 999px;
+    animation: lpPlayBar 4s ease-in-out infinite;
+  }
+  @keyframes lpPlayBar {
+    0%   { width: 38%; }
+    50%  { width: 72%; }
+    100% { width: 38%; }
+  }
+  .lp-play-line {
+    font-family: var(--sans); font-size: 12.5px; font-weight: 600;
+    color: var(--accent-deep);
+    letter-spacing: .04em;
   }
   .lp-feature h3 {
     font-family: var(--serif);
@@ -1783,7 +1913,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.8.0";
+const APP_VERSION = "4.9.0";
 
 //=============================================================
 // STORAGE
@@ -4067,50 +4197,113 @@ function renderAuthCallbackLoader() {
 }
 
 function renderLandingPage() {
-  // Three demo chord pills with sample voicings — visual anchor for "what is this thing"
+  // Real rendered diagrams used as feature visuals — same code paths as the app.
+  const visGuitar = svgGuitar("Cmaj7", null, "md");
+  const visPiano  = svgPianoFromPcs([0, 4, 7, 11, 2], 0, undefined, "md"); // Cmaj9
+  const visBarre  = svgGuitar("F#m7", null, "md"); // a derived movable shape
+
+  // Side-row of additional chord tiles to anchor "what diagrams look like".
   const demoChords = [
-    { name: "Cmaj7",   pcs: [0,4,7,11] },
-    { name: "G/B",     pcs: [11,2,7] },
-    { name: "Am9",     pcs: [9,0,4,7,11] },
+    { name: "Am7",    g: svgGuitar("Am7",   null, "md") },
+    { name: "Dmaj7",  g: svgGuitar("Dmaj7", null, "md") },
+    { name: "G/B",    g: svgGuitar("G/B",   null, "md") },
+    { name: "Em9",    g: svgGuitar("Em9",   null, "md") },
   ];
   const demoTiles = demoChords.map(c => `
     <div class="lp-chord-tile">
       <div class="lp-chord-name">${escapeHtml(c.name)}</div>
-      <div class="lp-chord-svg">${svgPianoFromPcs(c.pcs, c.pcs[0], undefined, "md")}</div>
+      <div class="lp-chord-svg">${c.g}</div>
     </div>
   `).join("");
+
+  // Songbook preview — actual chord pills + lyrics, styled like the real detail panel,
+  // so visitors see exactly what they'll get instead of reading a paragraph about it.
+  const sample = [
+    { chords: [{c: "F",   col: 0}, {c: "Am",  col: 14}, {c: "Dm",  col: 26}, {c: "Bb", col: 36}], lyric: "A heart that's full up like a landfill" },
+    { chords: [{c: "F",   col: 0}, {c: "Am",  col: 12}, {c: "Dm",  col: 23}, {c: "Bb", col: 33}], lyric: "A job that slowly kills you, bruises that won't heal" },
+    { chords: [{c: "F",   col: 0}, {c: "Am",  col: 11}, {c: "Bb",  col: 22}], lyric: "You look so tired-unhappy" },
+    { chords: [{c: "Bb",  col: 0}, {c: "C",   col: 13}], lyric: "Bring down the government" },
+  ];
+  const previewLines = sample.map(line => {
+    const segs = [];
+    let cursor = 0;
+    for (const ch of line.chords) {
+      if (ch.col > cursor) segs.push(`<span class="lp-pv-text">${escapeHtml(line.lyric.slice(cursor, ch.col))}</span>`);
+      segs.push(`<span class="lp-pv-chord">${escapeHtml(ch.c)}</span>`);
+      cursor = ch.col;
+    }
+    if (cursor < line.lyric.length) segs.push(`<span class="lp-pv-text">${escapeHtml(line.lyric.slice(cursor))}</span>`);
+    return `<div class="lp-pv-line">${segs.join("")}</div>`;
+  }).join("");
+
   return `
     <div class="lp-page">
       <section class="lp-hero">
         <h1 class="lp-title">Chord<em>pad</em></h1>
         <p class="lp-tagline">Your personal songbook for chords, lyrics, and voicings.</p>
-        <p class="lp-sub">Save chord charts from anywhere. Practice with auto-scrolling lyrics. Tailor voicings for your guitar or piano. Free forever for personal use.</p>
+        <p class="lp-sub">Save chord charts from anywhere. Practice with auto-scrolling lyrics. Tailor voicings for guitar or piano. Free forever for personal use.</p>
         <div class="lp-cta-row">
           <button class="lp-btn primary" id="lp-signup">Sign up free</button>
           <button class="lp-btn ghost" id="lp-browse">Or browse the demo songs →</button>
+        </div>
+        <div class="lp-trust">
+          <span>Local-first</span><span>·</span><span>No tracking</span><span>·</span><span>Open source</span><span>·</span><span>Works offline</span>
+        </div>
+      </section>
+
+      <section class="lp-preview">
+        <div class="lp-preview-card">
+          <div class="lp-preview-head">
+            <div class="lp-preview-meta">
+              <div class="lp-preview-artist">RADIOHEAD</div>
+              <div class="lp-preview-title">No Surprises</div>
+            </div>
+            <div class="lp-preview-pills">
+              <span class="lp-preview-pill key"><span class="cap">Key</span><span class="val">F</span></span>
+              <span class="lp-preview-pill acc"><span class="cap">Accidentals</span><span class="val">♯</span></span>
+              <span class="lp-preview-pill cap"><span class="cap">Capo</span><span class="val">2</span></span>
+            </div>
+          </div>
+          <div class="lp-preview-section">— Verse 1 —</div>
+          <div class="lp-preview-lyrics">${previewLines}</div>
+          <div class="lp-preview-hover">
+            <div class="lp-preview-hover-label">Hover any chord</div>
+            <div class="lp-preview-hover-diags">
+              ${visGuitar}
+              ${visPiano}
+            </div>
+          </div>
         </div>
       </section>
 
       <section class="lp-features">
         <div class="lp-feature">
-          <div class="lp-feature-icon">📥</div>
-          <h3>Build your library</h3>
-          <p>Install the browser extension, or paste plain text from anywhere. Chordpad parses it into a clean editable chart in one click.</p>
+          <div class="lp-feature-vis">${visBarre}</div>
+          <h3>Real chord shapes</h3>
+          <p>Hover any chord to see a guitar diagram and piano keyboard. Save custom shapes per song — or per occurrence, when the chorus voicing isn't the verse one.</p>
         </div>
         <div class="lp-feature">
-          <div class="lp-feature-icon">▶︎</div>
-          <h3>Practice in real time</h3>
-          <p>Full-screen Play mode with auto-scrolling lyrics, a scrub slider, rewind, and live chord-shape diagrams that follow the line you're playing.</p>
+          <div class="lp-feature-vis lp-feature-vis-stack">
+            <span class="lp-mini-pill">Cmaj7 <em>I⁷</em></span>
+            <span class="lp-mini-pill">Am7  <em>vi⁷</em></span>
+            <span class="lp-mini-pill">Dm7  <em>ii⁷</em></span>
+            <span class="lp-mini-pill">G7   <em>V⁷</em></span>
+          </div>
+          <h3>See the harmony</h3>
+          <p>Toggle Roman-numeral analysis, transpose with one click, switch between sharps and flats. Capo-aware diagrams show what your fingers actually play.</p>
         </div>
         <div class="lp-feature">
-          <div class="lp-feature-icon">🎚</div>
-          <h3>Make it yours</h3>
-          <p>Save custom voicings per song or per occurrence. Transpose. Toggle sharps/flats. Roman numeral analysis. Capo-aware diagrams. It's your songbook — make it match how you actually play.</p>
+          <div class="lp-feature-vis lp-feature-vis-play">
+            <div class="lp-play-bar"></div>
+            <div class="lp-play-line">▶ Play mode · auto-scroll</div>
+          </div>
+          <h3>Practice, hands-free</h3>
+          <p>Full-screen Play mode auto-scrolls the lyrics, with a scrub slider, rewind, and live chord-shape diagrams that follow the line you're playing.</p>
         </div>
       </section>
 
       <section class="lp-demo">
-        <div class="lp-demo-label">A few of the diagrams Chordpad draws:</div>
+        <div class="lp-demo-label">Some chords Chordpad draws automatically</div>
         <div class="lp-demo-row">${demoTiles}</div>
       </section>
 
