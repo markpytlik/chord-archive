@@ -1066,6 +1066,13 @@
     align-items: center; justify-content: center;
     gap: 20px;
   }
+  /* Picker view: top-anchored so toggling between piano (6 drills) and guitar
+     (5 drills) doesn't visibly shift the toggle / "Pick a drill" header up
+     and down as the list height changes. The step view stays centered. */
+  .practice-body.practice-picker {
+    justify-content: flex-start;
+    padding-top: 48px;
+  }
   .practice-sub {
     font-size: 13px; color: var(--ink-soft);
     text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
@@ -2032,7 +2039,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.14.0";
+const APP_VERSION = "4.14.1";
 
 //=============================================================
 // STORAGE
@@ -4439,7 +4446,10 @@ function renderPreviewCardInner(song) {
     ${renderSongControlsHTML(song)}
     ${renderMetaRowHTML(song)}
     <div class="lp-preview-lyrics lyrics${song.showRoman ? " show-roman" : ""}">${renderLyrics(song.lyrics, song)}</div>
-    <div class="lp-preview-hint">Hover any chord pill to see the diagram</div>
+    <div class="lp-preview-hint">
+      <div>Hover over any chord to see the shape</div>
+      <div>Edit and save your preferred voicings for every song</div>
+    </div>
   `;
 }
 
@@ -6215,7 +6225,7 @@ function openPracticeMode() {
             <h2 class="practice-title">Practice</h2>
             <button class="practice-close" aria-label="Close practice mode">✕</button>
           </div>
-          <div class="practice-body">
+          <div class="practice-body practice-picker">
             <div class="practice-sub">Pick a drill</div>
             <div class="practice-instrument-toggle" role="radiogroup" aria-label="Instrument">
               <button class="pi-btn ${instrument === "piano" ? "active" : ""}" data-inst="piano" aria-pressed="${instrument === "piano"}"><span class="pi-icon">🎹</span> Piano</button>
@@ -6394,14 +6404,20 @@ function renderPopover(target) {
     </div>` : "";
   const noteHtml = (current && current.note) ? `<div class="voicing-note">${escapeHtml(current.note)}</div>` : "";
   const pinned = !!popoverState.pinned;
+  // Consolidated primary action — replaces the previous "+ Add voicing" /
+  // "Customize" pair. When a built-in shape is showing, the editor opens
+  // pre-filled with that shape (the user can save modifications as a new
+  // voicing). Otherwise it opens with the current state of the song's voicings
+  // for this chord. "Edit" / "Delete" still appear for saved user voicings.
+  const primaryAction = current && current.builtIn ? "edit-from-builtin" : "add";
   const actionsHtml = `
     <div class="pop-actions">
       <button data-action="pin" class="pin-toggle ${pinned ? "active" : ""}" title="${pinned ? "Unpin (allow auto-close)" : "Pin (keep open)"}">${pinned ? "📌 Pinned" : "📌"}</button>
-      <button data-action="add" title="Add a new voicing">+ Add voicing</button>
+      <button data-action="${primaryAction}" title="Edit this chord or add a new voicing">Edit this chord or add a new voicing</button>
       ${current && !current.builtIn ? `
         <button data-action="edit" title="Edit this voicing">Edit</button>
         <button data-action="delete" class="danger" title="Delete this voicing">Delete</button>
-      ` : current && current.builtIn ? `<button data-action="edit-from-builtin" title="Customize this chord">Customize</button>` : ""}
+      ` : ""}
     </div>`;
 
   const titleSuffix = voicingTitleSuffix(chordName, current);
@@ -6900,12 +6916,12 @@ function openChordModal(chordName, song, occ) {
 
       <div style="display:flex; align-items:center; justify-content:space-between; margin: 18px 0 10px;">
         <h4 style="margin:0; font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; font-weight:600;">Voicings</h4>
-        <button id="cm-add" class="primary" style="font-size:13px; padding:5px 12px;">+ Add voicing</button>
+        <button id="cm-add" class="primary" style="font-size:13px; padding:5px 12px;">Edit this chord or add a new voicing</button>
       </div>
       ${voicings.length === 0 ? `
         <div class="muted small" style="text-align:center; padding:24px 0; background:var(--panel-2); border-radius:var(--radius);">
           No voicings saved for ${escapeHtml(chordName)}.<br>
-          <span class="micro">Click <b>+ Add voicing</b> to save a custom shape.</span>
+          <span class="micro">Click <b>Edit this chord or add a new voicing</b> to save a custom shape.</span>
         </div>
       ` : `
         <div id="cm-voicings" class="diag-grid" style="grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));">
