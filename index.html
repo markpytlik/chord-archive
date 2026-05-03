@@ -170,6 +170,15 @@
     font-weight: 600;
     letter-spacing: -.01em;
     color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    transition: opacity .12s;
+  }
+  header .brand:hover { opacity: .75; }
+  header .brand:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+    border-radius: 4px;
   }
   header .brand .accent { color: var(--accent); font-style: italic; font-size: 1.2em; }
   header .brand .glyph { color: var(--accent); margin-right: 4px; }
@@ -1794,7 +1803,7 @@
 <body>
 
 <header>
-  <div class="brand"><span class="glyph">♪</span> Chord<span class="accent">pad</span><span class="brand-version" id="brand-version" title="App version"></span></div>
+  <div class="brand" id="brand-home" role="link" tabindex="0" title="Home"><span class="glyph">♪</span> Chord<span class="accent">pad</span><span class="brand-version" id="brand-version" title="App version"></span></div>
   <input type="search" id="search" class="search" placeholder="Search artist, title, or lyrics…" />
   <div class="grow"></div>
   <button id="btn-practice" class="ghost header-btn" title="Piano practice drills (circle of fifths, scales, ii–V–I, etc.)">Practice</button>
@@ -1912,7 +1921,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.10.0";
+const APP_VERSION = "4.10.1";
 
 //=============================================================
 // STORAGE
@@ -6750,6 +6759,26 @@ async function init() {
     state.editing = "new"; renderDetail();
   });
   document.getElementById("btn-practice").addEventListener("click", () => openPracticeMode());
+
+  // Brand → "home". For guests this restores the marketing landing (which
+  // localStorage["chordpad_landing_dismissed"] otherwise hides forever after
+  // the first time they click "browse demo songs"). For signed-in users it
+  // just deselects the current song so they see the songbook overview.
+  const brandLink = document.getElementById("brand-home");
+  if (brandLink) {
+    const goHome = () => {
+      state.selectedId = null;
+      state.editing = false;
+      hidePopover && hidePopover(true);
+      if (!auth.user) localStorage.removeItem("chordpad_landing_dismissed");
+      renderList();
+      renderDetail();
+    };
+    brandLink.addEventListener("click", goHome);
+    brandLink.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goHome(); }
+    });
+  }
 
   // Kebab menu replaced by user-menu Settings (see openSettingsModal).
   // We keep the hidden file input wired so Import-from-file still works.
