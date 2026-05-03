@@ -1804,7 +1804,6 @@
     display: none; z-index: 20;
   }
   header .auth-area.open .user-menu { display: block; }
-  header .auth-area .user-menu .user-email { padding: 8px 10px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
   header .auth-area .user-menu button {
     width: 100%; text-align: left; padding: 8px 10px;
     background: transparent; border: 0; border-radius: 6px;
@@ -1959,7 +1958,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.17.0";
+const APP_VERSION = "4.18.0";
 
 //=============================================================
 // STORAGE
@@ -2408,23 +2407,22 @@ function renderAuthArea() {
   if (auth.user) {
     area.innerHTML = `
       <span id="sync-indicator" class="sync-indicator"></span>
-      <button class="user-chip" id="user-chip" title="Signed in as ${escapeHtml(auth.user.email)}">
+      <button id="btn-settings" class="ghost header-btn" title="Settings" aria-label="Settings">⚙</button>
+      <button class="user-chip" id="user-chip" title="${escapeHtml(auth.user.email)} — click to sign out options">
         <span class="user-dot"></span>${escapeHtml(auth.user.email)}
       </button>
       <div class="user-menu">
-        <div class="user-email">${escapeHtml(auth.user.email)}</div>
-        <button id="btn-settings">Settings…</button>
         <button id="btn-signout">Sign out</button>
       </div>
     `;
     renderSyncIndicator();
-    document.getElementById("user-chip").addEventListener("click", e => {
-      e.stopPropagation();
-      area.classList.toggle("open");
-    });
     document.getElementById("btn-settings").addEventListener("click", () => {
       area.classList.remove("open");
       openSettingsModal();
+    });
+    document.getElementById("user-chip").addEventListener("click", e => {
+      e.stopPropagation();
+      area.classList.toggle("open");
     });
     document.getElementById("btn-signout").addEventListener("click", () => {
       area.classList.remove("open");
@@ -2445,9 +2443,7 @@ function renderAuthArea() {
     document.addEventListener("click", () => area.classList.remove("open"), { once: true });
   } else {
     area.innerHTML = `
-      <button id="btn-settings-guest" class="ghost" title="Import / Export / Bookmarklet" aria-label="Settings">⚙</button>
       <button id="btn-signin" class="primary" title="Sign in to save songs to the cloud">Sign in</button>`;
-    document.getElementById("btn-settings-guest").addEventListener("click", openSettingsModal);
     document.getElementById("btn-signin").addEventListener("click", openAuthModal);
   }
 }
@@ -5328,9 +5324,28 @@ function setHelper(msg, kind="") {
   el.className = "helper-msg " + kind;
 }
 
+// User-wide default for which instruments a new song starts with. Persisted in
+// localStorage so it survives reloads. Settings modal lets the user pick
+// "both" / "guitar" / "piano". Default is "both" so new songs render diagrams
+// for both instruments out of the box; the per-song editor can still override.
+const DEFAULT_INSTRUMENTS_KEY = "chordpad_default_instruments";
+function getDefaultInstrumentsPref() {
+  const v = localStorage.getItem(DEFAULT_INSTRUMENTS_KEY);
+  return (v === "guitar" || v === "piano" || v === "both") ? v : "both";
+}
+function setDefaultInstrumentsPref(v) {
+  if (v !== "guitar" && v !== "piano" && v !== "both") return;
+  localStorage.setItem(DEFAULT_INSTRUMENTS_KEY, v);
+}
+function defaultInstrumentsArray() {
+  const pref = getDefaultInstrumentsPref();
+  if (pref === "guitar") return ["guitar"];
+  if (pref === "piano")  return ["piano"];
+  return ["guitar", "piano"];
+}
+
 function blankSong() {
-  // Both instruments off by default — user picks per-song what they want diagrams for
-  return { id: uid(), title: "", artist: "", key: "", capo: 0, instruments: [], lyrics: "", notes: "", sourceUrl: "", voicings: {}, createdAt: now(), updatedAt: now() };
+  return { id: uid(), title: "", artist: "", key: "", capo: 0, instruments: defaultInstrumentsArray(), lyrics: "", notes: "", sourceUrl: "", voicings: {}, createdAt: now(), updatedAt: now() };
 }
 
 // ---- Voicings model ----
@@ -5846,6 +5861,9 @@ function openSettingsModal() {
   const bg = document.createElement("div");
   bg.className = "modal-bg";
   const signedIn = !!auth.user;
+  const pref = getDefaultInstrumentsPref();
+  const pillBtn = (val, label) =>
+    `<label class="pill-btn ${pref === val ? "on" : ""}" data-default-inst="${val}">${escapeHtml(label)}</label>`;
   bg.innerHTML = `
     <div class="modal" style="max-width:480px;">
       <h3>Settings</h3>
@@ -5853,9 +5871,21 @@ function openSettingsModal() {
 
       <div style="margin-top: 18px; display: grid; gap: 10px;">
         <div style="border: 1px solid var(--line); border-radius: 8px; padding: 14px;">
+          <div style="font-weight: 600; margin-bottom: 4px;">Default instruments</div>
+          <div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; line-height: 1.5;">
+            Which chord diagrams new songs should show by default. You can still override this on each song.
+          </div>
+          <div class="instrument-toggles" id="set-default-instruments">
+            ${pillBtn("guitar", "Guitar")}
+            ${pillBtn("piano",  "Piano")}
+            ${pillBtn("both",   "Both")}
+          </div>
+        </div>
+
+        <div style="border: 1px solid var(--line); border-radius: 8px; padding: 14px;">
           <div style="font-weight: 600; margin-bottom: 4px;">Browser bookmarklet</div>
           <div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; line-height: 1.5;">
-            One-click chord-chart capture from any chord page — bypasses Cloudflare and other bot blocks because it runs in your real browser session.
+            One-click chord-chart capture from any chord page — runs in your real browser session, so pages that block automated fetches still work.
           </div>
           <button id="set-bookmarklet" class="primary" style="width:100%;">Get bookmarklet…</button>
         </div>
@@ -5887,6 +5917,14 @@ function openSettingsModal() {
   });
   bg.querySelector("#set-export").addEventListener("click", () => { bg.remove(); exportJson(); });
   bg.querySelector("#set-import").addEventListener("click", () => { bg.remove(); document.getElementById("import-file").click(); });
+  bg.querySelectorAll("#set-default-instruments .pill-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const val = btn.dataset.defaultInst;
+      setDefaultInstrumentsPref(val);
+      bg.querySelectorAll("#set-default-instruments .pill-btn").forEach(b =>
+        b.classList.toggle("on", b.dataset.defaultInst === val));
+    });
+  });
 }
 
 //=============================================================
