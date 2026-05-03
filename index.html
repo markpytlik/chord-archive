@@ -1958,7 +1958,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.18.1";
+const APP_VERSION = "4.19.0";
 
 //=============================================================
 // STORAGE
@@ -2001,6 +2001,8 @@ const auth = {
   initialized: false,
   // Track which song IDs we've already synced to cloud this session, to avoid storms
   knownIds: new Set(),
+  // Supabase realtime subscription handle — populated after sign-in, torn down on sign-out.
+  realtimeChannel: null,
 };
 
 function initAuth() {
@@ -2174,41 +2176,49 @@ async function onSignIn() {
     renderList(); renderDetail();
     return;
   }
-  if (data && data.length) {
-    state.songs = data.map(r => r.data);
-    auth.knownIds = new Set(state.songs.map(s => s.id));
-  } else {
-    // First sign-in — push USER-ADDED local songs (not the public seed library) as starter content.
-    const userAdded = state.songs.filter(s => !String(s.id || "").startsWith("seed-"));
-    if (userAdded.length) {
-      const rows = userAdded.map(song => ({ id: song.id, user_id: auth.user.id, data: song, updated_at: new Date(song.updatedAt || Date.now()).toISOString() }));
-      // Bound the seed upsert with the same watchdog timeout as cloudSyncOut —
-      // a wedged client here would otherwise hang onSignIn forever with no signal.
-      try {
-        const { error: upErr } = await withTimeout(
-          auth.client.from("songs").upsert(rows),
-          10000,
-          "songs seed upsert"
-        );
-        if (upErr) console.warn("Cloud seed-from-local failed:", upErr);
-      } catch (e) {
-        console.warn("[onSignIn] seed-from-local timed out:", e);
-        setSyncStatus("error", e?.message || "Couldn't seed cloud library — click to reconnect.");
-      }
-      state.songs = userAdded;
-      auth.knownIds = new Set(userAdded.map(s => s.id));
+  // MERGE cloud + local instead of replace. Preserves songs that were saved
+  // locally before auth resolved (the bookmarklet "save before sign-in" race
+  // where the imported song landed in localStorage but cloudSyncOut was
+  // skipped because auth.user was still null). Conflicts resolve by
+  // updatedAt — newer wins per song. Anything local-newer or local-only
+  // gets pushed back up.
+  const cloudData = (data || []).map(r => r.data).filter(s => s && s.id);
+  const cloudById = new Map(cloudData.map(s => [s.id, s]));
+  const localUserSongs = state.songs.filter(s => s && s.id && !String(s.id).startsWith("seed-"));
+  const merged = [];
+  const seenIds = new Set();
+  let toUpload = false;
+  for (const local of localUserSongs) {
+    seenIds.add(local.id);
+    const cloud = cloudById.get(local.id);
+    if (!cloud) {
+      merged.push(local);
+      toUpload = true;
+    } else if ((local.updatedAt || 0) > (cloud.updatedAt || 0)) {
+      merged.push(local);
+      toUpload = true;
     } else {
-      state.songs = [];
-      auth.knownIds = new Set();
+      merged.push(cloud);
     }
   }
-  saveState({ songs: state.songs }); // mirror to localStorage cache
+  for (const cloud of cloudData) {
+    if (!seenIds.has(cloud.id)) merged.push(cloud);
+  }
+  state.songs = merged;
+  auth.knownIds = new Set(state.songs.map(s => s.id));
+  if (toUpload) {
+    saveState({ songs: state.songs });   // localStorage + cloudSyncOut
+  } else {
+    saveLocalOnly({ songs: state.songs }); // cache only — nothing to push
+  }
   renderList(); renderDetail();
+  subscribeRealtime();
 }
 
 // On sign-out: clear the offline cache (so a shared browser doesn't leak the previous user's
 // library) and restore the public seed library as the guest view.
 function onSignOut() {
+  unsubscribeRealtime();
   auth.knownIds = new Set();
   state.selectedId = null;
   state.editing = false;
@@ -2219,6 +2229,80 @@ function onSignOut() {
     if (seed && Array.isArray(seed.songs)) state.songs = seed.songs;
     renderList(); renderDetail();
   });
+}
+
+//=============================================================
+// REALTIME — listen for cross-browser/tab updates to the user's songs.
+// On insert/update from another client, merge the row into state.songs
+// (skipping self-echoes via updatedAt comparison). On delete, drop the
+// row. The currently-edited song is exempted from re-render so the user
+// isn't yanked out of their editor mid-typing.
+//=============================================================
+function subscribeRealtime() {
+  if (!auth.client || !auth.user) return;
+  unsubscribeRealtime(); // clear any previous channel before re-subscribing
+  try {
+    const ch = auth.client
+      .channel(`songs:${auth.user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "songs", filter: `user_id=eq.${auth.user.id}` },
+        handleRealtimeChange
+      )
+      .subscribe(status => {
+        if (status === "SUBSCRIBED") console.log("[realtime] subscribed");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          console.warn("[realtime] channel state:", status);
+        }
+      });
+    auth.realtimeChannel = ch;
+  } catch (e) {
+    console.warn("[realtime] subscribe failed:", e);
+  }
+}
+function unsubscribeRealtime() {
+  if (auth.realtimeChannel && auth.client) {
+    try { auth.client.removeChannel(auth.realtimeChannel); }
+    catch (e) { console.warn("[realtime] unsubscribe failed:", e); }
+  }
+  auth.realtimeChannel = null;
+}
+function isEditingSong(id) {
+  return state.editing && typeof state.editing === "object" && state.editing.id === id;
+}
+function handleRealtimeChange(payload) {
+  if (!auth.user) return;
+  const eventType = payload.eventType || payload.type;
+  if (eventType === "DELETE") {
+    const id = payload.old?.id;
+    if (!id) return;
+    const idx = state.songs.findIndex(s => s.id === id);
+    if (idx === -1) return; // already gone (likely self-echo)
+    state.songs.splice(idx, 1);
+    auth.knownIds.delete(id);
+    if (state.selectedId === id) state.selectedId = null;
+    saveLocalOnly({ songs: state.songs });
+    if (!isEditingSong(id)) { renderList(); renderDetail(); }
+    else { renderList(); }
+    return;
+  }
+  // INSERT or UPDATE
+  const incoming = payload.new?.data;
+  if (!incoming || !incoming.id) return;
+  const idx = state.songs.findIndex(s => s.id === incoming.id);
+  if (idx === -1) {
+    // New song from another browser/tab.
+    state.songs.push(incoming);
+    auth.knownIds.add(incoming.id);
+  } else {
+    const local = state.songs[idx];
+    // Skip self-echoes and stale events. Strict > so equal updatedAt = no-op.
+    if ((incoming.updatedAt || 0) <= (local.updatedAt || 0)) return;
+    state.songs[idx] = incoming;
+  }
+  saveLocalOnly({ songs: state.songs });
+  if (!isEditingSong(incoming.id)) { renderList(); renderDetail(); }
+  else { renderList(); }
 }
 
 // Push the full song list to cloud — upserts new/changed, deletes anything that's been removed locally.
