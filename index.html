@@ -737,11 +737,19 @@
     box-shadow: 0 0 0 1px rgba(177, 74, 44, .25);
   }
   .lyrics { position: relative; }
+  /* Section header spacing — moved from .section-label (inline span) to the
+     block-level .section-row so margin reliably paints, and gives sections
+     real breathing room above + below in the songsheet view, mirroring the
+     blank lines around them in the editor. */
+  .lyrics .section-row {
+    margin-top: 1.6em;
+    margin-bottom: .4em;
+  }
+  .lyrics .section-row:first-child { margin-top: 0; }
   .lyrics .section-label {
     color: var(--accent);
     font-weight: 700;
     font-style: normal;
-    margin-top: 1.6em;
     display: block;
     letter-spacing: .12em;
     text-transform: uppercase;
@@ -750,7 +758,6 @@
   }
   .lyrics .section-label::before { content: "— "; opacity: .5; }
   .lyrics .section-label::after  { content: " —"; opacity: .5; }
-  .lyrics .section-label:first-child { margin-top: 0; }
   /* Chord-only lines (intros/outros) — block-level row of inline pills, no absolute positioning */
   .lyrics .chord-only-row {
     display: block;
@@ -2087,7 +2094,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.16.0";
+const APP_VERSION = "4.16.1";
 
 //=============================================================
 // STORAGE
