@@ -17,7 +17,7 @@ generic `<pre>`-based fallback for everything else.
 ## Install (Firefox)
 
 Pre-built `.xpi` is at the repo root, versioned per release. Latest:
-[`chordpad-1.5.1.xpi`](https://chordpad.app/chordpad-1.5.1.xpi)
+[`chordpad-1.5.2.xpi`](https://chordpad.app/chordpad-1.5.2.xpi)
 
 Older versions remain in the repo root for rollback if needed.
 
