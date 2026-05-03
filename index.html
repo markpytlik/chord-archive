@@ -1988,7 +1988,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.11.0";
+const APP_VERSION = "4.12.0";
 
 //=============================================================
 // STORAGE
@@ -4271,6 +4271,103 @@ function renderAuthCallbackLoader() {
   `;
 }
 
+// Builds the inner HTML of the interactive landing preview card. Re-rendered
+// on each preview-state mutation so the visitor sees their toggles take effect.
+function renderPreviewCardInner(song) {
+  return `
+    <div class="lp-preview-head">
+      <div class="lp-preview-meta">
+        <div class="lp-preview-artist">${escapeHtml(song.artist || "—")}</div>
+        <div class="lp-preview-title">${escapeHtml(song.title || "")}</div>
+      </div>
+    </div>
+    ${renderSongControlsHTML(song)}
+    ${renderMetaRowHTML(song)}
+    <div class="lp-preview-lyrics lyrics${song.showRoman ? " show-roman" : ""}">${renderLyrics(song.lyrics, song)}</div>
+    <div class="lp-preview-hint">Hover any chord pill to see the diagram</div>
+  `;
+}
+
+// Wire all the song-controls + meta-row handlers on the landing preview.
+// Mutations go to window._lpPreviewSong only — never persisted via saveState.
+// After each mutation we re-render the card and re-attach handlers.
+function wirePreviewCard() {
+  const card = document.getElementById("lp-preview-card");
+  const song = window._lpPreviewSong;
+  if (!card || !song) return;
+  // Hover popovers on the freshly-rendered chord pills
+  const lyricsEl = card.querySelector(".lyrics");
+  if (lyricsEl) attachHoverPopover(lyricsEl, song);
+
+  const rerender = () => {
+    card.innerHTML = renderPreviewCardInner(song);
+    wirePreviewCard();
+  };
+
+  // Transpose ±1
+  card.querySelectorAll(".transpose-btn[data-step]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const step = parseInt(btn.dataset.step, 10);
+      transposeSong(song, step);
+      rerender();
+    });
+  });
+  // Reset to original key
+  card.querySelectorAll(".transpose-btn[data-reset]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const semis = semitonesToOriginalKey(song);
+      if (semis) { transposeSong(song, semis); rerender(); }
+    });
+  });
+  // Sharps/flats segmented
+  card.querySelectorAll("[data-accidental]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const useFlat = btn.dataset.accidental === "flat";
+      rewriteAccidentals(song, useFlat);
+      rerender();
+    });
+  });
+  // ↺ reset accidentals
+  card.querySelectorAll("[data-accidental-reset]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (typeof song.originalPreferFlat !== "boolean") return;
+      if (!!song.preferFlat === !!song.originalPreferFlat) return;
+      rewriteAccidentals(song, !!song.originalPreferFlat);
+      rerender();
+    });
+  });
+  // Analysis (Roman) toggle
+  card.querySelectorAll("[data-rn-toggle]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      song.showRoman = !song.showRoman;
+      rerender();
+    });
+  });
+  // Capo-shapes toggle
+  card.querySelectorAll("[data-capo-shapes-toggle]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      song.capoShapes = !song.capoShapes;
+      rerender();
+    });
+  });
+  // Instrument view toggle (guitar / piano)
+  card.querySelectorAll("[data-inst-toggle]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const inst = btn.dataset.instToggle;
+      const cur = song.viewInstrument;
+      song.viewInstrument = (cur === undefined) ? inst : (cur === inst ? undefined : inst);
+      rerender();
+    });
+  });
+}
+
 function renderLandingPage() {
   // Real rendered diagrams used as feature visuals — same code paths as the app.
   const visBarre  = svgGuitar("F#m7", null, "md"); // a derived movable shape
@@ -4325,21 +4422,7 @@ function renderLandingPage() {
       </section>
 
       <section class="lp-preview">
-        <div class="lp-preview-card">
-          <div class="lp-preview-head">
-            <div class="lp-preview-meta">
-              <div class="lp-preview-artist">SAMPLE CHART</div>
-              <div class="lp-preview-title">Your first song</div>
-            </div>
-            <div class="lp-preview-pills">
-              <span class="lp-preview-pill key"><span class="cap">Key</span><span class="val">F</span></span>
-              <span class="lp-preview-pill acc"><span class="cap">Accidentals</span><span class="val">♯</span></span>
-              <span class="lp-preview-pill cap"><span class="cap">Capo</span><span class="val">2</span></span>
-            </div>
-          </div>
-          <div class="lp-preview-lyrics lyrics">${previewLyricsHTML}</div>
-          <div class="lp-preview-hint">Hover any chord pill to see the diagram</div>
-        </div>
+        <div class="lp-preview-card" id="lp-preview-card">${renderPreviewCardInner(previewSong)}</div>
       </section>
 
       <section class="lp-features">
@@ -4401,12 +4484,81 @@ function wireLandingPage() {
   });
   const signupBtns = [document.getElementById("lp-signup"), document.getElementById("lp-signup-2")].filter(Boolean);
   signupBtns.forEach(b => b.addEventListener("click", () => openAuthModal({ initialMode: "signup" })));
-  // Wire live hover-popovers on the preview chord pills so visitors actually
-  // experience the feature instead of seeing static images.
-  const previewLyrics = document.querySelector(".lp-preview-card .lyrics");
-  if (previewLyrics && window._lpPreviewSong) {
-    attachHoverPopover(previewLyrics, window._lpPreviewSong);
-  }
+  // Wire the interactive preview card — hover popovers + transpose / acc /
+  // analysis / capo / instrument toggles. Mutations are ephemeral (no
+  // saveState) and the card re-renders in place on each change.
+  wirePreviewCard();
+}
+
+// Shared markup helpers — used by renderDetail AND the interactive landing
+// preview so the same toolbar appears in both places.
+function renderSongControlsHTML(song) {
+  const keyChanged = !!(song.originalKey && song.originalKey !== song.key);
+  const accChanged = (typeof song.originalPreferFlat === "boolean") && (song.originalPreferFlat !== !!song.preferFlat);
+  const accResetTitle = accChanged ? `Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})` : "Already at original accidentals";
+  const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
+  return `
+    <div class="song-controls" role="toolbar" aria-label="Song display controls">
+      <div class="sc-group">
+        <div class="sc-pill sc-key-state" title="Current key">
+          <span class="sc-cap">Key</span>
+          <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
+        </div>
+        <div class="sc-pill sc-key-ctrls" title="Transpose this song">
+          <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
+          <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
+          <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
+        </div>
+      </div>
+      <div class="sc-group">
+        <div class="sc-pill sc-acc-state" title="Current accidental style">
+          <span class="sc-cap">Accidentals</span>
+          <span class="sc-value">${song.preferFlat ? "♭" : "♯"}</span>
+        </div>
+        <div class="sc-pill sc-acc-ctrls" role="radiogroup" aria-label="Accidentals" title="Switch sharps / flats">
+          <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
+          <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
+          <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
+        </div>
+      </div>
+      ${song.key ? `
+      <div class="sc-group">
+        <div class="sc-pill sc-analysis-state" title="Whether chord analysis (i, IV, V…) is shown">
+          <span class="sc-cap">Analysis</span>
+          <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
+        </div>
+        <div class="sc-pill sc-analysis-ctrls" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
+          <button class="sc-toggle" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" aria-label="Toggle chord analysis">
+            <span class="sc-toggle-track"><span class="sc-toggle-knob"></span></span>
+          </button>
+        </div>
+      </div>` : ""}
+      ${song.capo > 0 && song.viewInstrument !== "piano" ? `
+      <div class="sc-group">
+        <div class="sc-pill sc-capo-state" title="Capo position">
+          <span class="sc-cap">Capo</span>
+          <span class="sc-value">${song.capo}</span>
+        </div>
+        <div class="sc-pill sc-capo-ctrls" title="${song.capoShapes ? "Diagrams show shapes (transposed −" + song.capo + " for capo). Toggle off to show sounding pitches." : "Diagrams show sounding pitches. Toggle on to show shapes (what your fingers play with capo on)."}">
+          <button class="sc-toggle" data-capo-shapes-toggle aria-pressed="${song.capoShapes ? "true" : "false"}" aria-label="Toggle capo-shape diagrams">
+            <span class="sc-toggle-track"><span class="sc-toggle-knob"></span></span>
+          </button>
+        </div>
+      </div>` : ""}
+    </div>`;
+}
+
+function renderMetaRowHTML(song) {
+  const insts = song.instruments || [];
+  const both = insts.includes("guitar") && insts.includes("piano");
+  const view = song.viewInstrument; // undefined = both, "guitar", "piano"
+  const pillsHtml = insts.map(i => {
+    if (!both) return `<span class="pill ${i}">${i}</span>`;
+    const active = (view === undefined) || (view === i);
+    const titleText = active && view === i ? `Show both instruments` : (view === undefined ? `Show only ${i}` : `Show only ${i}`);
+    return `<button type="button" class="pill ${i} pill-toggle${active ? " active" : " muted"}" data-inst-toggle="${i}" aria-pressed="${active ? "true" : "false"}" title="${titleText}">${i}</button>`;
+  }).join("");
+  return `<div class="meta-row">${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}${pillsHtml}</div>`;
 }
 
 function renderDetail() {
@@ -4455,61 +4607,7 @@ function renderDetail() {
       <div class="title-block">
         <div class="artist">${escapeHtml(song.artist || "—")}</div>
         <h1>${escapeHtml(song.title || "Untitled")}${song.sourceUrl ? `<a class="source-corner" href="${escapeHtml(song.sourceUrl)}" target="_blank" rel="noopener" title="Original source" aria-label="Open original source">↗</a>` : ""}</h1>
-        ${(() => {
-          const keyChanged = !!(song.originalKey && song.originalKey !== song.key);
-          const accChanged = (typeof song.originalPreferFlat === "boolean") && (song.originalPreferFlat !== !!song.preferFlat);
-          const accResetTitle = accChanged ? `Reset accidentals to original (${song.originalPreferFlat ? "♭" : "♯"})` : "Already at original accidentals";
-          const keyResetTitle = keyChanged ? `Reset to original key (${escapeHtml(song.originalKey)})` : "Already at original key";
-          return `
-          <div class="song-controls" role="toolbar" aria-label="Song display controls">
-            <div class="sc-group">
-              <div class="sc-pill sc-key-state" title="Current key">
-                <span class="sc-cap">Key</span>
-                <span class="sc-value">${song.key ? escapeHtml(song.key) : "—"}</span>
-              </div>
-              <div class="sc-pill sc-key-ctrls" title="Transpose this song">
-                <button class="sc-btn transpose-btn" data-step="-1" title="Transpose down 1 semitone" aria-label="Transpose down">−</button>
-                <button class="sc-btn transpose-btn" data-step="1" title="Transpose up 1 semitone" aria-label="Transpose up">+</button>
-                <button class="sc-btn sc-reset transpose-btn" data-reset="1" title="${keyResetTitle}" aria-label="Reset to original key" ${keyChanged ? "" : "disabled"}>↺</button>
-              </div>
-            </div>
-            <div class="sc-group">
-              <div class="sc-pill sc-acc-state" title="Current accidental style">
-                <span class="sc-cap">Accidentals</span>
-                <span class="sc-value">${song.preferFlat ? "♭" : "♯"}</span>
-              </div>
-              <div class="sc-pill sc-acc-ctrls" role="radiogroup" aria-label="Accidentals" title="Switch sharps / flats">
-                <button class="sc-seg acc-toggle" data-accidental="sharp" aria-pressed="${!song.preferFlat}" title="Display sharps (C♯, F♯m)">♯</button>
-                <button class="sc-seg acc-toggle" data-accidental="flat"  aria-pressed="${!!song.preferFlat}" title="Display flats (D♭, G♭m)">♭</button>
-                <button class="sc-btn sc-reset acc-reset" data-accidental-reset="1" title="${accResetTitle}" aria-label="Reset accidentals" ${accChanged ? "" : "disabled"}>↺</button>
-              </div>
-            </div>
-            ${song.key ? `
-            <div class="sc-group">
-              <div class="sc-pill sc-analysis-state" title="Whether chord analysis (i, IV, V…) is shown">
-                <span class="sc-cap">Analysis</span>
-                <span class="sc-value">${song.showRoman ? "On" : "Off"}</span>
-              </div>
-              <div class="sc-pill sc-analysis-ctrls" title="${song.showRoman ? "Hide chord analysis" : `Show how each chord relates to the key of ${escapeHtml(song.key)}`}">
-                <button class="sc-toggle" data-rn-toggle aria-pressed="${song.showRoman ? "true" : "false"}" aria-label="Toggle chord analysis">
-                  <span class="sc-toggle-track"><span class="sc-toggle-knob"></span></span>
-                </button>
-              </div>
-            </div>` : ""}
-            ${song.capo > 0 && song.viewInstrument !== "piano" ? `
-            <div class="sc-group">
-              <div class="sc-pill sc-capo-state" title="Capo position">
-                <span class="sc-cap">Capo</span>
-                <span class="sc-value">${song.capo}</span>
-              </div>
-              <div class="sc-pill sc-capo-ctrls" title="${song.capoShapes ? "Diagrams show shapes (transposed −" + song.capo + " for capo). Toggle off to show sounding pitches." : "Diagrams show sounding pitches. Toggle on to show shapes (what your fingers play with capo on)."}">
-                <button class="sc-toggle" data-capo-shapes-toggle aria-pressed="${song.capoShapes ? "true" : "false"}" aria-label="Toggle capo-shape diagrams">
-                  <span class="sc-toggle-track"><span class="sc-toggle-knob"></span></span>
-                </button>
-              </div>
-            </div>` : ""}
-          </div>`;
-        })()}
+        ${renderSongControlsHTML(song)}
       </div>
       <div class="detail-actions">
         <button id="btn-play" class="primary" title="Full-screen play mode with auto-scroll"><span class="da-icon">▶</span>Play</button>
@@ -4527,17 +4625,7 @@ function renderDetail() {
       </div>
     </div>
 
-    ${(() => {
-      const insts = song.instruments || [];
-      const both = insts.includes("guitar") && insts.includes("piano");
-      const view = song.viewInstrument; // undefined = both, "guitar", "piano"
-      const pillsHtml = insts.map(i => {
-        if (!both) return `<span class="pill ${i}">${i}</span>`;
-        const active = (view === undefined) || (view === i);
-        return `<button type="button" class="pill ${i} pill-toggle${active ? " active" : " muted"}" data-inst-toggle="${i}" aria-pressed="${active ? "true" : "false"}" title="${active && view === i ? `Show both instruments` : (view === undefined ? `Show only ${i}` : `Show only ${i}`)}">${i}</button>`;
-      }).join("");
-      return `<div class="meta-row">${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}${pillsHtml}</div>`;
-    })()}
+    ${renderMetaRowHTML(song)}
 
     <div class="lyrics${song.showRoman ? " show-roman" : ""}" id="lyrics-view">${renderLyrics(song.lyrics || "", song)}</div>
 
