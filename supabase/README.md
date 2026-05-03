@@ -12,7 +12,8 @@ Stack: pg_cron → pg_net.http_post → Edge Function → Resend → email.
 #### 1. Resend (sender)
 
 1. Sign up at <https://resend.com>.
-2. Domains → Add Domain → `chordpad.app`. Resend gives you 3–5 DNS records
+2. Domains → Add Domain → `mail.chordpad.app` (subdomain pattern keeps the
+   apex available for other providers). Resend gives you 3–5 DNS records
    (SPF TXT, DKIM CNAMEs, return-path MX/CNAME).
 3. Add those records to Porkbun → DNS for chordpad.app, save.
 4. Wait for Resend to verify (usually a few minutes).
@@ -37,7 +38,7 @@ Then on the function's settings:
 - Add Secrets:
   - `RESEND_API_KEY`  → the key from step 1.5
   - `CRON_SECRET`     → any long random string (e.g. `openssl rand -hex 32`)
-  - `DIGEST_FROM`     → `Chordpad Reports <reports@chordpad.app>`
+  - `DIGEST_FROM`     → `Chordpad Reports <reports@mail.chordpad.app>` (must use the verified Resend subdomain)
   - `DIGEST_TO`       → `hello@chordpad.app`
 
 (`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-injected.)
