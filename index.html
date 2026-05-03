@@ -1963,9 +1963,42 @@
     .play-mode .play-shape-panel { padding: 12px 4% 22px; }
     .play-mode .lyrics-large { font-size: 18px; }
 
-    /* Landing page — single-column features, less hero padding. */
-    .lp-hero { padding: 5vh 16px 4vh; }
-    .lp-features { grid-template-columns: 1fr; }
+    /* Landing page — outer container padding down from 32px so content
+       isn't squeezed; hero font shrinks (the desktop clamp's 56px min is
+       too big for a 375px screen); features stack; the interactive demo
+       card is hidden because its chord-line-above-lyrics layout doesn't
+       fit at phone widths and the rest of the page already carries the
+       story. The personalize "standard → your voicing" pairs stack with
+       a ↓ arrow instead of side-by-side with →. */
+    .lp-page { padding: 4vh 14px 4vh; max-width: 100%; }
+    .lp-hero { padding: 0; margin-bottom: 4vh; }
+    .lp-hero .lp-title { font-size: 48px; line-height: 1; }
+    .lp-hero .lp-tagline { font-size: 18px; padding: 0 4px; }
+    .lp-hero .lp-sub { font-size: 14.5px; padding: 0 4px; }
+    .lp-cta-row { flex-direction: column; gap: 10px; }
+    .lp-cta-row .lp-btn { width: 100%; }
+    .lp-trust { font-size: 11px; gap: 6px; margin-top: 22px; }
+
+    /* Demo preview card — hidden on phones. */
+    .lp-preview { display: none; }
+
+    .lp-features {
+      grid-template-columns: 1fr;
+      padding: 24px 0;
+      gap: 24px;
+      margin-bottom: 6vh;
+    }
+    .lp-feature h3 { font-size: 19px; }
+    .lp-feature-vis { height: 90px; }
+
+    .lp-personalize { margin-bottom: 6vh; }
+    .lp-pz-pair { flex-direction: column; gap: 12px; flex-wrap: nowrap; }
+    .lp-pz-arrow { transform: rotate(90deg); }
+    .lp-pz-tile { min-width: 0; width: 100%; max-width: 280px; padding: 12px 14px 8px; }
+    .lp-pz-svg svg { max-width: 100% !important; }
+
+    .lp-cta-bottom { padding: 5vh 16px; }
+    .lp-cta-bottom h2 { font-size: 24px; }
   }
 
   /* Tighter overrides for narrow phones. */
@@ -2099,7 +2132,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.20.0";
+const APP_VERSION = "4.20.1";
 
 //=============================================================
 // STORAGE
