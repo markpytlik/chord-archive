@@ -1610,7 +1610,11 @@
      cleanly. */
   .lp-preview-card .lyrics {
     margin: 0;
-    padding: 4px 0 4px;
+    padding: 8px 14px 4px;
+    background: var(--panel-2);
+    border-radius: 10px;
+    border: 1px solid var(--line-soft);
+    overflow-x: auto;
   }
   .lp-preview-card .lyrics .section-row { margin-bottom: 6px; }
   .lp-preview-hint {
@@ -1988,7 +1992,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.12.0";
+const APP_VERSION = "4.12.1";
 
 //=============================================================
 // STORAGE
@@ -4398,6 +4402,9 @@ function renderLandingPage() {
     key: "F",
     capo: 2,
     instruments: ["guitar", "piano"],
+    // Default to guitar-only view so the demo opens with the green guitar pill
+    // active and the violet piano pill muted. Visitors can click piano to swap.
+    viewInstrument: "guitar",
     lyrics: "{Verse}\n[F]This is a [Am]sample line [Dm]of lyrics in [Bb]your songbook\n[F]Hover any [Am]chord pill to [Bb]see the [Dm]diagram instantly\n[F]Click to [Am]save your own [Bb]preferred [Dm]voicings per song",
     voicings: {},
   };
@@ -4549,6 +4556,8 @@ function renderSongControlsHTML(song) {
 }
 
 function renderMetaRowHTML(song) {
+  // Capo info now lives in the song-controls toolbar above (its own pill +
+  // shapes toggle), so we no longer duplicate "Capo N" in the meta-row.
   const insts = song.instruments || [];
   const both = insts.includes("guitar") && insts.includes("piano");
   const view = song.viewInstrument; // undefined = both, "guitar", "piano"
@@ -4558,7 +4567,7 @@ function renderMetaRowHTML(song) {
     const titleText = active && view === i ? `Show both instruments` : (view === undefined ? `Show only ${i}` : `Show only ${i}`);
     return `<button type="button" class="pill ${i} pill-toggle${active ? " active" : " muted"}" data-inst-toggle="${i}" aria-pressed="${active ? "true" : "false"}" title="${titleText}">${i}</button>`;
   }).join("");
-  return `<div class="meta-row">${song.capo ? `<span class="pill">Capo ${song.capo}</span>` : ""}${pillsHtml}</div>`;
+  return `<div class="meta-row">${pillsHtml}</div>`;
 }
 
 function renderDetail() {
