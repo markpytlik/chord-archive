@@ -44,7 +44,7 @@ Two passes through the codebase: one from a senior engineer reviewing the techni
 
 10. **No error boundary.** Any thrown exception in `renderDetail` blanks the panel with no recovery. The voicing-editor save errors (Invalid frets, etc.) use `alert()` which is jarring and accessibility-hostile.
 
-11. **The bookmarklet, the extension popup, and `chordkeeper.markpytlik.com/#new=` flow all duplicate scraper logic.** Three places to update if Ultimate Guitar changes its DOM. Extracting the scraper into a single function (loaded via `<script>` from a known URL or just inlined identically) would consolidate maintenance.
+11. **The bookmarklet, the extension popup, and `chordpad.app/#new=` flow all duplicate scraper logic.** Three places to update if Ultimate Guitar changes its DOM. Extracting the scraper into a single function (loaded via `<script>` from a known URL or just inlined identically) would consolidate maintenance.
 
 12. **HTTPS is still serving the github.io wildcard cert** (per the curl I ran earlier). Need to nudge GitHub Pages to provision the per-domain cert before flipping on Enforce HTTPS.
 

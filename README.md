@@ -1,6 +1,6 @@
 # Chordpad
 
-Live at [chordpad.app](https://chordpad.app/) (formerly Chord Keeper / Chord Archive).
+Live at [chordpad.app](https://chordpad.app/).
 
 A personal songbook for chords, lyrics, and your own preferred voicings.
 Static site — no server, no build step. Open `index.html` in any modern browser.

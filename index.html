@@ -37,15 +37,15 @@
 <meta name="Bytespider" content="noindex, nofollow" />
 <meta name="PerplexityBot" content="noindex, nofollow" />
 
-<title>Chordpad (formerly ChordKeeper) — songbook for guitar tabs, chords, lyrics & voicings</title>
-<meta name="description" content="Chordpad (formerly ChordKeeper / Chord Archive) is a free songbook app for guitar and piano. Capture chord charts and guitar tabs from sites like Ultimate Guitar, E-Chords, and Chordie; tailor voicings; practice with auto-scrolling lyrics and live chord-shape diagrams; and sync across every device." />
+<title>Chordpad — songbook for guitar tabs, chords, lyrics & voicings</title>
+<meta name="description" content="Chordpad is a free songbook app for guitar and piano. Capture chord charts and guitar tabs from sites like Ultimate Guitar, E-Chords, and Chordie; tailor voicings; practice with auto-scrolling lyrics and live chord-shape diagrams; and sync across every device." />
 <meta name="keywords" content="chordpad, chordkeeper, chord keeper, chord archive, chord chart, songbook app, guitar tabs, guitar tab manager, ultimate guitar alternative, e-chords, chordie, songsterr, guitar chords, piano chords, chord diagrams, voicings, transpose, capo, ChordPro, lyrics, auto-scroll" />
 <meta name="author" content="Chordpad" />
 
 <!-- Open Graph (Facebook, LinkedIn, Slack, iMessage) -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://chordpad.app/" />
-<meta property="og:title" content="Chordpad (formerly ChordKeeper) — songbook for guitar tabs, chords, lyrics & voicings" />
+<meta property="og:title" content="Chordpad — songbook for guitar tabs, chords, lyrics & voicings" />
 <meta property="og:description" content="Free songbook app for guitar and piano. Grab chord charts from guitar tab sites (Ultimate Guitar, E-Chords, Chordie), tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
 <meta property="og:site_name" content="Chordpad" />
 <meta property="og:image" content="https://chordpad.app/favicon.svg" />
@@ -53,7 +53,7 @@
 
 <!-- Twitter / X card -->
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="Chordpad (formerly ChordKeeper) — songbook for guitar tabs, chords, lyrics & voicings" />
+<meta name="twitter:title" content="Chordpad — songbook for guitar tabs, chords, lyrics & voicings" />
 <meta name="twitter:description" content="Free songbook app for guitar and piano. Grab chord charts from guitar tab sites (Ultimate Guitar, E-Chords, Chordie), tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
 <meta name="twitter:image" content="https://chordpad.app/favicon.svg" />
 
@@ -1982,14 +1982,32 @@
     /* Demo preview card — hidden on phones. */
     .lp-preview { display: none; }
 
+    /* Stacked feature cards: center each card so the visuals (which have
+       different intrinsic shapes — barre SVG, stacked pills, play bar)
+       all sit on the same vertical axis, and the headlines line up
+       directly under them. Generous gap so each card feels like its own
+       block instead of crowding the next. */
     .lp-features {
       grid-template-columns: 1fr;
-      padding: 24px 0;
-      gap: 24px;
+      padding: 36px 0;
+      gap: 44px;
       margin-bottom: 6vh;
     }
-    .lp-feature h3 { font-size: 19px; }
-    .lp-feature-vis { height: 90px; }
+    .lp-feature { text-align: center; }
+    .lp-feature-vis {
+      height: 90px;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .lp-feature-vis-stack { align-items: center; }
+    .lp-feature-vis-play {
+      width: 70%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .lp-feature h3 { font-size: 20px; margin-bottom: 10px; }
+    .lp-feature p { max-width: 360px; margin-left: auto; margin-right: auto; }
 
     .lp-personalize { margin-bottom: 6vh; }
     .lp-pz-pair { flex-direction: column; gap: 12px; flex-wrap: nowrap; }
@@ -2132,7 +2150,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.20.1";
+const APP_VERSION = "4.20.2";
 
 //=============================================================
 // STORAGE
