@@ -2039,7 +2039,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.14.3";
+const APP_VERSION = "4.15.0";
 
 //=============================================================
 // STORAGE
@@ -3713,6 +3713,50 @@ function svgGuitar(chordName, custom, size="md") {
   }
   svg += `</svg>`;
   _svgCache.set(key, svg);
+  return svg;
+}
+
+// SVG renderer for a scale fingering — multiple notes per string in a fret
+// window. Used by guitar practice-mode scale drills. Notes are
+// {s, f, isRoot} entries; the window covers fretStart..fretEnd inclusive.
+// Roots render in the chordpad accent (rust); non-roots render solid black.
+// Open-string notes (f === 0) when fretStart === 0 render as outlined circles
+// above the nut, matching the chord-shape conventions.
+function svgGuitarScale(notes, fretStart, fretEnd) {
+  const NUM_FRETS = Math.max(1, fretEnd - fretStart + 1);
+  const W = 220, padTop = 28, padBot = 14, padX = 22;
+  const stringGap = (W - padX*2) / 5;
+  const fretGap = 30;
+  const H = padTop + fretGap * NUM_FRETS + padBot;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto;">`;
+  // Strings
+  for (let s = 0; s < 6; s++) {
+    const x = padX + s * stringGap;
+    svg += `<line x1="${x}" y1="${padTop}" x2="${x}" y2="${H - padBot}" stroke="#bbb" stroke-width="1"/>`;
+  }
+  // Frets
+  for (let i = 0; i <= NUM_FRETS; i++) {
+    const y = padTop + i * fretGap;
+    const w = (i === 0 && fretStart === 0) ? 3 : 1;
+    svg += `<line x1="${padX}" y1="${y}" x2="${W - padX}" y2="${y}" stroke="#14161a" stroke-width="${w}"/>`;
+  }
+  if (fretStart > 0) {
+    svg += `<text x="${padX - 6}" y="${padTop + fretGap*0.7}" text-anchor="end" font-size="11" fill="#6b7180" font-family="ui-monospace,monospace">${fretStart}fr</text>`;
+  }
+  // Notes
+  const ROOT = "#b14a2c"; // accent
+  for (const n of notes) {
+    if (n.f < fretStart || n.f > fretEnd) continue;
+    const x = padX + n.s * stringGap;
+    if (n.f === 0 && fretStart === 0) {
+      svg += `<circle cx="${x}" cy="${padTop - 9}" r="6" fill="${n.isRoot ? ROOT : "#fff"}" stroke="${n.isRoot ? ROOT : "#14161a"}" stroke-width="${n.isRoot ? 0 : 1.4}"/>`;
+    } else {
+      const offset = fretStart === 0 ? n.f - 1 : n.f - fretStart;
+      const cy = padTop + (offset + 0.5) * fretGap;
+      svg += `<circle cx="${x}" cy="${cy}" r="7.5" fill="${n.isRoot ? ROOT : "#14161a"}"/>`;
+    }
+  }
+  svg += `</svg>`;
   return svg;
 }
 
@@ -6059,8 +6103,78 @@ function drillInversions() {
 }
 
 // ---- Guitar-specific drills ----
-// Each guitar drill step uses { instrument: "guitar", label, detail, chord, frets?, fingers?, barre? }
-// — the renderer calls svgGuitar with the explicit shape if present, otherwise looks up the chord name.
+// Each guitar drill step uses one of two diagram payloads:
+//   { instrument: "guitar", chord, frets?, fingers?, barre? } — chord shape (svgGuitar)
+//   { instrument: "guitar", scaleNotes, fretStart }            — scale fingering (svgGuitarScale)
+
+// Open-string pitch classes, low E to high e — used by scale builders to walk
+// the fretboard. Already declared elsewhere as GUITAR_OPEN_PCS, reused here.
+function _scaleNotesInWindow(rootPc, intervals, fretStart, fretEnd) {
+  const open = GUITAR_OPEN_PCS;
+  const scaleSet = new Set(intervals.map(iv => (rootPc + iv) % 12));
+  const out = [];
+  for (let s = 0; s < 6; s++) {
+    for (let f = fretStart; f <= fretEnd; f++) {
+      const pc = (open[s] + f) % 12;
+      if (scaleSet.has(pc)) out.push({ s, f, isRoot: pc === rootPc });
+    }
+  }
+  return out;
+}
+
+function _scaleDrillSteps(scaleName, rootPc, intervals, positions) {
+  // positions: array of {label, fretStart, fretEnd} — each becomes one drill step.
+  const flats = new Set([5, 10, 3, 8, 1, 6]);
+  const flat = flats.has(rootPc);
+  const naming = pc => pcNameWithAccidentals(pc, flat);
+  const detail = intervals.map(iv => naming((rootPc + iv) % 12)).join(" – ");
+  return positions.map((pos, i) => ({
+    instrument: "guitar",
+    label: `${naming(rootPc)} ${scaleName} — Position ${i + 1} (${pos.label})`,
+    detail,
+    scaleNotes: _scaleNotesInWindow(rootPc, intervals, pos.fretStart, pos.fretEnd),
+    fretStart: pos.fretStart,
+    fretEnd: pos.fretEnd,
+    rootPc,
+  }));
+}
+
+function drillGuitarMajorScale() {
+  // C major in 5 fretboard positions covering the neck. Spans roughly nut → fret 12.
+  const positions = [
+    { label: "open / nut",         fretStart: 0,  fretEnd: 4  },
+    { label: "around fret 2–5",    fretStart: 2,  fretEnd: 5  },
+    { label: "around fret 4–8",    fretStart: 4,  fretEnd: 8  },
+    { label: "around fret 7–10",   fretStart: 7,  fretEnd: 10 },
+    { label: "around fret 9–12",   fretStart: 9,  fretEnd: 12 },
+  ];
+  return _scaleDrillSteps("major scale", 0, [0, 2, 4, 5, 7, 9, 11], positions);
+}
+
+function drillGuitarMinorPentatonic() {
+  // A minor pentatonic in 5 standard positions — the most-used improv shape on
+  // guitar. Covers fret 0 (open A on string 1) through fret 17.
+  const positions = [
+    { label: "open / nut",         fretStart: 0,  fretEnd: 5  },
+    { label: "Position 1 (5fr)",   fretStart: 5,  fretEnd: 8  },
+    { label: "Position 2 (7fr)",   fretStart: 7,  fretEnd: 10 },
+    { label: "Position 3 (10fr)",  fretStart: 9,  fretEnd: 13 },
+    { label: "Position 4 (12fr)",  fretStart: 12, fretEnd: 15 },
+  ];
+  return _scaleDrillSteps("minor pentatonic", 9, [0, 3, 5, 7, 10], positions);
+}
+
+function drillGuitarBlues() {
+  // A minor blues scale = minor pentatonic + b5. Same 5 positions.
+  const positions = [
+    { label: "open / nut",         fretStart: 0,  fretEnd: 5  },
+    { label: "Position 1 (5fr)",   fretStart: 5,  fretEnd: 8  },
+    { label: "Position 2 (7fr)",   fretStart: 7,  fretEnd: 10 },
+    { label: "Position 3 (10fr)",  fretStart: 9,  fretEnd: 13 },
+    { label: "Position 4 (12fr)",  fretStart: 12, fretEnd: 15 },
+  ];
+  return _scaleDrillSteps("blues scale", 9, [0, 3, 5, 6, 7, 10], positions);
+}
 
 function drillGuitarOpenChords() {
   const chords = [
@@ -6078,49 +6192,6 @@ function drillGuitarOpenChords() {
     { chord: "D7", label: "D7 (open)",        frets: [-1,-1,0,2,1,2], fingers: [0,0,0,2,1,3] },
   ];
   return chords.map(c => ({ instrument: "guitar", ...c, detail: "frets: " + c.frets.map(f => f === -1 ? "x" : f).join("") }));
-}
-
-function _walkBarreUpNeck(shapeName, getStep) {
-  const out = [];
-  const flats = new Set([5, 10, 3, 8, 1, 6]);
-  for (let fret = 1; fret <= 12; fret++) {
-    const step = getStep(fret);
-    const rootPc = step.rootPc;
-    const flat = flats.has(rootPc);
-    const name = pcNameWithAccidentals(rootPc, flat);
-    out.push({
-      instrument: "guitar",
-      chord: name + (step.qualSuffix || ""),
-      label: `${shapeName} at fret ${fret} (${name}${step.qualWord || " major"})`,
-      detail: `Root pc: ${name}${step.qualWord || ""}`,
-      frets: step.frets,
-      fingers: step.fingers,
-      barre: step.barre,
-    });
-  }
-  return out;
-}
-
-function drillBarreEShape() {
-  // E-shape major barre walking up. Open-low-E pitch class is 4. Root pc at fret f = (4+f) % 12.
-  return _walkBarreUpNeck("E-shape barre", fret => ({
-    rootPc: (4 + fret) % 12,
-    qualWord: " major",
-    frets: [fret, fret+2, fret+2, fret+1, fret, fret],
-    fingers: [1, 3, 4, 2, 1, 1],
-    barre: { fret, from: 0, to: 5 },
-  }));
-}
-
-function drillBarreAShape() {
-  // A-shape major barre. Open-A pitch class is 9. Root pc at fret f = (9+f) % 12.
-  return _walkBarreUpNeck("A-shape barre", fret => ({
-    rootPc: (9 + fret) % 12,
-    qualWord: " major",
-    frets: [-1, fret, fret+2, fret+2, fret+2, fret],
-    fingers: [0, 1, 3, 4, 4, 1],
-    barre: { fret, from: 1, to: 5 },
-  }));
 }
 
 function drillPowerChords() {
@@ -6143,19 +6214,6 @@ function drillPowerChords() {
   return out;
 }
 
-function drillGuitarMinorBarres() {
-  // Em-shape minor barre walking up — the relative-minor counterpart of the
-  // E-shape major barre. Useful for working through every minor key shape.
-  return _walkBarreUpNeck("Em-shape minor barre", fret => ({
-    rootPc: (4 + fret) % 12,
-    qualSuffix: "m",
-    qualWord: " minor",
-    frets: [fret, fret+2, fret+2, fret, fret, fret],
-    fingers: [1, 3, 4, 1, 1, 1],
-    barre: { fret, from: 0, to: 5 },
-  }));
-}
-
 const PRACTICE_DRILLS = [
   // ---- Piano drills ----
   { id: "circle5",   instrument: "piano",  name: "Circle of fifths — major chord roots",        build: drillCircleOfFifths },
@@ -6166,10 +6224,10 @@ const PRACTICE_DRILLS = [
   { id: "inversions",instrument: "piano",  name: "Triad inversions (root, 1st, 2nd)",          build: drillInversions },
   // ---- Guitar drills ----
   { id: "g-open",       instrument: "guitar", name: "Open chords (C / G / D / A / E / Am / Em / Dm / F + 7ths)", build: drillGuitarOpenChords },
-  { id: "g-barre-e",    instrument: "guitar", name: "Barre chords up the neck — E shape (12 frets)",            build: drillBarreEShape },
-  { id: "g-barre-a",    instrument: "guitar", name: "Barre chords up the neck — A shape (12 frets)",            build: drillBarreAShape },
-  { id: "g-barre-min",  instrument: "guitar", name: "Minor barre chords — Em shape up the neck",                build: drillGuitarMinorBarres },
-  { id: "g-power",      instrument: "guitar", name: "Power chords up the low-E string (12 frets)",              build: drillPowerChords },
+  { id: "g-major",      instrument: "guitar", name: "C major scale — 5 positions across the neck",              build: drillGuitarMajorScale },
+  { id: "g-minpent",    instrument: "guitar", name: "A minor pentatonic — 5 positions across the neck",         build: drillGuitarMinorPentatonic },
+  { id: "g-blues",      instrument: "guitar", name: "A minor blues scale — 5 positions across the neck",        build: drillGuitarBlues },
+  { id: "g-power",      instrument: "guitar", name: "Power chords on the low-E string (12 frets)",              build: drillPowerChords },
 ];
 
 let practiceState = null;
@@ -6216,6 +6274,9 @@ function openPracticeMode() {
 
   function renderStepDiagram(step) {
     if (step.instrument === "guitar") {
+      if (step.scaleNotes) {
+        return svgGuitarScale(step.scaleNotes, step.fretStart || 0, step.fretEnd || 4);
+      }
       const opts = step.frets ? { frets: step.frets, fingers: step.fingers, barre: step.barre } : null;
       return svgGuitar(step.chord || "", opts, "lg");
     }
@@ -6276,7 +6337,9 @@ function openPracticeMode() {
           </div>
         </div>
       `;
-      overlay.querySelector(".practice-close").addEventListener("click", close);
+      // ✕ inside a drill returns to the drill picker (not all the way out of
+      // practice mode). The picker view's ✕ still closes practice entirely.
+      overlay.querySelector(".practice-close").addEventListener("click", back);
       overlay.querySelector(".practice-back").addEventListener("click", back);
       overlay.querySelector(".practice-prev").addEventListener("click", prev);
       overlay.querySelector(".practice-next").addEventListener("click", next);
