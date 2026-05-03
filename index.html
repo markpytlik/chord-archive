@@ -20,14 +20,73 @@
 " />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="favicon.svg" />
+<link rel="canonical" href="https://chordpad.app/" />
 <meta name="theme-color" content="#b14a2c" />
-<!-- Block search engines and most well-behaved AI/training crawlers from indexing or scraping. -->
-<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
-<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet" />
+
+<!-- Search-engine indexing: open to general crawlers (Google, Bing, DuckDuckGo).
+     AI-training bots are still explicitly blocked further down + in robots.txt. -->
+<meta name="robots" content="index, follow, max-image-preview:large" />
+<meta name="googlebot" content="index, follow" />
+
+<!-- AI/LLM training crawlers stay blocked. -->
 <meta name="GPTBot" content="noindex, nofollow" />
 <meta name="ClaudeBot" content="noindex, nofollow" />
-<meta name="referrer" content="no-referrer" />
-<title>Chordpad</title>
+<meta name="anthropic-ai" content="noindex, nofollow" />
+<meta name="Google-Extended" content="noindex, nofollow" />
+<meta name="CCBot" content="noindex, nofollow" />
+<meta name="Bytespider" content="noindex, nofollow" />
+<meta name="PerplexityBot" content="noindex, nofollow" />
+
+<title>Chordpad — your personal songbook for chords, lyrics, and voicings</title>
+<meta name="description" content="Chordpad is a free songbook app for guitar and piano. Add your own songs or paste a chord chart from anywhere, tailor voicings, practice with auto-scrolling lyrics and live chord-shape diagrams, and sync across every device." />
+<meta name="keywords" content="chord chart, songbook app, guitar chords, piano chords, chord diagrams, voicings, transpose, capo, ChordPro, lyrics, practice, auto-scroll" />
+<meta name="author" content="Chordpad" />
+
+<!-- Open Graph (Facebook, LinkedIn, Slack, iMessage) -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://chordpad.app/" />
+<meta property="og:title" content="Chordpad — your personal songbook for chords, lyrics, and voicings" />
+<meta property="og:description" content="Free songbook app for guitar and piano. Paste a chord chart, tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
+<meta property="og:site_name" content="Chordpad" />
+<meta property="og:image" content="https://chordpad.app/favicon.svg" />
+<meta property="og:locale" content="en_US" />
+
+<!-- Twitter / X card -->
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Chordpad — your personal songbook for chords, lyrics, and voicings" />
+<meta name="twitter:description" content="Free songbook app for guitar and piano. Paste a chord chart, tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
+<meta name="twitter:image" content="https://chordpad.app/favicon.svg" />
+
+<!-- JSON-LD structured data: SoftwareApplication so Google's rich-results
+     pipeline understands what kind of thing this is. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Chordpad",
+  "applicationCategory": "MusicApplication",
+  "operatingSystem": "Web",
+  "url": "https://chordpad.app/",
+  "description": "Personal songbook app for chords, lyrics, and voicings. Add your own songs or paste a chord chart from the web, tailor voicings for guitar or piano, practice with auto-scrolling lyrics and live chord-shape diagrams, and sync across every device.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "featureList": [
+    "Chord chart editor",
+    "Guitar chord diagrams",
+    "Piano keyboard diagrams",
+    "Custom voicings per song or per occurrence",
+    "One-click transposition",
+    "Capo-aware diagrams",
+    "Roman-numeral analysis",
+    "Auto-scrolling Play mode",
+    "Local-first storage with cloud sync",
+    "Browser extension for capturing chord pages"
+  ]
+}
+</script>
 <style>
   /* ====================== Reset & Tokens ====================== */
   :root {
@@ -1721,6 +1780,15 @@
     font-size: 12px;
     border-top: 1px solid var(--line);
   }
+  .lp-footer-stack { text-align: center; line-height: 1.6; }
+  .lp-footer-tagline { color: var(--muted); }
+  .lp-footer-beta {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+  .lp-footer-beta a { color: var(--accent); text-decoration: none; }
+  .lp-footer-beta a:hover { text-decoration: underline; }
 
   /* Auth area in header */
   header .auth-area {
@@ -1920,7 +1988,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.10.3";
+const APP_VERSION = "4.11.0";
 
 //=============================================================
 // STORAGE
@@ -4312,7 +4380,13 @@ function renderLandingPage() {
       </section>
 
       <footer class="lp-footer">
-        <span>Chordpad · a personal practice tool</span>
+        <div class="lp-footer-stack">
+          <div class="lp-footer-tagline">Chordpad · a personal practice tool</div>
+          <div class="lp-footer-beta">
+            Chordpad is in beta. Please send bug reports to
+            <a href="mailto:hello@chordpad.app">hello@chordpad.app</a>.
+          </div>
+        </div>
       </footer>
     </div>
   `;
@@ -4422,7 +4496,7 @@ function renderDetail() {
                 </button>
               </div>
             </div>` : ""}
-            ${song.capo > 0 ? `
+            ${song.capo > 0 && song.viewInstrument !== "piano" ? `
             <div class="sc-group">
               <div class="sc-pill sc-capo-state" title="Capo position">
                 <span class="sc-cap">Capo</span>

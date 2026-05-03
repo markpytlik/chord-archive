@@ -1,12 +1,20 @@
-# Block all crawlers — this is a personal songbook, not for indexing.
-User-agent: *
-Disallow: /
+# Chordpad — robots policy
+# Open to general search engines (Google, Bing, DuckDuckGo, Apple, etc.).
+# Explicit blocks below for AI / LLM training crawlers.
 
-# Explicit blocks for major AI training crawlers
+User-agent: *
+Allow: /
+
+Sitemap: https://chordpad.app/sitemap.xml
+
+# === AI / LLM training crawlers — denied ===
 User-agent: GPTBot
 Disallow: /
 
 User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: OAI-SearchBot
 Disallow: /
 
 User-agent: ClaudeBot
