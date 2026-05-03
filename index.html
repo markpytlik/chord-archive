@@ -1992,7 +1992,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.12.1";
+const APP_VERSION = "4.13.0";
 
 //=============================================================
 // STORAGE
@@ -3046,6 +3046,117 @@ function buildClickablePianoKeyboard(initialPositions, onChange, rootPc) {
   wrap.getSelectedPositions = () => [...selected];
   wrap.setSelectedPositions = (positions) => { selected.clear(); positions.forEach(p => selected.add(p)); rerender(); };
   wrap.setRootPc = (pc) => { currentRootPc = (pc === null || pc === undefined) ? null : pc; rerender(); };
+  return wrap;
+}
+
+// Clickable guitar fretboard for voicing editing.
+// Mirrors buildClickablePianoKeyboard's pattern. State is a frets[6] array
+// where each entry is -1 (mute) | 0 (open) | 1+ (fret number).
+// onChange(frets) fires on every selection change.
+//
+// Click model:
+//   - Top row above the nut shows × / O selectors per string. Click × to
+//     mute, O to open. Clicking the currently-active state turns it off
+//     (back to "no selection" — drawn as a faint placeholder).
+//   - Body row clicks set frets[s] to the clicked fret. Re-clicking the
+//     same fret toggles off (back to mute).
+//   - When any fret > 4 is set, the visible window auto-shifts to show
+//     a 5-fret span anchored at the lowest played fret. A "+/-" pair on
+//     the left manually nudges the window.
+function buildClickableGuitarFretboard(initialFrets, onChange) {
+  const wrap = document.createElement("div");
+  wrap.className = "click-fretboard";
+  let frets = (initialFrets && initialFrets.length === 6) ? initialFrets.slice() : [-1, -1, -1, -1, -1, -1];
+  // Window start fret. 0 = nut. If any played fret exceeds 4, auto-shift.
+  let windowStart = 0;
+  function autoFitWindow() {
+    const positives = frets.filter(f => f > 0);
+    if (!positives.length) { windowStart = 0; return; }
+    const minF = Math.min(...positives), maxF = Math.max(...positives);
+    if (maxF <= 4) { windowStart = 0; return; }
+    // Anchor window at minF so the lowest played fret is the first body row.
+    windowStart = Math.max(1, minF);
+  }
+  autoFitWindow();
+
+  const W = 220, padTop = 36, padBot = 8, padX = 22;
+  const NUM_FRETS = 5;
+  const stringGap = (W - padX*2) / 5;
+  const fretGap   = 22; // body row height
+  const H = padTop + fretGap * NUM_FRETS + padBot;
+
+  function svg() {
+    let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block; max-width:100%; height:auto; cursor:pointer; user-select:none;">`;
+    // Top row: × / O selectors per string. Each gets a wide invisible hit area.
+    for (let str = 0; str < 6; str++) {
+      const x = padX + str * stringGap;
+      const f = frets[str];
+      // × selector at y=8
+      const muteFill = f === -1 ? "#b41a1a" : "#d8d3c4";
+      s += `<text x="${x}" y="12" text-anchor="middle" font-size="14" font-weight="700" fill="${muteFill}" font-family="ui-monospace,monospace" pointer-events="none">×</text>`;
+      s += `<rect class="fb-target" data-string="${str}" data-fret="-1" x="${x - stringGap*0.4}" y="0" width="${stringGap*0.8}" height="16" fill="transparent"/>`;
+      // O selector at y=24
+      const openStroke = f === 0 ? "#14161a" : "#d8d3c4";
+      const openWidth  = f === 0 ? 1.6 : 1.2;
+      s += `<circle cx="${x}" cy="24" r="4.5" fill="none" stroke="${openStroke}" stroke-width="${openWidth}" pointer-events="none"/>`;
+      s += `<rect class="fb-target" data-string="${str}" data-fret="0" x="${x - stringGap*0.4}" y="16" width="${stringGap*0.8}" height="14" fill="transparent"/>`;
+    }
+    // Strings (vertical lines)
+    for (let str = 0; str < 6; str++) {
+      const x = padX + str * stringGap;
+      s += `<line x1="${x}" y1="${padTop}" x2="${x}" y2="${H - padBot}" stroke="#bbb" stroke-width="1" pointer-events="none"/>`;
+    }
+    // Frets (horizontal lines). Top one is the nut (thick) only when window starts at 0.
+    for (let i = 0; i <= NUM_FRETS; i++) {
+      const y = padTop + i * fretGap;
+      const w = (i === 0 && windowStart === 0) ? 3 : 1;
+      s += `<line x1="${padX}" y1="${y}" x2="${W - padX}" y2="${y}" stroke="#14161a" stroke-width="${w}" pointer-events="none"/>`;
+    }
+    // Window-start label when not at the nut
+    if (windowStart > 0) {
+      s += `<text x="${padX - 6}" y="${padTop + fretGap * 0.7}" text-anchor="end" font-size="10" fill="#6b7180" font-family="ui-monospace,monospace" pointer-events="none">${windowStart}fr</text>`;
+    }
+    // Body click targets: 5 fret rows × 6 strings (transparent rects)
+    for (let row = 0; row < NUM_FRETS; row++) {
+      const fretNum = windowStart + row + (windowStart === 0 ? 1 : 0); // row 0 = fret 1 when at nut, else fret = windowStart
+      const cy = padTop + (row + 0.5) * fretGap;
+      for (let str = 0; str < 6; str++) {
+        const x = padX + str * stringGap;
+        s += `<rect class="fb-target" data-string="${str}" data-fret="${fretNum}" x="${x - stringGap*0.45}" y="${padTop + row*fretGap}" width="${stringGap*0.9}" height="${fretGap}" fill="transparent"/>`;
+        // Active dot if this string is set to this fret
+        if (frets[str] === fretNum) {
+          s += `<circle cx="${x}" cy="${cy}" r="7.5" fill="#14161a" pointer-events="none"/>`;
+        }
+      }
+    }
+    s += `</svg>`;
+    return s;
+  }
+
+  function rerender() {
+    autoFitWindow();
+    wrap.innerHTML = svg();
+  }
+  rerender();
+
+  wrap.addEventListener("click", e => {
+    const t = e.target.closest(".fb-target[data-string]");
+    if (!t) return;
+    const str = parseInt(t.getAttribute("data-string"), 10);
+    const fret = parseInt(t.getAttribute("data-fret"), 10);
+    // Toggle: click the currently-active value to clear it (back to mute).
+    if (frets[str] === fret) frets[str] = -1;
+    else frets[str] = fret;
+    rerender();
+    onChange(frets.slice());
+  });
+
+  wrap.getFrets = () => frets.slice();
+  wrap.setFrets = (f) => {
+    if (!f || f.length !== 6) return;
+    frets = f.slice();
+    rerender();
+  };
   return wrap;
 }
 
@@ -6330,7 +6441,8 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
       <div class="modal-form stack">
         ${showGuitar ? `
           <div>
-            <label>Guitar shape <span class="muted">(low-E to high-E; <code>x</code> = muted, <code>0</code> = open)</span></label>
+            <label>Guitar shape <span class="muted">(click frets to build the shape, or type below — low-E to high-E; <code>x</code> = muted, <code>0</code> = open)</span></label>
+            <div id="ve-guitar-fretboard" style="text-align:center; padding:6px 0;"></div>
             <input id="ve-frets" placeholder="x32010" value="${escapeHtml(initFrets)}" />
             <div class="helper-msg" id="ve-preview-guitar" style="text-align:center;"></div>
           </div>
@@ -6387,6 +6499,19 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
       clickPiano.setSelectedPositions([]);
       updateAll();
     });
+  }
+
+  // Clickable guitar fretboard, synced bidirectionally with the frets text input.
+  let clickGuitar = null;
+  const fretboardMount = showGuitar ? bg.querySelector("#ve-guitar-fretboard") : null;
+  if (fretboardMount) {
+    const seedFrets = stringToFrets(initFrets) || [-1, -1, -1, -1, -1, -1];
+    clickGuitar = buildClickableGuitarFretboard(seedFrets, frets => {
+      // Visual edit → update the text input, then run shared updateAll.
+      if (fretsInput) fretsInput.value = fretsToString(frets);
+      updateAll();
+    });
+    fretboardMount.appendChild(clickGuitar);
   }
 
   function fretsToPcs(frets) {
@@ -6448,7 +6573,14 @@ function openVoicingEditor(chordName, song, editIndex, seedFromBuiltin, occ) {
     notesEl.textContent = describeNotes(nameInput.value || chordName);
     resolvedName = nameInput.value || chordName;
   }
-  fretsInput?.addEventListener("input", updateAll);
+  fretsInput?.addEventListener("input", () => {
+    // Mirror typed text back onto the clickable fretboard when valid.
+    if (clickGuitar) {
+      const f = stringToFrets(fretsInput.value.trim());
+      if (f) clickGuitar.setFrets(f);
+    }
+    updateAll();
+  });
   bg.querySelector("#ve-chord-name").addEventListener("input", e => {
     e.target.dataset.userEdited = "1";
     // When user types a recognized chord name, sync the keyboard to that chord's notes
