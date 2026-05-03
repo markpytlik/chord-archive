@@ -1106,15 +1106,53 @@
     font-family: var(--mono); font-size: 16px; color: var(--ink-soft);
     text-align: center; letter-spacing: .04em;
   }
-  .practice-step .practice-piano {
+  .practice-step .practice-piano,
+  .practice-step .practice-guitar {
     margin: 14px 0 8px;
     /* Constrain width so it scales nicely */
     max-width: 760px; width: 100%;
     display: flex; justify-content: center;
   }
-  .practice-step .practice-piano svg {
+  .practice-step .practice-piano svg,
+  .practice-step .practice-guitar svg {
     max-width: 100%; height: auto;
   }
+  .practice-step .practice-guitar svg {
+    /* Guitar diagrams are intrinsically smaller than the piano keyboard, so
+       give them a generous max so they fill the practice card nicely. */
+    width: auto; max-height: 320px;
+  }
+  .practice-instrument-toggle {
+    display: inline-flex;
+    gap: 4px;
+    margin: 6px auto 16px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+  }
+  .practice-instrument-toggle .pi-btn {
+    background: transparent;
+    border: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .12s, color .12s;
+  }
+  .practice-instrument-toggle .pi-btn:hover { color: var(--ink); }
+  .practice-instrument-toggle .pi-btn.active {
+    background: var(--panel);
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .practice-instrument-toggle .pi-icon { font-size: 15px; line-height: 1; }
   .practice-step .practice-nav {
     display: flex; gap: 10px; margin-top: 10px;
   }
@@ -1544,7 +1582,9 @@
   body.landing-active #search,
   body.landing-active #btn-new,
   body.landing-active .header-menu { display: none !important; }
-  body.landing-active header { padding: 14px 32px; }
+  /* Keep header padding identical between landing-active and the regular
+     songbook view so the brand logo stays anchored at the same x-coordinate
+     when the visitor toggles between them. */
   body.landing-active .grow { flex: 1; }
 
   .lp-page {
@@ -1992,7 +2032,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.13.0";
+const APP_VERSION = "4.14.0";
 
 //=============================================================
 // STORAGE
@@ -6002,19 +6042,128 @@ function drillInversions() {
   return out;
 }
 
+// ---- Guitar-specific drills ----
+// Each guitar drill step uses { instrument: "guitar", label, detail, chord, frets?, fingers?, barre? }
+// — the renderer calls svgGuitar with the explicit shape if present, otherwise looks up the chord name.
+
+function drillGuitarOpenChords() {
+  const chords = [
+    { chord: "C",  label: "C major (open)",   frets: [-1,3,2,0,1,0],  fingers: [0,3,2,0,1,0] },
+    { chord: "G",  label: "G major (open)",   frets: [3,2,0,0,0,3],   fingers: [3,2,0,0,0,4] },
+    { chord: "D",  label: "D major (open)",   frets: [-1,-1,0,2,3,2], fingers: [0,0,0,1,3,2] },
+    { chord: "A",  label: "A major (open)",   frets: [-1,0,2,2,2,0],  fingers: [0,0,1,2,3,0] },
+    { chord: "E",  label: "E major (open)",   frets: [0,2,2,1,0,0],   fingers: [0,2,3,1,0,0] },
+    { chord: "Am", label: "A minor (open)",   frets: [-1,0,2,2,1,0],  fingers: [0,0,2,3,1,0] },
+    { chord: "Em", label: "E minor (open)",   frets: [0,2,2,0,0,0],   fingers: [0,2,3,0,0,0] },
+    { chord: "Dm", label: "D minor (open)",   frets: [-1,-1,0,2,3,1], fingers: [0,0,0,2,3,1] },
+    { chord: "F",  label: "F major (full barre)", frets: [1,3,3,2,1,1], fingers: [1,3,4,2,1,1], barre: { fret: 1, from: 0, to: 5 } },
+    { chord: "C7", label: "C7 (open)",        frets: [-1,3,2,3,1,0],  fingers: [0,3,2,4,1,0] },
+    { chord: "G7", label: "G7 (open)",        frets: [3,2,0,0,0,1],   fingers: [3,2,0,0,0,1] },
+    { chord: "D7", label: "D7 (open)",        frets: [-1,-1,0,2,1,2], fingers: [0,0,0,2,1,3] },
+  ];
+  return chords.map(c => ({ instrument: "guitar", ...c, detail: "frets: " + c.frets.map(f => f === -1 ? "x" : f).join("") }));
+}
+
+function _walkBarreUpNeck(shapeName, getStep) {
+  const out = [];
+  const flats = new Set([5, 10, 3, 8, 1, 6]);
+  for (let fret = 1; fret <= 12; fret++) {
+    const step = getStep(fret);
+    const rootPc = step.rootPc;
+    const flat = flats.has(rootPc);
+    const name = pcNameWithAccidentals(rootPc, flat);
+    out.push({
+      instrument: "guitar",
+      chord: name + (step.qualSuffix || ""),
+      label: `${shapeName} at fret ${fret} (${name}${step.qualWord || " major"})`,
+      detail: `Root pc: ${name}${step.qualWord || ""}`,
+      frets: step.frets,
+      fingers: step.fingers,
+      barre: step.barre,
+    });
+  }
+  return out;
+}
+
+function drillBarreEShape() {
+  // E-shape major barre walking up. Open-low-E pitch class is 4. Root pc at fret f = (4+f) % 12.
+  return _walkBarreUpNeck("E-shape barre", fret => ({
+    rootPc: (4 + fret) % 12,
+    qualWord: " major",
+    frets: [fret, fret+2, fret+2, fret+1, fret, fret],
+    fingers: [1, 3, 4, 2, 1, 1],
+    barre: { fret, from: 0, to: 5 },
+  }));
+}
+
+function drillBarreAShape() {
+  // A-shape major barre. Open-A pitch class is 9. Root pc at fret f = (9+f) % 12.
+  return _walkBarreUpNeck("A-shape barre", fret => ({
+    rootPc: (9 + fret) % 12,
+    qualWord: " major",
+    frets: [-1, fret, fret+2, fret+2, fret+2, fret],
+    fingers: [0, 1, 3, 4, 4, 1],
+    barre: { fret, from: 1, to: 5 },
+  }));
+}
+
+function drillPowerChords() {
+  // Root + fifth on the low two strings, walking up. Common rock/punk shape.
+  const out = [];
+  const flats = new Set([5, 10, 3, 8, 1, 6]);
+  for (let fret = 1; fret <= 12; fret++) {
+    const rootPc = (4 + fret) % 12;
+    const flat = flats.has(rootPc);
+    const name = pcNameWithAccidentals(rootPc, flat);
+    out.push({
+      instrument: "guitar",
+      chord: name + "5",
+      label: `${name}5 power chord (root low-E fret ${fret})`,
+      detail: `Two-note: root + fifth`,
+      frets: [fret, fret + 2, -1, -1, -1, -1],
+      fingers: [1, 3, 0, 0, 0, 0],
+    });
+  }
+  return out;
+}
+
+function drillGuitarMinorBarres() {
+  // Em-shape minor barre walking up — the relative-minor counterpart of the
+  // E-shape major barre. Useful for working through every minor key shape.
+  return _walkBarreUpNeck("Em-shape minor barre", fret => ({
+    rootPc: (4 + fret) % 12,
+    qualSuffix: "m",
+    qualWord: " minor",
+    frets: [fret, fret+2, fret+2, fret, fret, fret],
+    fingers: [1, 3, 4, 1, 1, 1],
+    barre: { fret, from: 0, to: 5 },
+  }));
+}
+
 const PRACTICE_DRILLS = [
-  { id: "circle5",   name: "Circle of fifths — major chord roots",        build: drillCircleOfFifths },
-  { id: "majscales", name: "Major scales — all 12 keys",                  build: drillMajorScales },
-  { id: "minscales", name: "Natural minor scales — all 12 keys",          build: drillNaturalMinorScales },
-  { id: "iivi",      name: "ii–V–I in all 12 keys (36 chords)",           build: drillIIVI },
-  { id: "triadsC",   name: "Diatonic triads of C major (I–ii–iii–IV–V–vi–vii°)", build: drillTriadsOfCMajor },
-  { id: "inversions", name: "Triad inversions (root, 1st, 2nd)",          build: drillInversions },
+  // ---- Piano drills ----
+  { id: "circle5",   instrument: "piano",  name: "Circle of fifths — major chord roots",        build: drillCircleOfFifths },
+  { id: "majscales", instrument: "piano",  name: "Major scales — all 12 keys",                  build: drillMajorScales },
+  { id: "minscales", instrument: "piano",  name: "Natural minor scales — all 12 keys",          build: drillNaturalMinorScales },
+  { id: "iivi",      instrument: "piano",  name: "ii–V–I in all 12 keys (36 chords)",           build: drillIIVI },
+  { id: "triadsC",   instrument: "piano",  name: "Diatonic triads of C major (I–ii–iii–IV–V–vi–vii°)", build: drillTriadsOfCMajor },
+  { id: "inversions",instrument: "piano",  name: "Triad inversions (root, 1st, 2nd)",          build: drillInversions },
+  // ---- Guitar drills ----
+  { id: "g-open",       instrument: "guitar", name: "Open chords (C / G / D / A / E / Am / Em / Dm / F + 7ths)", build: drillGuitarOpenChords },
+  { id: "g-barre-e",    instrument: "guitar", name: "Barre chords up the neck — E shape (12 frets)",            build: drillBarreEShape },
+  { id: "g-barre-a",    instrument: "guitar", name: "Barre chords up the neck — A shape (12 frets)",            build: drillBarreAShape },
+  { id: "g-barre-min",  instrument: "guitar", name: "Minor barre chords — Em shape up the neck",                build: drillGuitarMinorBarres },
+  { id: "g-power",      instrument: "guitar", name: "Power chords up the low-E string (12 frets)",              build: drillPowerChords },
 ];
 
 let practiceState = null;
 function openPracticeMode() {
   if (practiceState) return; // already open
   let chosen = null, steps = [], cursor = 0;
+  // Picker filters drills by selected instrument. Persisted in localStorage so
+  // a returning user lands back on the instrument they were practising.
+  let instrument = localStorage.getItem("practice_instrument") || "piano";
+  if (instrument !== "piano" && instrument !== "guitar") instrument = "piano";
   const overlay = document.createElement("div");
   overlay.className = "practice-overlay";
   document.body.appendChild(overlay);
@@ -6042,9 +6191,24 @@ function openPracticeMode() {
     cursor = 0;
     render();
   }
+  function setInstrument(inst) {
+    if (inst !== "piano" && inst !== "guitar") return;
+    instrument = inst;
+    localStorage.setItem("practice_instrument", inst);
+    render();
+  }
+
+  function renderStepDiagram(step) {
+    if (step.instrument === "guitar") {
+      const opts = step.frets ? { frets: step.frets, fingers: step.fingers, barre: step.barre } : null;
+      return svgGuitar(step.chord || "", opts, "lg");
+    }
+    return svgPianoFromPcs(step.notes, step.rootPc, undefined, "lg");
+  }
 
   function render() {
     if (!chosen) {
+      const drills = PRACTICE_DRILLS.filter(d => d.instrument === instrument);
       overlay.innerHTML = `
         <div class="practice-shell">
           <div class="practice-head">
@@ -6053,8 +6217,12 @@ function openPracticeMode() {
           </div>
           <div class="practice-body">
             <div class="practice-sub">Pick a drill</div>
+            <div class="practice-instrument-toggle" role="radiogroup" aria-label="Instrument">
+              <button class="pi-btn ${instrument === "piano" ? "active" : ""}" data-inst="piano" aria-pressed="${instrument === "piano"}"><span class="pi-icon">🎹</span> Piano</button>
+              <button class="pi-btn ${instrument === "guitar" ? "active" : ""}" data-inst="guitar" aria-pressed="${instrument === "guitar"}"><span class="pi-icon">🎸</span> Guitar</button>
+            </div>
             <div class="practice-drills">
-              ${PRACTICE_DRILLS.map(d => `
+              ${drills.map(d => `
                 <button class="practice-drill" data-id="${d.id}">
                   <span class="pd-name">${escapeHtml(d.name)}</span>
                   <span class="pd-arrow">→</span>
@@ -6065,10 +6233,13 @@ function openPracticeMode() {
         </div>
       `;
       overlay.querySelector(".practice-close").addEventListener("click", close);
+      overlay.querySelectorAll(".pi-btn[data-inst]").forEach(b =>
+        b.addEventListener("click", () => setInstrument(b.dataset.inst)));
       overlay.querySelectorAll(".practice-drill").forEach(b =>
         b.addEventListener("click", () => pick(b.dataset.id)));
     } else {
       const step = steps[cursor];
+      const isGuitar = step.instrument === "guitar";
       overlay.innerHTML = `
         <div class="practice-shell">
           <div class="practice-head">
@@ -6080,7 +6251,7 @@ function openPracticeMode() {
           <div class="practice-body practice-step">
             <div class="practice-prompt-big">${escapeHtml(step.label)}</div>
             ${step.detail ? `<div class="practice-detail">${escapeHtml(step.detail)}</div>` : ""}
-            <div class="practice-piano">${svgPianoFromPcs(step.notes, step.rootPc, undefined, "lg")}</div>
+            <div class="${isGuitar ? "practice-guitar" : "practice-piano"}">${renderStepDiagram(step)}</div>
             <div class="practice-nav">
               <button class="practice-prev" ${cursor === 0 ? "disabled" : ""}>◀ Prev</button>
               <button class="practice-next" ${cursor === steps.length - 1 ? "disabled" : ""}>${cursor === steps.length - 1 ? "Done" : "Next ▶"}</button>
