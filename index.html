@@ -1716,12 +1716,11 @@
   }
 
   .lp-footer {
-    display: flex; justify-content: space-between; padding: 24px 0;
+    display: flex; justify-content: center; padding: 24px 0;
     color: var(--muted);
     font-size: 12px;
     border-top: 1px solid var(--line);
   }
-  .lp-footer a { color: var(--muted); text-decoration: underline; }
 
   /* Auth area in header */
   header .auth-area {
@@ -1921,7 +1920,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.10.2";
+const APP_VERSION = "4.10.3";
 
 //=============================================================
 // STORAGE
@@ -4253,7 +4252,7 @@ function renderLandingPage() {
           <button class="lp-btn ghost" id="lp-browse">Or browse the demo songs →</button>
         </div>
         <div class="lp-trust">
-          <span>Local-first</span><span>·</span><span>No tracking</span><span>·</span><span>Open source</span><span>·</span><span>Works offline</span>
+          <span>Local-first</span><span>·</span><span>Cloud sync</span><span>·</span><span>No tracking</span><span>·</span><span>Works offline</span>
         </div>
       </section>
 
@@ -4308,13 +4307,12 @@ function renderLandingPage() {
 
       <section class="lp-cta-bottom">
         <h2>Ready to start?</h2>
-        <p>Free Chordpad account. Your songbook syncs across every device you sign in on.</p>
+        <p>Your songbook syncs across every device.</p>
         <button class="lp-btn primary lp-btn-large" id="lp-signup-2">Create your free account</button>
       </section>
 
       <footer class="lp-footer">
         <span>Chordpad · a personal practice tool</span>
-        <span><a href="https://github.com/markpytlik/chord-archive" target="_blank" rel="noopener">Source on GitHub</a></span>
       </footer>
     </div>
   `;
