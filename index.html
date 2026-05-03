@@ -1779,36 +1779,78 @@
     margin: 0;
   }
 
-  .lp-demo {
+  /* === Personalize-any-chord section ===
+     Shows the same chord twice per instrument: standard built-in shape on
+     the left, "your saved voicing" on the right, with a quiet pulse on the
+     custom tile to draw attention. Visually communicates the editor's
+     value proposition without requiring the visitor to interact. */
+  .lp-personalize {
     text-align: center;
     margin-bottom: 8vh;
   }
-  .lp-demo-label {
+  .lp-pz-label {
     color: var(--muted);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: .12em;
     font-weight: 600;
-    margin-bottom: 18px;
+    margin-bottom: 22px;
   }
-  .lp-demo-row {
-    display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
+  .lp-pz-rows {
+    display: flex; flex-direction: column; gap: 28px; align-items: center;
   }
-  .lp-chord-tile {
+  .lp-pz-row {
+    width: 100%; max-width: 720px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .lp-pz-instrument {
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--ink);
+    letter-spacing: -.005em;
+  }
+  .lp-pz-pair {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    justify-content: center;
+  }
+  .lp-pz-tile {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 18px 22px 14px;
+    padding: 14px 18px 10px;
     box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    min-width: 180px;
+    transition: border-color .2s ease;
   }
-  .lp-chord-tile .lp-chord-name {
-    font-family: var(--serif);
-    font-size: 22px;
-    margin-bottom: 10px;
-    color: var(--ink);
+  .lp-pz-tile-custom {
+    border-color: #ecccc0;
+    /* Soft, slow pulse — draws the eye to the "after" without being noisy. */
+    animation: lpPzPulse 3.6s ease-in-out infinite;
   }
-  .lp-chord-tile .lp-chord-svg svg {
-    max-width: 220px !important; height: auto !important; width: auto !important;
+  @keyframes lpPzPulse {
+    0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 0 0 0 rgba(177, 74, 44, 0); }
+    50%      { box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 0 0 6px rgba(177, 74, 44, .18); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lp-pz-tile-custom { animation: none; }
+  }
+  .lp-pz-tag {
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .lp-pz-tile-custom .lp-pz-tag { color: var(--accent); }
+  .lp-pz-svg svg {
+    max-width: 200px !important; height: auto !important; width: auto !important;
+  }
+  .lp-pz-arrow {
+    font-size: 28px;
+    color: var(--muted);
+    line-height: 1;
+    user-select: none;
   }
 
   .lp-cta-bottom {
@@ -2045,7 +2087,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.15.2";
+const APP_VERSION = "4.16.0";
 
 //=============================================================
 // STORAGE
@@ -4593,19 +4635,24 @@ function renderLandingPage() {
   // Real rendered diagrams used as feature visuals — same code paths as the app.
   const visBarre  = svgGuitar("F#m7", null, "md"); // a derived movable shape
 
-  // Side-row of additional chord tiles to anchor "what diagrams look like".
-  const demoChords = [
-    { name: "Am7",    g: svgGuitar("Am7",   null, "md") },
-    { name: "Dmaj7",  g: svgGuitar("Dmaj7", null, "md") },
-    { name: "G/B",    g: svgGuitar("G/B",   null, "md") },
-    { name: "Em9",    g: svgGuitar("Em9",   null, "md") },
-  ];
-  const demoTiles = demoChords.map(c => `
-    <div class="lp-chord-tile">
-      <div class="lp-chord-name">${escapeHtml(c.name)}</div>
-      <div class="lp-chord-svg">${c.g}</div>
-    </div>
-  `).join("");
+  // "Personalize any chord" demo — renders the same chord (Cmaj7) twice per
+  // instrument: the standard built-in shape, then a saved custom voicing.
+  // Visually shows what the editor lets you do.
+  const personalize = {
+    chord: "Cmaj7",
+    guitar: {
+      // Standard: open Cmaj7
+      standard: svgGuitar("Cmaj7", { frets: [-1, 3, 2, 0, 0, 0] }, "md"),
+      // Custom: a movable jazz Cmaj7 voicing (no open strings, fuller)
+      custom:   svgGuitar("Cmaj7", { frets: [-1, 3, 5, 4, 5, 3] }, "md"),
+    },
+    piano: {
+      // Standard: pcs auto-stack ascending from C → C E G B
+      standard: svgPianoFromPcs([0, 4, 7, 11], 0, undefined, "md"),
+      // Custom: rootless extended → E G B D in upper octave (positions 11/14/18/21)
+      custom:   svgPianoFromPcs([11, 14, 18, 21], 0, undefined, "md"),
+    },
+  };
 
   // Songbook preview — runs the real renderLyrics + attachHoverPopover so the
   // chord-line-above-lyric layout matches the actual app exactly and hovering
@@ -4675,9 +4722,38 @@ function renderLandingPage() {
         </div>
       </section>
 
-      <section class="lp-demo">
-        <div class="lp-demo-label">Some chords Chordpad draws automatically</div>
-        <div class="lp-demo-row">${demoTiles}</div>
+      <section class="lp-personalize">
+        <div class="lp-pz-label">Edit any chord into your preferred voicing</div>
+        <div class="lp-pz-rows">
+          <div class="lp-pz-row">
+            <div class="lp-pz-instrument">Guitar · ${escapeHtml(personalize.chord)}</div>
+            <div class="lp-pz-pair">
+              <div class="lp-pz-tile">
+                <div class="lp-pz-tag">Standard</div>
+                <div class="lp-pz-svg">${personalize.guitar.standard}</div>
+              </div>
+              <div class="lp-pz-arrow" aria-hidden="true">→</div>
+              <div class="lp-pz-tile lp-pz-tile-custom">
+                <div class="lp-pz-tag">Your voicing</div>
+                <div class="lp-pz-svg">${personalize.guitar.custom}</div>
+              </div>
+            </div>
+          </div>
+          <div class="lp-pz-row">
+            <div class="lp-pz-instrument">Piano · ${escapeHtml(personalize.chord)}</div>
+            <div class="lp-pz-pair">
+              <div class="lp-pz-tile">
+                <div class="lp-pz-tag">Standard</div>
+                <div class="lp-pz-svg">${personalize.piano.standard}</div>
+              </div>
+              <div class="lp-pz-arrow" aria-hidden="true">→</div>
+              <div class="lp-pz-tile lp-pz-tile-custom">
+                <div class="lp-pz-tag">Your voicing</div>
+                <div class="lp-pz-svg">${personalize.piano.custom}</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="lp-cta-bottom">
