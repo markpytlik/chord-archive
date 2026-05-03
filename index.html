@@ -1958,7 +1958,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.18.0";
+const APP_VERSION = "4.18.1";
 
 //=============================================================
 // STORAGE
@@ -1980,6 +1980,13 @@ function saveState(s) {
   if (auth.user && auth.client) {
     cloudSyncOut(s.songs);
   }
+}
+// Mirror state to localStorage WITHOUT pushing to the cloud. Used in error
+// recovery paths (e.g. cloud SELECT failed during sign-in) where pushing the
+// in-memory state up could clobber real cloud data with an empty/seed snapshot.
+function saveLocalOnly(s) {
+  s.version = SCHEMA_VERSION;
+  localStorage.setItem(STORE_KEY, JSON.stringify(s));
 }
 
 //=============================================================
@@ -2145,11 +2152,28 @@ async function onSignIn() {
         continue;
       }
       setSyncStatus("error", e?.message || "Couldn't load your library — click to reconnect.");
+      // Cloud unreachable. Don't leave the guest seed library in state.songs —
+      // it's misleading (looks like the user's data is gone) and any subsequent
+      // edit would push seed-* rows up via cloudSyncOut. Clear to empty so the
+      // error state is unambiguous; the actual cloud data is untouched and will
+      // reload on the next successful sign-in / Reconnect.
+      state.songs = [];
+      auth.knownIds = new Set();
+      saveLocalOnly({ songs: state.songs });
+      renderList(); renderDetail();
       return;
     }
   }
   const { data, error } = res;
-  if (error) { console.warn("Cloud fetch failed:", error); setSyncStatus("error", error.message || "Couldn't load your library"); return; }
+  if (error) {
+    console.warn("Cloud fetch failed:", error);
+    setSyncStatus("error", error.message || "Couldn't load your library");
+    state.songs = [];
+    auth.knownIds = new Set();
+    saveLocalOnly({ songs: state.songs });
+    renderList(); renderDetail();
+    return;
+  }
   if (data && data.length) {
     state.songs = data.map(r => r.data);
     auth.knownIds = new Set(state.songs.map(s => s.id));
@@ -2260,9 +2284,12 @@ async function cloudSyncOut(songs) {
   cloudSyncTimer = setTimeout(async () => {
     // Defensive: only push songs with a valid id. Songs without ids will fail
     // upsert with a cryptic message — drop them and log so we know.
-    const validSongs = songs.filter(s => s && s.id);
+    // Also exclude seed-* IDs — these are the public guest library; they get
+    // loaded into state.songs while signed-out, and shouldn't ever travel up
+    // to the cloud as if they were the user's saved data.
+    const validSongs = songs.filter(s => s && s.id && !String(s.id).startsWith("seed-"));
     if (validSongs.length !== songs.length) {
-      console.warn("[cloudSyncOut] skipping", songs.length - validSongs.length, "songs without an id");
+      console.warn("[cloudSyncOut] skipping", songs.length - validSongs.length, "songs (no id or seed-*)");
     }
     const rows = validSongs.map(song => ({
       id: song.id,
@@ -4711,7 +4738,20 @@ function renderDetail() {
   // band-aids for layered multi-tab issues that extension 1.5.1 sidesteps.
   // Editor (incl. extension/bookmarklet imports) only opens after auth has resolved
   // so the auth chip and cloud sync are wired up before the user starts typing.
-  if (state.editing) { renderEditor(el); return; }
+  if (state.editing) {
+    // Don't blow away the user's in-progress edits if we're already showing the
+    // editor for the same target — auth/sync events call renderDetail repeatedly
+    // while the user is typing, and renderEditor() would otherwise reset the
+    // textarea to state.editing.lyrics on every call (the bookmarklet-import
+    // "edits revert after ~20s" bug).
+    const editingKey = state.editing === "new" ? "__new__" : (state.editing.id || "__draft__");
+    if (el.dataset.editingFor !== editingKey || !document.getElementById("f-lyrics")) {
+      renderEditor(el);
+      el.dataset.editingFor = editingKey;
+    }
+    return;
+  }
+  if (el.dataset.editingFor) delete el.dataset.editingFor;
   const song = state.songs.find(s => s.id === state.selectedId);
   // Landing page: no signed-in user, no song picked, hasn't dismissed → marketing view.
   const landingDismissed = localStorage.getItem("chordpad_landing_dismissed") === "1";
