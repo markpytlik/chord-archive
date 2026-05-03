@@ -261,6 +261,13 @@
   }
   header input.search:focus { background: var(--panel); border-color: var(--accent); }
   header .header-btn { white-space: nowrap; }
+  /* Header settings gear — sits to the right of the user chip; sized up so it
+     reads as an icon instead of a tiny glyph among the other text-sized buttons. */
+  header .settings-gear {
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 10px;
+  }
   header .header-menu { position: relative; display: inline-block; }
   header .header-menu-pop {
     position: absolute; right: 0; top: calc(100% + 4px);
@@ -1958,7 +1965,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.19.0";
+const APP_VERSION = "4.19.1";
 
 //=============================================================
 // STORAGE
@@ -2518,10 +2525,10 @@ function renderAuthArea() {
   if (auth.user) {
     area.innerHTML = `
       <span id="sync-indicator" class="sync-indicator"></span>
-      <button id="btn-settings" class="ghost header-btn" title="Settings" aria-label="Settings">⚙</button>
       <button class="user-chip" id="user-chip" title="${escapeHtml(auth.user.email)} — click to sign out options">
         <span class="user-dot"></span>${escapeHtml(auth.user.email)}
       </button>
+      <button id="btn-settings" class="ghost header-btn settings-gear" title="Settings" aria-label="Settings">⚙</button>
       <div class="user-menu">
         <button id="btn-signout">Sign out</button>
       </div>
