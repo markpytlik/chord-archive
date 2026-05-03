@@ -2039,7 +2039,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.14.1";
+const APP_VERSION = "4.14.2";
 
 //=============================================================
 // STORAGE
@@ -2109,8 +2109,14 @@ function initAuth() {
   // states whenever Supabase emitted a transient state change.
   auth.client.auth.onAuthStateChange(async (event, session) => {
     // Quiet events — just keep auth.user fresh, do nothing else.
+    // CRITICAL: only refresh auth.user if it was already truthy. After an
+    // optimistic sign-out (auth.user nulled before auth.client.auth.signOut()
+    // completes), an in-flight TOKEN_REFRESHED can land with a still-valid
+    // session and accidentally restore auth.user, "logging the user back in".
+    // The check below makes this branch a true no-op when we've already
+    // signed out locally.
     if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-      if (session) auth.user = { id: session.user.id, email: session.user.email };
+      if (session && auth.user) auth.user = { id: session.user.id, email: session.user.email };
       return;
     }
 
