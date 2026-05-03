@@ -37,24 +37,24 @@
 <meta name="Bytespider" content="noindex, nofollow" />
 <meta name="PerplexityBot" content="noindex, nofollow" />
 
-<title>Chordpad — your personal songbook for chords, lyrics, and voicings</title>
-<meta name="description" content="Chordpad is a free songbook app for guitar and piano. Add your own songs or paste a chord chart from anywhere, tailor voicings, practice with auto-scrolling lyrics and live chord-shape diagrams, and sync across every device." />
-<meta name="keywords" content="chord chart, songbook app, guitar chords, piano chords, chord diagrams, voicings, transpose, capo, ChordPro, lyrics, practice, auto-scroll" />
+<title>Chordpad (formerly ChordKeeper) — songbook for guitar tabs, chords, lyrics & voicings</title>
+<meta name="description" content="Chordpad (formerly ChordKeeper / Chord Archive) is a free songbook app for guitar and piano. Capture chord charts and guitar tabs from sites like Ultimate Guitar, E-Chords, and Chordie; tailor voicings; practice with auto-scrolling lyrics and live chord-shape diagrams; and sync across every device." />
+<meta name="keywords" content="chordpad, chordkeeper, chord keeper, chord archive, chord chart, songbook app, guitar tabs, guitar tab manager, ultimate guitar alternative, e-chords, chordie, songsterr, guitar chords, piano chords, chord diagrams, voicings, transpose, capo, ChordPro, lyrics, auto-scroll" />
 <meta name="author" content="Chordpad" />
 
 <!-- Open Graph (Facebook, LinkedIn, Slack, iMessage) -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://chordpad.app/" />
-<meta property="og:title" content="Chordpad — your personal songbook for chords, lyrics, and voicings" />
-<meta property="og:description" content="Free songbook app for guitar and piano. Paste a chord chart, tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
+<meta property="og:title" content="Chordpad (formerly ChordKeeper) — songbook for guitar tabs, chords, lyrics & voicings" />
+<meta property="og:description" content="Free songbook app for guitar and piano. Grab chord charts from guitar tab sites (Ultimate Guitar, E-Chords, Chordie), tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
 <meta property="og:site_name" content="Chordpad" />
 <meta property="og:image" content="https://chordpad.app/favicon.svg" />
 <meta property="og:locale" content="en_US" />
 
 <!-- Twitter / X card -->
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="Chordpad — your personal songbook for chords, lyrics, and voicings" />
-<meta name="twitter:description" content="Free songbook app for guitar and piano. Paste a chord chart, tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
+<meta name="twitter:title" content="Chordpad (formerly ChordKeeper) — songbook for guitar tabs, chords, lyrics & voicings" />
+<meta name="twitter:description" content="Free songbook app for guitar and piano. Grab chord charts from guitar tab sites (Ultimate Guitar, E-Chords, Chordie), tailor voicings, practice with auto-scrolling lyrics and live chord shapes, and sync across every device." />
 <meta name="twitter:image" content="https://chordpad.app/favicon.svg" />
 
 <!-- JSON-LD structured data: SoftwareApplication so Google's rich-results
@@ -64,10 +64,11 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Chordpad",
+  "alternateName": ["ChordKeeper", "Chord Keeper", "Chord Archive"],
   "applicationCategory": "MusicApplication",
   "operatingSystem": "Web",
   "url": "https://chordpad.app/",
-  "description": "Personal songbook app for chords, lyrics, and voicings. Add your own songs or paste a chord chart from the web, tailor voicings for guitar or piano, practice with auto-scrolling lyrics and live chord-shape diagrams, and sync across every device.",
+  "description": "Personal songbook app for chords, lyrics, and voicings. Capture chord charts and guitar tabs from sites like Ultimate Guitar, E-Chords, and Chordie; tailor voicings for guitar or piano; practice with auto-scrolling lyrics and live chord-shape diagrams; and sync across every device.",
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -262,11 +263,21 @@
   header input.search:focus { background: var(--panel); border-color: var(--accent); }
   header .header-btn { white-space: nowrap; }
   /* Header settings gear — sits to the right of the user chip; sized up so it
-     reads as an icon instead of a tiny glyph among the other text-sized buttons. */
+     reads as an icon instead of a tiny glyph among the other text-sized buttons.
+     Flex-centered internally so the ⚙ glyph (which has uneven vertical metrics)
+     sits in the geometric middle of the button, and the button height is pinned
+     to the chip height so the parent's align-items: center lands the two midlines
+     on the same y-coordinate. */
   header .settings-gear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-size: 22px;
     line-height: 1;
-    padding: 4px 10px;
+    padding: 0 8px;
+    height: 28px;
+    width: 36px;
+    box-sizing: border-box;
   }
   header .header-menu { position: relative; display: inline-block; }
   header .header-menu-pop {
@@ -1842,6 +1853,129 @@
   .auth-modal .actions { margin-top: 18px; }
   .auth-modal .actions .primary { width: 100%; padding: 11px; }
   .auth-modal .small-link { background: transparent; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
+
+  /* ====================== Mobile (≤ 768px) ======================
+     The desktop layout is a 340px sidebar + 1fr detail grid with 56px
+     section padding and 720px-wide modals — none of which fit on a phone.
+     This block stacks the sidebar above the detail, drops the side
+     padding, collapses the editor to one column, and makes modals
+     viewport-friendly. Touch targets bumped to ~40px+ where they were
+     borderline. */
+  @media (max-width: 768px) {
+    /* Header — wrap so the search field can take its own row instead of
+       fighting the brand and buttons for 375px of width. */
+    header {
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      gap: 8px 10px;
+    }
+    header .grow { display: none; }
+    header input.search {
+      order: 99;
+      flex: 1 1 100%;
+      max-width: 100%;
+      margin: 4px 0 0;
+    }
+    header .header-btn { padding: 8px 12px; }
+    header .auth-area { margin-left: auto; }
+
+    /* Main grid — stack the song list above the detail. Sidebar caps at
+       40vh and scrolls; detail takes the rest and gets its own scroll. */
+    main {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+      height: auto;
+      min-height: calc(100vh - 60px);
+    }
+    aside {
+      border-right: none;
+      border-bottom: 1px solid var(--line);
+      max-height: 40vh;
+      height: auto;
+      overflow-y: auto;
+    }
+    section.detail {
+      padding: 16px 14px 80px;
+      min-height: 60vh;
+    }
+    .detail-head {
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .detail-head h1 {
+      font-size: 24px;
+      line-height: 1.2;
+    }
+    .detail-actions {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .detail-actions button {
+      padding: 8px 12px;
+      font-size: 13px;
+      min-height: 38px;
+    }
+
+    /* Song list rows — bigger tap targets. */
+    .song-list li { min-height: 44px; padding: 10px 12px; }
+
+    /* Editor — collapse to a single column so Artist + Title each get
+       full width instead of fighting in 160px each. */
+    .editor-grid { grid-template-columns: 1fr; gap: 14px; }
+    .editor-grid .full { grid-column: 1; }
+    #f-lyrics { font-size: 14px; }
+
+    /* Lyrics view — drop the desktop-class side padding so chord pills
+       have actual horizontal room. */
+    .lyrics { padding: 0; font-size: 15px; }
+    .meta-row { flex-wrap: wrap; gap: 6px; }
+
+    /* Modals — fit the viewport, stack the action buttons. */
+    .modal-bg { padding: 12px; align-items: flex-start; padding-top: 24px; }
+    .modal {
+      max-width: 100%;
+      padding: 18px;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+    }
+    .modal .actions {
+      flex-direction: column-reverse;
+      gap: 8px;
+    }
+    .modal .actions button { width: 100%; min-height: 44px; }
+    /* Diag grid inside chord modal — single column so each instrument
+       diagram gets full width instead of being squeezed to ~160px. */
+    .diag-grid { grid-template-columns: 1fr !important; }
+
+    /* Chord popover — was min-width 420px, way wider than a phone. */
+    .chord-popover {
+      min-width: auto;
+      max-width: calc(100vw - 16px);
+    }
+
+    /* Play mode — controls wrap; speed/scrub sliders get full width and
+       a taller hit area for fingers. */
+    .play-mode .play-controls { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+    .play-mode .speed-controls { flex: 1 1 100%; }
+    .play-mode .speed-controls input[type=range],
+    .play-mode .play-scrub input[type=range] { height: 36px; }
+    .play-mode .play-content { padding: 16px 12px; }
+    .play-mode .play-shape-panel { padding: 12px 4% 22px; }
+    .play-mode .lyrics-large { font-size: 18px; }
+
+    /* Landing page — single-column features, less hero padding. */
+    .lp-hero { padding: 5vh 16px 4vh; }
+    .lp-features { grid-template-columns: 1fr; }
+  }
+
+  /* Tighter overrides for narrow phones. */
+  @media (max-width: 480px) {
+    header { padding: 8px 12px; }
+    header .brand { font-size: 18px; }
+    section.detail { padding: 12px 10px 80px; }
+    .modal { padding: 14px; }
+    h1 { font-size: 22px; }
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -1965,7 +2099,7 @@
 //=============================================================
 // App version — bumped on every meaningful push so Mark can verify deploys.
 // Displayed next to the brand in the header.
-const APP_VERSION = "4.19.1";
+const APP_VERSION = "4.20.0";
 
 //=============================================================
 // STORAGE
